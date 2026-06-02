@@ -8,6 +8,7 @@ import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './shared/exceptions/http-exception.filter';
 import { TransformInterceptor } from './shared/interceptors/transform.interceptor';
+import * as express from 'express';
 import { Request, Response, NextFunction } from 'express';
 
 async function bootstrap() {
@@ -49,7 +50,7 @@ async function bootstrap() {
   );
 
   // Swagger Setup (Protected by Custom Login to avoid Nginx 401 interception)
-  app.use(['/api/docs', '/api-json', '/api/docs-json'], (req: Request, res: Response, next: NextFunction) => {
+  app.use(['/api/docs', '/api-json', '/api/docs-json'], express.urlencoded({ extended: true }), (req: Request, res: Response, next: NextFunction) => {
     const authCookie = req.cookies['swagger-auth'];
     if (authCookie === 'valid') {
       return next();
@@ -71,7 +72,7 @@ async function bootstrap() {
       <html>
       <head><title>Swagger Login</title></head>
       <body style="display:flex;justify-content:center;align-items:center;height:100vh;background:#f0f2f5;font-family:sans-serif;margin:0;">
-        <form method="POST" action="/api/docs" style="background:#fff;padding:2rem;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.1);width:300px;">
+        <form method="POST" action="/api/docs/" style="background:#fff;padding:2rem;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.1);width:300px;">
           <h2 style="margin-top:0;text-align:center;color:#333;">CareFollow API</h2>
           <p style="color:red;font-size:13px;text-align:center;${user || pass ? 'display:block;' : 'display:none;'}">Sai tài khoản hoặc mật khẩu!</p>
           <div style="margin-bottom:1rem;">
