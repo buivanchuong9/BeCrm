@@ -136,6 +136,35 @@ export class BpmFormController {
     return this.bpmFormService.deleteFormMapping(id, actor);
   }
 
+  @Post('formMapping/clone')
+  @ApiOperation({ summary: 'Clone a form mapping' })
+  cloneFormMapping(@Body('id') id: string, @CurrentUser() actor: RequestUser) {
+    return this.bpmFormService.cloneFormMapping(id, actor);
+  }
+
+  // businessProcess/* aliases expected by FE
+  @Get('businessProcess/bpmForm/list')
+  @ApiOperation({ summary: 'List BPM forms (businessProcess alias)' })
+  listFormsBPAlias(@TenantId() tenantId: string, @Query() query: Record<string, string>) {
+    return this.bpmFormService.listForms(tenantId, {
+      keyword: query.keyword,
+      page: query.page ? Number(query.page) : undefined,
+      limit: query.limit ? Number(query.limit) : undefined,
+    });
+  }
+
+  @Post('businessProcess/formMapping/clone')
+  @ApiOperation({ summary: 'Clone form mapping (businessProcess alias)' })
+  cloneFormMappingBPAlias(@Body('id') id: string, @CurrentUser() actor: RequestUser) {
+    return this.bpmFormService.cloneFormMapping(id, actor);
+  }
+
+  @Post('businessProcess/variableDeclare/update')
+  @ApiOperation({ summary: 'Declare variable (businessProcess alias)' })
+  upsertVariableBPAlias(@Body() body: Record<string, unknown>, @CurrentUser() actor: RequestUser) {
+    return { id: 'stub', ...body };
+  }
+
   // ── BpmFormProcess ────────────────────────────────────────────────────────
 
   @Get('bpmFormProcess/list')

@@ -159,18 +159,25 @@ export class MiscController {
   @Delete('rolePermission/delete') deleteRolePerm(@Query('id') id: string) { return { message: 'Deleted' }; }
 
   // ── Fanpage / Chat ────────────────────────────────────────────────────────
+  @Get('fanpage/connect') getFanpageConnect(@TenantId() t: string) { return { url: '', configured: false }; }
   @Get('fanpage/list') listFanpages(@TenantId() t: string, @Query() q: Record<string, string>) { return this.svc.list('fanpage', t, q); }
   @Post('fanpage/update') upsertFanpage(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.upsert('fanpage', b, a); }
   @Delete('fanpage/delete') deleteFanpage(@Query('id') id: string) { return { message: 'Deleted' }; }
+  @Delete('fanpage/remove') removeFanpage(@Query('id') id: string) { return { message: 'Removed' }; }
   @Get('fanpage/get') getFanpage(@Query('id') id: string) { return this.svc.getById('fanpage', id); }
   @Get('fanpageChat/list') listFanpageChats(@TenantId() t: string, @Query() q: Record<string, string>) { return this.svc.list('fanpageChat', t, q); }
   @Get('fanpageChat/get') getFanpageChat(@Query('id') id: string) { return this.svc.getById('fanpageChat', id); }
   @Post('fanpageChat/send') sendFanpageChat(@Body() b: Record<string, unknown>) { return { sent: true }; }
+  @Post('fanpageChat/reply') replyFanpageChat(@Body() b: Record<string, unknown>) { return { sent: true }; }
+  @Post('fanpageChat/send/attachment') sendFanpageChatAttachment(@Body() b: Record<string, unknown>) { return { sent: true }; }
   @Get('fanpageComment/list') listFanpageComments(@TenantId() t: string, @Query() q: Record<string, string>) { return this.svc.list('fanpageComment', t, q); }
   @Post('fanpageComment/update') upsertFanpageComment(@Body() b: Record<string, unknown>) { return b; }
+  @Post('fanpageComment/reply') replyFanpageComment(@Body() b: Record<string, unknown>) { return { sent: true }; }
   @Delete('fanpageComment/delete') deleteFanpageComment(@Query('id') id: string) { return { message: 'Deleted' }; }
+  @Delete('fanpageComment/hidden') hideFanpageComment(@Query('id') id: string) { return { message: 'Hidden' }; }
   @Get('fanpageComment/get') getFanpageComment(@Query('id') id: string) { return this.svc.getById('fanpageComment', id); }
   @Get('fanpagePost/list') listFanpagePosts(@TenantId() t: string, @Query() q: Record<string, string>) { return this.svc.list('fanpagePost', t, q); }
+  @Get('fanpagePost/get') getFanpagePost(@Query('id') id: string) { return this.svc.getById('fanpagePost', id); }
   @Post('fanpagePost/update') upsertFanpagePost(@Body() b: Record<string, unknown>) { return b; }
   @Get('fanpageDialog/list') listFanpageDialogs(@TenantId() t: string) { return []; }
 
@@ -308,11 +315,58 @@ export class MiscController {
   @Delete('surveyForm/delete') deleteSurveyForm(@Query('id') id: string) { return { message: 'Deleted' }; }
   @Get('surveyForm/get') getSurveyForm(@Query('id') id: string) { return this.svc.getById('surveyForm', id); }
 
-  // ── TemplateCategory ──────────────────────────────────────────────────────
+  // ── TemplateCategory / TemplateEmail / TemplateSms / TemplateZalo ────────
   @Get('templateCategory/list') listTplCat(@TenantId() t: string) { return []; }
   @Post('templateCategory/update') upsertTplCat(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.upsert('templateCategory', b, a); }
   @Delete('templateCategory/delete') deleteTplCat(@Query('id') id: string) { return { message: 'Deleted' }; }
   @Get('templateCategory/get') getTplCat(@Query('id') id: string) { return { id }; }
+  @Get('templateEmail/list') listTemplateEmail(@TenantId() t: string, @Query() q: Record<string, string>) { return this.svc.list('templateEmail', t, q); }
+  @Get('templateEmail/get') getTemplateEmail(@Query('id') id: string) { return this.svc.getById('templateEmail', id); }
+  @Post('templateEmail/update') upsertTemplateEmail(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.upsert('templateEmail', b, a); }
+  @Delete('templateEmail/delete') deleteTemplateEmail(@Query('id') id: string, @CurrentUser() a: RequestUser) { return this.svc.delete('templateEmail', id, a); }
+  @Get('templateSms/list') listTemplateSms(@TenantId() t: string, @Query() q: Record<string, string>) { return this.svc.list('templateSms', t, q); }
+  @Get('templateSms/get') getTemplateSms(@Query('id') id: string) { return this.svc.getById('templateSms', id); }
+  @Post('templateSms/update') upsertTemplateSms(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.upsert('templateSms', b, a); }
+  @Delete('templateSms/delete') deleteTemplateSms(@Query('id') id: string, @CurrentUser() a: RequestUser) { return this.svc.delete('templateSms', id, a); }
+  @Get('templateZalo/list') listTemplateZalo(@TenantId() t: string, @Query() q: Record<string, string>) { return this.svc.list('templateZalo', t, q); }
+  @Get('templateZalo/get') getTemplateZalo(@Query('id') id: string) { return this.svc.getById('templateZalo', id); }
+  @Post('templateZalo/update') upsertTemplateZalo(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.upsert('templateZalo', b, a); }
+  @Delete('templateZalo/delete') deleteTemplateZalo(@Query('id') id: string, @CurrentUser() a: RequestUser) { return this.svc.delete('templateZalo', id, a); }
+  @Get('brandname/list') listBrandnames(@TenantId() t: string, @Query() q: Record<string, string>) { return this.svc.list('brandname', t, q); }
+  @Post('brandname/update') upsertBrandname(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.upsert('brandname', b, a); }
+  @Delete('brandname/delete') deleteBrandname(@Query('id') id: string, @CurrentUser() a: RequestUser) { return this.svc.delete('brandname', id, a); }
+  @Get('whitelist/brandname/contact/list') listBrandnameWhitelist(@TenantId() t: string) { return []; }
+  @Post('whitelist/brandname/contact/update') upsertBrandnameWhitelist(@Body() b: Record<string, unknown>) { return b; }
+  @Delete('whitelist/brandname/contact/delete') deleteBrandnameWhitelist(@Query('id') id: string) { return { message: 'Deleted' }; }
+  @Post('whitelist/brandname/update') changeBrandnameStatus(@Body() b: Record<string, unknown>) { return b; }
+  @Get('earnings/admin/list') listAdminEarnings(@TenantId() t: string, @Query() q: Record<string, string>) { return this.svc.list('earnings', t, q); }
+  @Get('emailConfig/list') listEmailConfig(@TenantId() t: string) { return []; }
+  @Post('emailConfig/update') upsertEmailConfig(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return b; }
+  @Delete('emailConfig/delete') deleteEmailConfig(@Query('id') id: string) { return { message: 'Deleted' }; }
+  @Post('email/testConnection') testEmailConnection(@Body() b: Record<string, unknown>) { return { success: true }; }
+  @Get('webhook/list') listWebhooks(@TenantId() t: string, @Query() q: Record<string, string>) { return this.svc.list('webhook', t, q); }
+  @Post('webhook/update') upsertWebhook(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.upsert('webhook', b, a); }
+  @Get('webhook/get') getWebhook(@Query('id') id: string) { return this.svc.getById('webhook', id); }
+  @Delete('webhook/delete') deleteWebhook(@Query('id') id: string, @CurrentUser() a: RequestUser) { return this.svc.delete('webhook', id, a); }
+  @Get('callConfig/list') listCallConfig(@TenantId() t: string) { return []; }
+  @Post('callConfig/update') upsertCallConfig(@Body() b: Record<string, unknown>) { return b; }
+  @Get('callConfig/get') getCallConfig(@Query('id') id: string) { return { id }; }
+  @Delete('callConfig/delete') deleteCallConfig(@Query('id') id: string) { return { message: 'Deleted' }; }
+  @Post('callConfig/update/status') updateCallConfigStatus(@Body() b: Record<string, unknown>) { return b; }
+  @Get('callCenter/makeCall') makeCall(@Query() q: Record<string, string>) { return { status: 'calling', ...q }; }
+  @Get('callCenter/transferCall') transferCall(@Query() q: Record<string, string>) { return { status: 'transferred', ...q }; }
+  @Get('callCenter/hangupCall') hangupCall(@Query() q: Record<string, string>) { return { status: 'hung_up', ...q }; }
+  @Get('callCenter/makeCallOTP') makeCallOTP(@Query() q: Record<string, string>) { return { status: 'calling_otp', ...q }; }
+  @Get('callCenter/getHistory') getCallHistory(@TenantId() t: string, @Query() q: Record<string, string>) { return { data: [], total: 0 }; }
+  @Get('callCenter/getHistoryByCallId') getCallHistoryById(@Query('callId') callId: string) { return { callId, history: [] }; }
+  @Get('customerCall/list') listCustomerCallHistory(@TenantId() t: string, @Query() q: Record<string, string>) { return { data: [], total: 0 }; }
+  @Get('diarySurgery/listAll') listAllDiarySurgeries(@TenantId() t: string, @Query() q: Record<string, string>) { return this.svc.list('diarySurgery', t, q); }
+  @Post('warrantySupportObject/receive') warrantySOReceive(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return { received: true }; }
+  @Post('warrantySupportObject/processDone') warrantySODone(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return { done: true }; }
+  @Post('warranty/send/jssdk') warrantyCollect(@Body() b: Record<string, unknown>) { return { collected: true }; }
+  @Post('promotion/init-receive-task') promotionInitReceive(@Body() b: Record<string, unknown>) { return { initiated: true }; }
+  @Get('promotion/list-active') listActivePromotions(@TenantId() t: string) { return []; }
+  @Get('employeeAgent/employeeId') getEmployeeCallAccount(@TenantId() t: string, @Query() q: Record<string, string>) { return { configured: false }; }
 
   // ── EmployeeAgent ─────────────────────────────────────────────────────────
   @Get('employeeAgent/list') listEmpAgents(@TenantId() t: string, @Query() q: Record<string, string>) { return this.svc.list('employeeAgent', t, q); }

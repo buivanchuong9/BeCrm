@@ -2080,9 +2080,20 @@ model BpmWorkOrder {
   status      String    @default("pending") @db.VarChar(30)
   priority    Int       @default(0)
   dueDate     DateTime? @map("due_date") @db.Timestamptz
-  completedAt DateTime? @map("completed_at") @db.Timestamptz
-  note        String?
-  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  completedAt   DateTime? @map("completed_at") @db.Timestamptz
+  pausedAt      DateTime? @map("paused_at") @db.Timestamptz
+  startTime     DateTime? @map("start_time") @db.Timestamptz
+  percentDone   Int       @default(0) @map("percent_done")
+  workLoad      Float?    @map("work_load")
+  workLoadUnit  String?   @map("work_load_unit") @db.VarChar(20)
+  managerId     String?   @map("manager_id") @db.Uuid
+  participants  Json?
+  customers     Json?
+  contentDelta  Json?     @map("content_delta")
+  ratingMark    Int?      @map("rating_mark")
+  ratingContent String?   @map("rating_content")
+  note          String?
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
   createdBy   String    @map("created_by") @db.Uuid
   updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
   updatedBy   String    @map("updated_by") @db.Uuid

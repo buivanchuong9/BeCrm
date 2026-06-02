@@ -159,6 +159,7 @@ export class BpmNodeController {
   @Post('timerTask/clone') cloneTimerTask(@Body('id') id: string, @CurrentUser() a: RequestUser) { return this.svc.cloneNode('timerTask', id, a); }
 
   @Get('userTask/get') getUserTask(@Query('id') id: string) { return this.svc.getNode('userTask', id); }
+  @Get('userTask/detail') getUserTaskDetail(@Query('nodeId') nodeId: string, @Query('id') id: string) { return this.svc.getNode('userTask', nodeId ?? id); }
   @Post('userTask/update') upsertUserTask(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.upsertNode('userTask', b, a); }
   @Post('userTask/clone') cloneUserTask(@Body('id') id: string, @CurrentUser() a: RequestUser) { return this.svc.cloneNode('userTask', id, a); }
 

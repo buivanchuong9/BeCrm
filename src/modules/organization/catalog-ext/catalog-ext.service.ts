@@ -366,6 +366,13 @@ export class CatalogExtService {
     return { message: 'Deleted' };
   }
 
+  async getCustomerFilterAttributes(tenantId: string) {
+    return this.prisma.customerAttribute.findMany({
+      where: { tenantId, deletedAt: null },
+      orderBy: { position: 'asc' },
+    });
+  }
+
   // ── Attachment ─────────────────────────────────────────────────────────────
 
   async listAttachments(tenantId: string, refType: string, refId: string) {

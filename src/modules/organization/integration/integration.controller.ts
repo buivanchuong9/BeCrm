@@ -12,6 +12,9 @@ export class IntegrationController {
   constructor(private svc: IntegrationService) {}
 
   // ── ZaloOA ────────────────────────────────────────────────────────────────
+  @Get('zaloOa/connect') @ApiOperation({ summary: 'Get Zalo OA OAuth connect URL' })
+  connectZaloOA(@TenantId() t: string) { return { url: '', configured: false }; }
+
   @Get('zaloOa/list') @ApiOperation({ summary: 'List Zalo OA connections' })
   listZaloOA(@TenantId() t: string) { return this.svc.listZaloOA(t); }
 
@@ -31,11 +34,32 @@ export class IntegrationController {
   @Post('zaloChat/send') @ApiOperation({ summary: 'Send Zalo message' })
   sendZalo(@Body() b: Record<string, unknown>) { return this.svc.sendZaloMessage(b); }
 
+  @Post('zaloChat/send/link_image') @ApiOperation({ summary: 'Send Zalo link image' })
+  sendZaloLinkImage(@Body() b: Record<string, unknown>) { return { sent: true }; }
+
+  @Post('zaloChat/send/file') @ApiOperation({ summary: 'Send Zalo file' })
+  sendZaloFile(@Body() b: Record<string, unknown>) { return { sent: true }; }
+
+  @Post('zaloChat/send/answer') @ApiOperation({ summary: 'Send Zalo answer' })
+  sendZaloAnswer(@Body() b: Record<string, unknown>) { return { sent: true }; }
+
+  @Delete('zaloChat/delete') @ApiOperation({ summary: 'Delete Zalo chat' })
+  deleteZaloChat(@Query('id') id: string) { return { message: 'Deleted' }; }
+
   @Get('zaloFollower/list') @ApiOperation({ summary: 'List Zalo followers' })
   listZaloFollowers(@TenantId() t: string, @Query() q: Record<string, string>) { return this.svc.listZaloFollowers(t, q); }
 
   @Get('znsTemplate/list') @ApiOperation({ summary: 'List ZNS templates' })
   listZNSTemplates(@TenantId() t: string) { return this.svc.listZNSTemplates(t); }
+
+  @Get('znsTemplate/list/sync') @ApiOperation({ summary: 'Sync ZNS templates' })
+  syncZNSTemplates(@TenantId() t: string) { return this.svc.listZNSTemplates(t); }
+
+  @Get('znsTemplate/get') @ApiOperation({ summary: 'Get ZNS template detail' })
+  getZNSTemplate(@Query('id') id: string) { return { id }; }
+
+  @Get('znsTemplate/refresh') @ApiOperation({ summary: 'Refresh ZNS template detail' })
+  refreshZNSTemplate(@Query('id') id: string) { return { id, refreshed: true }; }
 
   @Post('znsTemplate/update') @ApiOperation({ summary: 'Upsert ZNS template' })
   upsertZNSTemplate(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.upsertZNSTemplate(b, a); }
@@ -142,7 +166,15 @@ export class IntegrationController {
   @Post('reportTemplate/update') upsertReportTpl(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.upsertReport(b, a); }
   @Delete('reportTemplate/delete') deleteReportTpl(@Query('id') id: string, @CurrentUser() a: RequestUser) { return this.svc.deleteReport(id, a); }
   @Get('reportArtifact/list') listReportArtifact(@TenantId() t: string) { return []; }
+  @Post('reportArtifact/update') upsertReportArtifact(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.upsertReport(b, a); }
+  @Delete('reportArtifact/delete') deleteReportArtifact(@Query('id') id: string, @CurrentUser() a: RequestUser) { return this.svc.deleteReport(id, a); }
+  @Get('reportArtifact/list/byDashboard') listArtifactByDashboard(@Query('dashboardId') dashboardId: string) { return []; }
+  @Get('reportArtifact/list/byEmployee') listArtifactByEmployee(@TenantId() t: string, @CurrentUser() a: RequestUser) { return []; }
+  @Post('reportDashboard/update') upsertReportDashboard(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.upsertReport(b, a); }
+  @Delete('reportDashboard/delete') deleteReportDashboard(@Query('id') id: string, @CurrentUser() a: RequestUser) { return this.svc.deleteReport(id, a); }
   @Get('reportRole/list') listReportRole(@TenantId() t: string) { return []; }
+  @Post('reportRole/update') upsertReportRole(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.upsertReport(b, a); }
+  @Delete('reportRole/delete') deleteReportRole(@Query('id') id: string, @CurrentUser() a: RequestUser) { return this.svc.deleteReport(id, a); }
 
   // ── Mailbox ───────────────────────────────────────────────────────────────
   @Get('mailbox/list') listMailbox(@TenantId() t: string) { return []; }

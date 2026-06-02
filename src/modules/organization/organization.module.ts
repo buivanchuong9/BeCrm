@@ -11,9 +11,10 @@ import { BoughtModule } from './bought/bought.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { CatalogExtModule } from './catalog-ext/catalog-ext.module';
 import { IntegrationModule } from './integration/integration.module';
+import { MiscModule } from './misc/misc.module';
 
 @Module({
-  imports: [WorkModule, GroupModule, BoughtModule, CatalogModule, CatalogExtModule, IntegrationModule],
+  imports: [WorkModule, GroupModule, BoughtModule, CatalogModule, CatalogExtModule, IntegrationModule, MiscModule],
   controllers: [DepartmentController, EmployeeController, CustomerController],
   providers: [DepartmentService, EmployeeService, CustomerService],
   exports: [EmployeeService, CustomerService],

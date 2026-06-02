@@ -267,4 +267,22 @@ export class BpmFormService {
     });
     return { message: 'BpmFormProcess deleted' };
   }
+
+  async cloneFormMapping(id: string, actor: RequestUser) {
+    const src = await this.prisma.bpmFormMapping.findUnique({ where: { id } });
+    if (!src) throw new NotFoundException('BpmFormMapping', id);
+    return this.prisma.bpmFormMapping.create({
+      data: {
+        tenantId: src.tenantId,
+        bpmFormId: src.bpmFormId,
+        sourceField: src.sourceField,
+        targetField: src.targetField,
+        targetModel: src.targetModel ?? undefined,
+        mapType: src.mapType,
+        config: src.config ?? undefined,
+        createdBy: actor.id,
+        updatedBy: actor.id,
+      },
+    });
+  }
 }

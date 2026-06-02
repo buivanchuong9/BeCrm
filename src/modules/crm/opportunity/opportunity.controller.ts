@@ -162,6 +162,26 @@ export class OpportunityController {
     return this.opportunityService.upsertOpportunityContact(body, actor);
   }
 
+  // ── Standalone opportunity routes (FE CustomerService calls /opportunity/*) ─
+
+  @Get('opportunity/get')
+  @ApiOperation({ summary: 'Get opportunity detail (standalone)' })
+  getOpp(@Query('id') id: string, @TenantId() tenantId: string) {
+    return this.opportunityService.getById(id, tenantId);
+  }
+
+  @Post('opportunity/update')
+  @ApiOperation({ summary: 'Create or update opportunity (standalone)' })
+  upsertOpp(@Body() body: Record<string, unknown>, @CurrentUser() actor: RequestUser) {
+    return this.opportunityService.upsert(body, actor);
+  }
+
+  @Delete('opportunity/delete')
+  @ApiOperation({ summary: 'Delete opportunity (standalone)' })
+  deleteOpp(@Query('id') id: string, @CurrentUser() actor: RequestUser) {
+    return this.opportunityService.delete(id, actor);
+  }
+
   // ── Statistics ────────────────────────────────────────────────────────────
 
   @Get('campaignOpportunity/statisticApproach')

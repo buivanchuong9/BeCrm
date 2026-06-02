@@ -195,14 +195,25 @@ export class CatalogExtController {
   exportCashbook(@TenantId() t: string) { return { message: 'Export ready', url: `/exports/cashbook-${Date.now()}.xlsx` }; }
 
   // ── FilterSetting ─────────────────────────────────────────────────────────
+  @Get('filter-setting') @ApiOperation({ summary: 'Get active filter setting for entity' })
+  getFilterSetting(@TenantId() t: string, @CurrentUser() a: RequestUser, @Query('entityType') entityType?: string) { return this.svc.listFilterSettings(t, a.id, entityType); }
+
   @Get('filter-setting/list') @ApiOperation({ summary: 'List filter settings' })
   listFilterSettings(@TenantId() t: string, @CurrentUser() a: RequestUser, @Query('entityType') entityType?: string) { return this.svc.listFilterSettings(t, a.id, entityType); }
+
+  @Get('filter-setting/customers/attributes') @ApiOperation({ summary: 'Get customer attributes for filter' })
+  getCustomerFilterAttributes(@TenantId() t: string) { return this.svc.getCustomerFilterAttributes(t); }
 
   @Post('filter-setting/update') @ApiOperation({ summary: 'Upsert filter setting' })
   upsertFilterSetting(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.upsertFilterSetting(b, a); }
 
   @Delete('filter-setting/delete') @ApiOperation({ summary: 'Delete filter setting' })
   deleteFilterSetting(@Query('id') id: string) { return this.svc.deleteFilterSetting(id); }
+
+  @Get('customerExchange/attachment/list') @ApiOperation({ summary: 'List customer exchange attachments' })
+  listCustomerExchangeAttachments(@Query('customerId') customerId: string, @TenantId() t: string) {
+    return this.svc.listAttachments(t, 'customerExchange', customerId);
+  }
 
   // ── Attachment ────────────────────────────────────────────────────────────
   @Get('attachment/list') @ApiOperation({ summary: 'List attachments' })

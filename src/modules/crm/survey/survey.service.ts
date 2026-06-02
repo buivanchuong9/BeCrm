@@ -22,9 +22,34 @@ export class SurveyService {
     return this.prisma.cxmSurvey.create({ data: { tenantId: actor.tenantId, name: dto.name as string, code: dto.code as string | undefined, description: dto.description as string | undefined, createdBy: actor.id, updatedBy: actor.id } });
   }
 
+  async getSurvey(id: string) {
+    return this.prisma.cxmSurvey.findUnique({ where: { id }, include: { questions: { where: { deletedAt: null }, include: { options: { where: { deletedAt: null } } } } } });
+  }
+
+  async surveySummary(tenantId: string) {
+    const total = await this.prisma.cxmSurvey.count({ where: { tenantId, deletedAt: null } });
+    return { total };
+  }
+
   async deleteSurvey(id: string, actor: RequestUser) {
     await this.prisma.cxmSurvey.update({ where: { id }, data: { deletedAt: new Date(), deletedBy: actor.id } });
     return { message: 'Deleted' };
+  }
+
+  async listQuestions(surveyId: string) {
+    return this.prisma.cxmQuestion.findMany({ where: { surveyId, deletedAt: null }, orderBy: { position: 'asc' }, include: { options: { where: { deletedAt: null } } } });
+  }
+
+  async getQuestion(id: string) {
+    return this.prisma.cxmQuestion.findUnique({ where: { id }, include: { options: { where: { deletedAt: null } } } });
+  }
+
+  async listOptions(questionId: string) {
+    return this.prisma.cxmOption.findMany({ where: { questionId, deletedAt: null }, orderBy: { position: 'asc' } });
+  }
+
+  async getOption(id: string) {
+    return this.prisma.cxmOption.findUnique({ where: { id } });
   }
 
   async upsertQuestion(dto: Dto, actor: RequestUser) {
