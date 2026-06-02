@@ -60,7 +60,7 @@ async function bootstrap() {
 
     if (user === 'buivanchuong' && pass === '123456@') {
       res.cookie('swagger-auth', 'valid', { maxAge: 86400000, path: '/' });
-      return res.redirect('/api/docs');
+      return res.redirect('/api/docs?t=' + Date.now());
     }
 
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
@@ -71,7 +71,7 @@ async function bootstrap() {
       <html>
       <head><title>Swagger Login</title></head>
       <body style="display:flex;justify-content:center;align-items:center;height:100vh;background:#f0f2f5;font-family:sans-serif;margin:0;">
-        <form method="GET" action="/api/docs" style="background:#fff;padding:2rem;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.1);width:300px;">
+        <form method="POST" action="/api/docs" style="background:#fff;padding:2rem;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.1);width:300px;">
           <h2 style="margin-top:0;text-align:center;color:#333;">CareFollow API</h2>
           <p style="color:red;font-size:13px;text-align:center;${user || pass ? 'display:block;' : 'display:none;'}">Sai tài khoản hoặc mật khẩu!</p>
           <div style="margin-bottom:1rem;">
