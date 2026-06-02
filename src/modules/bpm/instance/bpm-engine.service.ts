@@ -86,20 +86,44 @@ export class BpmEngineService {
 
   /**
    * Claim a UserTask token — assign it to the actor.
+   * Uses an atomic raw SQL UPDATE to prevent TOCTOU race conditions
+   * where two concurrent users both see status='active' and both claim.
    */
   async claimTask(tokenId: string, actor: RequestUser) {
-    const token = await this.prisma.bpmTaskToken.findUnique({ where: { id: tokenId } });
-    if (!token || token.tenantId !== actor.tenantId) throw new NotFoundException('BpmTaskToken', tokenId);
-    if (token.status !== 'active') throw new Error('Token is not in active state');
-
-    return this.prisma.bpmTaskToken.update({
+    // First verify tenant ownership
+    const existing = await this.prisma.bpmTaskToken.findUnique({
       where: { id: tokenId },
-      data: {
-        iamAssigneeId: actor.id,
-        claimedAt: new Date(),
-        updatedBy: actor.id,
-      },
+      select: { tenantId: true, status: true, iamAssigneeId: true },
     });
+    if (!existing || existing.tenantId !== actor.tenantId) {
+      throw new NotFoundException('BpmTaskToken', tokenId);
+    }
+    if (existing.status !== 'active') {
+      throw new Error(`Token is not claimable (status: ${existing.status})`);
+    }
+
+    // Atomic claim: only succeeds if iam_assignee_id IS NULL (not yet claimed)
+    const result = await this.prisma.$executeRaw`
+      UPDATE bpm.bpm_task_tokens
+      SET iam_assignee_id = ${actor.id}::uuid,
+          claimed_at      = NOW(),
+          updated_by      = ${actor.id}::uuid,
+          updated_at      = NOW()
+      WHERE id               = ${tokenId}::uuid
+        AND status           = 'active'
+        AND iam_assignee_id  IS NULL
+        AND tenant_id        = ${actor.tenantId}::uuid
+    `;
+
+    if (result === 0) {
+      // Someone else claimed it between the read and the write
+      const current = await this.prisma.bpmTaskToken.findUnique({ where: { id: tokenId } });
+      throw new Error(
+        `Task already claimed by user ${current?.iamAssigneeId ?? 'unknown'}. Refresh and try again.`,
+      );
+    }
+
+    return this.prisma.bpmTaskToken.findUnique({ where: { id: tokenId } });
   }
 
   /**
@@ -118,7 +142,7 @@ export class BpmEngineService {
     });
     if (!template) throw new NotFoundException('BpmProcessTemplate', token.instance.templateId);
 
-    // Merge variables
+    // Merge variables from instance context + new form submission
     const mergedVars = { ...(token.instance.variables as object ?? {}), ...(variables ?? {}) };
 
     await this.prisma.bpmTaskToken.update({
@@ -127,11 +151,12 @@ export class BpmEngineService {
         status: 'completed',
         completedAt: new Date(),
         variables,
+        formData: variables,   // Persist E-Form submission data on the token
         updatedBy: actor?.id ?? token.iamAssigneeId ?? token.createdBy,
       },
     });
 
-    // Update instance variables
+    // Update instance variables (merge context forward)
     await this.prisma.bpmProcessInstance.update({
       where: { id: token.instanceId },
       data: { variables: mergedVars, updatedBy: actor?.id ?? token.createdBy },
@@ -159,6 +184,65 @@ export class BpmEngineService {
 
     await this.advanceFromNode(token.instanceId, token.node, template, dummyActor, mergedVars);
     return { message: 'Task completed', tokenId };
+  }
+
+  /**
+   * Delegate/Forward a task to another user.
+   * Creates a new token for the target user, marks the current token as delegated.
+   */
+  async delegateTask(
+    tokenId: string,
+    targetUserId: string,
+    reason: string,
+    actor: RequestUser,
+  ) {
+    const token = await this.prisma.bpmTaskToken.findUnique({
+      where: { id: tokenId },
+      include: { node: true, instance: true },
+    });
+    if (!token || token.tenantId !== actor.tenantId) throw new NotFoundException('BpmTaskToken', tokenId);
+    if (token.status !== 'active') throw new Error('Only active tasks can be delegated');
+
+    await this.prisma.$transaction(async (tx) => {
+      // Cancel the original token
+      await tx.bpmTaskToken.update({
+        where: { id: tokenId },
+        data: { status: 'delegated', updatedBy: actor.id },
+      });
+
+      // Create new token for the target user
+      await tx.bpmTaskToken.create({
+        data: {
+          tenantId: token.tenantId,
+          instanceId: token.instanceId,
+          nodeId: token.nodeId,
+          status: 'active',
+          iamAssigneeId: targetUserId,
+          claimedAt: new Date(), // Auto-claimed for delegated tasks
+          variables: token.variables as object ?? undefined,
+          slaDueDate: token.slaDueDate ?? undefined,
+          delegatedFrom: tokenId,
+          delegateReason: reason,
+          createdBy: actor.id,
+          updatedBy: actor.id,
+        },
+      });
+
+      await tx.bpmInstanceHistory.create({
+        data: {
+          tenantId: token.tenantId,
+          instanceId: token.instanceId,
+          eventType: 'task_delegate',
+          fromNode: token.node.nodeKey,
+          iamActorId: actor.id,
+          data: { targetUserId, reason },
+          createdBy: actor.id,
+        },
+      });
+    });
+
+    this.eventEmitter.emit('bpm.task.delegated', { tokenId, targetUserId, instanceId: token.instanceId });
+    return { message: 'Task delegated', originalTokenId: tokenId, targetUserId };
   }
 
   private async advanceFromNode(
@@ -259,11 +343,61 @@ export class BpmEngineService {
     this.logger.log(`Process instance ${instanceId} completed`);
   }
 
+  /**
+   * Expression evaluator for ExclusiveGateway and SequenceFlow conditions.
+   *
+   * Condition shape (stored as JSONB on BpmEdge.condition):
+   *   Single:  { field: 'approved', operator: 'eq', value: true }
+   *   Compound: { and: [...conditions] } | { or: [...conditions] }
+   */
   private evaluateCondition(condition: unknown, variables?: object): boolean {
     if (!condition) return true;
-    // TODO(UNKNOWN): implement a proper condition evaluator (JSONLogic or similar)
-    // For now, always returns true for the first edge
-    return true;
+    const vars = (variables ?? {}) as Record<string, unknown>;
+    const cond = condition as Record<string, unknown>;
+
+    // Compound conditions
+    if (Array.isArray(cond.and)) {
+      return (cond.and as unknown[]).every((c) => this.evaluateCondition(c, variables));
+    }
+    if (Array.isArray(cond.or)) {
+      return (cond.or as unknown[]).some((c) => this.evaluateCondition(c, variables));
+    }
+
+    // Simple condition: { field, operator, value }
+    const field = cond.field as string;
+    const operator = cond.operator as string;
+    const expected = cond.value;
+
+    if (!field || !operator) return true; // Malformed — default open
+
+    // Support nested field paths: 'form.approved' => vars['form']['approved']
+    const actual = field.split('.').reduce<unknown>((obj, key) => {
+      if (obj && typeof obj === 'object') return (obj as Record<string, unknown>)[key];
+      return undefined;
+    }, vars);
+
+    switch (operator) {
+      case 'eq':       return actual === expected;
+      case 'neq':      return actual !== expected;
+      case 'gt':       return Number(actual) > Number(expected);
+      case 'lt':       return Number(actual) < Number(expected);
+      case 'gte':      return Number(actual) >= Number(expected);
+      case 'lte':      return Number(actual) <= Number(expected);
+      case 'contains': return String(actual).includes(String(expected));
+      case 'startsWith': return String(actual).startsWith(String(expected));
+      case 'endsWith': return String(actual).endsWith(String(expected));
+      case 'in':       return Array.isArray(expected) && (expected as unknown[]).includes(actual);
+      case 'notIn':    return Array.isArray(expected) && !(expected as unknown[]).includes(actual);
+      case 'isNull':   return actual === null || actual === undefined;
+      case 'isNotNull': return actual !== null && actual !== undefined;
+      case 'between': {
+        const range = expected as [unknown, unknown];
+        return Number(actual) >= Number(range[0]) && Number(actual) <= Number(range[1]);
+      }
+      default:
+        this.logger.warn(`Unknown condition operator '${operator}' on field '${field}' — defaulting to true`);
+        return true;
+    }
   }
 
   async getInstanceHistory(instanceId: string, tenantId: string) {

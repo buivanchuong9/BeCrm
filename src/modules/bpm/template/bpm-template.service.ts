@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../shared/database/prisma.service';
 import { NotFoundException, OptimisticLockException } from '../../../shared/exceptions/domain.exception';
 import { RequestUser } from '../../../shared/guards/jwt.strategy';
+import { CreateProcessTemplateDto, UpdateProcessTemplateDto } from './bpm-process.dto';
 
 export interface GraphDto {
   nodes: Array<{
@@ -59,15 +60,14 @@ export class BpmTemplateService {
     return template;
   }
 
-  async create(dto: { name: string; code?: string; category?: string; description?: string }, actor: RequestUser) {
+  async create(dto: CreateProcessTemplateDto, actor: RequestUser) {
     return this.prisma.bpmProcessTemplate.create({
       data: {
         tenantId: actor.tenantId,
         name: dto.name,
-        code: dto.code,
-        category: dto.category,
-        description: dto.description,
-        status: 'draft',
+        xmlData: dto.xmlData,
+        xmlVersion: dto.xmlData ? 1 : 0,
+        status: dto.status ?? 'draft',
         version: 1,
         createdBy: actor.id,
         updatedBy: actor.id,
@@ -75,7 +75,7 @@ export class BpmTemplateService {
     });
   }
 
-  async update(id: string, dto: { name?: string; category?: string; description?: string }, actor: RequestUser) {
+  async update(id: string, dto: UpdateProcessTemplateDto, actor: RequestUser) {
     const existing = await this.prisma.bpmProcessTemplate.findUnique({ where: { id } });
     if (!existing || existing.tenantId !== actor.tenantId) throw new NotFoundException('BpmProcessTemplate', id);
     if (existing.status === 'published') {
@@ -84,9 +84,8 @@ export class BpmTemplateService {
         data: {
           tenantId: actor.tenantId,
           name: dto.name ?? existing.name,
-          code: existing.code,
-          category: dto.category ?? existing.category ?? undefined,
-          description: dto.description ?? existing.description ?? undefined,
+          xmlData: dto.xmlData ?? existing.xmlData,
+          xmlVersion: dto.xmlData ? existing.xmlVersion + 1 : existing.xmlVersion,
           status: 'draft',
           version: existing.version + 1,
           createdBy: actor.id,
@@ -96,7 +95,13 @@ export class BpmTemplateService {
     }
     return this.prisma.bpmProcessTemplate.update({
       where: { id },
-      data: { ...dto, rowVersion: { increment: 1 }, updatedBy: actor.id },
+      data: { 
+        ...dto, 
+        xmlData: dto.xmlData ?? existing.xmlData,
+        xmlVersion: dto.xmlData && dto.xmlData !== existing.xmlData ? existing.xmlVersion + 1 : existing.xmlVersion,
+        rowVersion: { increment: 1 }, 
+        updatedBy: actor.id 
+      },
     });
   }
 

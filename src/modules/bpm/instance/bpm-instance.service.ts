@@ -62,6 +62,10 @@ export class BpmInstanceService {
     return this.engine.completeTask(tokenId, variables, actor);
   }
 
+  async delegateTask(tokenId: string, targetUserId: string, reason: string, actor: RequestUser) {
+    return this.engine.delegateTask(tokenId, targetUserId, reason, actor);
+  }
+
   async getHistory(instanceId: string, tenantId: string) {
     return this.engine.getInstanceHistory(instanceId, tenantId);
   }

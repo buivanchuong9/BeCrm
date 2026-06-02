@@ -40,4 +40,10 @@ export class BpmParticipantController {
   delete(@Query('id') id: string, @CurrentUser() actor: RequestUser) {
     return this.service.delete(id, actor);
   }
+
+  @Get('identity/users-and-groups')
+  @ApiOperation({ summary: 'List available users and roles for assignment' })
+  getUsersAndGroups(@TenantId() tenantId: string) {
+    return this.service.getUsersAndGroups(tenantId);
+  }
 }

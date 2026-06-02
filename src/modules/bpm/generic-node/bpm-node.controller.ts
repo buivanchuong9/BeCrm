@@ -282,6 +282,13 @@ export class BpmNodeController {
 
   // ── Upload ────────────────────────────────────────────────────────────────
   @Post('upload/file') uploadFile(@Body() b: Record<string, unknown>) { return { url: `/uploads/file-${Date.now()}` }; }
+  
+  @Post('documents/upload')
+  uploadDocument(@Body() b: Record<string, unknown>) { 
+    // Alias for the standard BPM spec
+    return { url: `/uploads/document-${Date.now()}` }; 
+  }
+
   @Delete('upload/delete') deleteUpload(@Query('id') id: string) { return { message: 'Deleted' }; }
 
   // ── BpmParticipantProcesslog ──────────────────────────────────────────────

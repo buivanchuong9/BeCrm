@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Body, Query } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Query, Param } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { BpmFormService } from './bpm-form.service';
 import { CurrentUser } from '../../../shared/decorators/current-user.decorator';
@@ -33,6 +33,12 @@ export class BpmFormController {
   @ApiOperation({ summary: 'Delete BPM form' })
   deleteForm(@Query('id') id: string, @CurrentUser() actor: RequestUser) {
     return this.bpmFormService.deleteForm(id, actor);
+  }
+
+  @Get('forms/:formId')
+  @ApiOperation({ summary: 'Get BPM form by id to render' })
+  getFormById(@Param('formId') formId: string) {
+    return this.bpmFormService.getFormById(formId);
   }
 
   // ── BpmFormArtifact ───────────────────────────────────────────────────────

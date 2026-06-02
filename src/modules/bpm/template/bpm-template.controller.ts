@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Delete, Body, Query } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiBody } from '@nestjs/swagger';
 import { BpmTemplateService, GraphDto } from './bpm-template.service';
+import { CreateProcessTemplateDto, UpdateProcessTemplateDto } from './bpm-process.dto';
 import { CurrentUser } from '../../../shared/decorators/current-user.decorator';
 import { TenantId } from '../../../shared/decorators/tenant.decorator';
 import { RequestUser } from '../../../shared/guards/jwt.strategy';
@@ -31,8 +32,9 @@ export class BpmTemplateController {
 
   @Post('process/create')
   @ApiOperation({ summary: 'Create BPM process template' })
+  @ApiBody({ type: CreateProcessTemplateDto })
   create(
-    @Body() body: { name: string; code?: string; category?: string; description?: string },
+    @Body() body: CreateProcessTemplateDto,
     @CurrentUser() actor: RequestUser,
   ) {
     return this.templateService.create(body, actor);
@@ -40,9 +42,10 @@ export class BpmTemplateController {
 
   @Post('process/update')
   @ApiOperation({ summary: 'Update BPM process template metadata' })
+  @ApiBody({ type: UpdateProcessTemplateDto })
   update(
     @Query('id') id: string,
-    @Body() body: { name?: string; category?: string; description?: string },
+    @Body() body: UpdateProcessTemplateDto,
     @CurrentUser() actor: RequestUser,
   ) {
     return this.templateService.update(id, body, actor);

@@ -62,4 +62,18 @@ export class BpmParticipantService {
     });
     return { message: 'BpmParticipant deleted' };
   }
+
+  async getUsersAndGroups(tenantId: string) {
+    const [users, roles] = await Promise.all([
+      this.prisma.user.findMany({
+        where: { tenantId, deletedAt: null, isActive: true },
+        select: { id: true, username: true, fullName: true, email: true },
+      }),
+      this.prisma.role.findMany({
+        where: { tenantId, deletedAt: null },
+        select: { id: true, name: true, code: true },
+      }),
+    ]);
+    return { users, roles };
+  }
 }

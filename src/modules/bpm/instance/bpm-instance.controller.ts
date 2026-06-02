@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, Param } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { BpmInstanceService } from './bpm-instance.service';
 import { CurrentUser } from '../../../shared/decorators/current-user.decorator';
@@ -56,10 +56,27 @@ export class BpmInstanceController {
     return this.instanceService.completeTask(tokenId, body.variables, actor);
   }
 
+  @Post('tasks/:taskId/delegate')
+  @ApiOperation({ summary: 'Delegate a task to another user' })
+  delegateTask(
+    @Param('taskId') taskId: string,
+    @Body() body: { targetUserId: string; reason: string },
+    @CurrentUser() actor: RequestUser,
+  ) {
+    return this.instanceService.delegateTask(taskId, body.targetUserId, body.reason, actor);
+  }
+
   @Get('instance/history')
   @ApiOperation({ summary: 'Get process instance history' })
   getHistory(@Query('instanceId') instanceId: string, @TenantId() tenantId: string) {
     return this.instanceService.getHistory(instanceId, tenantId);
+  }
+
+  @Get('process-instances/:id/documents')
+  @ApiOperation({ summary: 'Get documents associated with a process instance' })
+  getInstanceDocuments(@Param('id') id: string) {
+    // Stub: In a full implementation, this queries a Document/Attachment model linked to the instance
+    return { data: [], total: 0 };
   }
 
   @Get('instance/kanban')

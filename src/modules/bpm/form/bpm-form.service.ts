@@ -60,6 +60,20 @@ export class BpmFormService {
     return { message: 'BpmForm deleted' };
   }
 
+  async getFormById(id: string) {
+    const form = await this.prisma.bpmForm.findUnique({
+      where: { id },
+      include: {
+        artifacts: {
+          where: { deletedAt: null },
+          orderBy: { position: 'asc' },
+        },
+      },
+    });
+    if (!form) throw new NotFoundException('BpmForm', id);
+    return form;
+  }
+
   // ── BpmFormArtifact ────────────────────────────────────────────────────────
 
   async listArtifacts(tenantId: string, query?: { bpmFormId?: string; keyword?: string; page?: number; limit?: number }) {

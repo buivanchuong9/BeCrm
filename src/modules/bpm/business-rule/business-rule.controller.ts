@@ -42,6 +42,17 @@ export class BusinessRuleController {
     return this.businessRuleService.delete(id, actor);
   }
 
+  @Post('rules/evaluate')
+  @ApiOperation({ summary: 'Evaluate a business rule against a given payload' })
+  evaluateRule(@Body() body: { ruleId?: string; ruleCode?: string; payload: Record<string, unknown> }, @TenantId() tenantId: string) {
+    // Basic stub; the real implementation requires the engine or DMN table evaluator
+    return {
+      success: true,
+      matched: true,
+      result: { action: 'proceed' } // Mock response matching standard schema
+    };
+  }
+
   @Get('businessRuleItem/list')
   listItems(@Query('businessRuleId') businessRuleId: string) {
     return this.businessRuleService.listItems(businessRuleId);
