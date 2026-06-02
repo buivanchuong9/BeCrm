@@ -8,6 +8,7 @@ import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './shared/exceptions/http-exception.filter';
 import { TransformInterceptor } from './shared/interceptors/transform.interceptor';
+import { Request, Response, NextFunction } from 'express';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
@@ -49,7 +50,7 @@ async function bootstrap() {
 
   // Swagger (dev only)
   if (nodeEnv !== 'production') {
-    app.use(['/api/docs', '/api-json'], (req, res, next) => {
+    app.use(['/api/docs', '/api-json'], (req: Request, res: Response, next: NextFunction) => {
       const b64auth = (req.headers.authorization || '').split(' ')[1] || '';
       const [login, password] = Buffer.from(b64auth, 'base64').toString().split(':');
 
