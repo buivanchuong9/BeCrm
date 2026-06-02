@@ -49,6 +49,18 @@ async function bootstrap() {
 
   // Swagger (dev only)
   if (nodeEnv !== 'production') {
+    app.use(['/api/docs', '/api-json'], (req, res, next) => {
+      const b64auth = (req.headers.authorization || '').split(' ')[1] || '';
+      const [login, password] = Buffer.from(b64auth, 'base64').toString().split(':');
+
+      if (login === 'buivanchuong' && password === '123456@') {
+        return next();
+      }
+
+      res.set('WWW-Authenticate', 'Basic realm="Swagger Docs"');
+      res.status(401).send('Authentication required.');
+    });
+
     const config = new DocumentBuilder()
       .setTitle('CareFollow CRM API')
       .setDescription('CareFollow Platform — Backend API Documentation')
