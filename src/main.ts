@@ -55,11 +55,17 @@ async function bootstrap() {
       return next();
     }
 
-    if (req.query.username === 'buivanchuong' && req.query.password === '123456@') {
-      res.cookie('swagger-auth', 'valid', { maxAge: 86400000 });
+    const user = (req.body?.username || req.query?.username || '').toString().trim();
+    const pass = (req.body?.password || req.query?.password || '').toString().trim();
+
+    if (user === 'buivanchuong' && pass === '123456@') {
+      res.cookie('swagger-auth', 'valid', { maxAge: 86400000, path: '/' });
       return res.redirect('/api/docs');
     }
 
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
     res.status(200).send(`
       <!DOCTYPE html>
       <html>
@@ -67,6 +73,7 @@ async function bootstrap() {
       <body style="display:flex;justify-content:center;align-items:center;height:100vh;background:#f0f2f5;font-family:sans-serif;margin:0;">
         <form method="GET" action="/api/docs" style="background:#fff;padding:2rem;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.1);width:300px;">
           <h2 style="margin-top:0;text-align:center;color:#333;">CareFollow API</h2>
+          <p style="color:red;font-size:13px;text-align:center;${user || pass ? 'display:block;' : 'display:none;'}">Sai tài khoản hoặc mật khẩu!</p>
           <div style="margin-bottom:1rem;">
             <input type="text" name="username" placeholder="Username" required style="width:100%;padding:0.75rem;border:1px solid #d9d9d9;border-radius:4px;box-sizing:border-box;" />
           </div>
