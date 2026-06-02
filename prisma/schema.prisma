@@ -1,0 +1,3964 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// CareFollow — Prisma Schema
+// Multi-schema: iam | crm | ticket | warranty | bpm | notification
+// ─────────────────────────────────────────────────────────────────────────────
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  schemas  = ["iam", "crm", "ticket", "warranty", "bpm", "notification"]
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// IAM SCHEMA — Identity & Access Management
+// ═════════════════════════════════════════════════════════════════════════════
+
+model Tenant {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code        String    @unique @db.VarChar(50)
+  name        String    @db.VarChar(255)
+  domain      String?   @db.VarChar(255)
+  isActive    Boolean   @default(true) @map("is_active")
+  plan        String?   @db.VarChar(50)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+
+  users       User[]
+  departments Department[]
+  roles       Role[]
+  employees   Employee[]
+
+  @@map("tenants")
+  @@schema("iam")
+}
+
+model User {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  username     String    @db.VarChar(100)
+  email        String?   @db.VarChar(255)
+  phone        String?   @db.VarChar(30)
+  passwordHash String    @map("password_hash")
+  name         String    @db.VarChar(255)
+  avatar       String?   @db.VarChar(500)
+  gender       String?   @db.VarChar(10)
+  isActive     Boolean   @default(true) @map("is_active")
+  isSuperAdmin Boolean   @default(false) @map("is_super_admin")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy    String?   @map("created_by") @db.Uuid
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy    String?   @map("updated_by") @db.Uuid
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy    String?   @map("deleted_by") @db.Uuid
+  rowVersion   Int       @default(1) @map("row_version")
+
+  tenant      Tenant        @relation(fields: [tenantId], references: [id])
+  userRoles   UserRole[]
+  employee    Employee?
+  loginLogs   UserLoginLog[]
+  fcmDevices  FcmDevice[]
+
+  @@unique([tenantId, username])
+  @@map("users")
+  @@schema("iam")
+}
+
+model Role {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  name        String    @db.VarChar(100)
+  code        String    @db.VarChar(100)
+  description String?
+  isSystem    Boolean   @default(false) @map("is_system")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+  rowVersion  Int       @default(1) @map("row_version")
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id])
+  userRoles   UserRole[]
+  permissions RolePermission[]
+
+  @@unique([tenantId, code])
+  @@map("roles")
+  @@schema("iam")
+}
+
+model UserRole {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  roleId    String    @map("role_id") @db.Uuid
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy String    @map("created_by") @db.Uuid
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id])
+  role Role @relation(fields: [roleId], references: [id])
+
+  @@unique([userId, roleId])
+  @@map("user_roles")
+  @@schema("iam")
+}
+
+model RolePermission {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  roleId       String   @map("role_id") @db.Uuid
+  resourceCode String   @map("resource_code") @db.VarChar(100)
+  action       String   @db.VarChar(50)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  createdBy    String   @map("created_by") @db.Uuid
+
+  role Role @relation(fields: [roleId], references: [id])
+
+  @@unique([roleId, resourceCode, action])
+  @@map("role_permissions")
+  @@schema("iam")
+}
+
+model Department {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  parentId   String?   @map("parent_id") @db.Uuid
+  code       String?   @db.VarChar(50)
+  name       String    @db.VarChar(255)
+  position   Int       @default(0)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy  String    @map("created_by") @db.Uuid
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy  String    @map("updated_by") @db.Uuid
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy  String?   @map("deleted_by") @db.Uuid
+  rowVersion Int       @default(1) @map("row_version")
+
+  tenant   Tenant      @relation(fields: [tenantId], references: [id])
+  parent   Department? @relation("DeptParent", fields: [parentId], references: [id])
+  children Department[] @relation("DeptParent")
+  employees Employee[]
+
+  @@map("departments")
+  @@schema("iam")
+}
+
+model Employee {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  userId       String?   @unique @map("user_id") @db.Uuid
+  departmentId String?   @map("department_id") @db.Uuid
+  code         String?   @db.VarChar(50)
+  name         String    @db.VarChar(255)
+  phone        String?   @db.VarChar(30)
+  email        String?   @db.VarChar(255)
+  avatar       String?   @db.VarChar(500)
+  position     String?   @db.VarChar(100)
+  isActive     Boolean   @default(true) @map("is_active")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy    String    @map("created_by") @db.Uuid
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy    String    @map("updated_by") @db.Uuid
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy    String?   @map("deleted_by") @db.Uuid
+  rowVersion   Int       @default(1) @map("row_version")
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id])
+  user       User?       @relation(fields: [userId], references: [id])
+  department Department? @relation(fields: [departmentId], references: [id])
+
+  @@map("employees")
+  @@schema("iam")
+}
+
+model UserLoginLog {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  ipAddress String?  @map("ip_address") @db.VarChar(45)
+  userAgent String?  @map("user_agent")
+  loggedAt  DateTime @default(now()) @map("logged_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("user_login_logs")
+  @@schema("iam")
+}
+
+model Customer {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId          String    @map("tenant_id") @db.Uuid
+  code              String?   @db.VarChar(50)
+  name              String    @db.VarChar(255)
+  phone             String?   @db.VarChar(30)
+  email             String?   @db.VarChar(255)
+  gender            String?   @db.VarChar(10)
+  dateOfBirth       DateTime? @map("date_of_birth") @db.Date
+  address           String?
+  avatarUrl         String?   @map("avatar_url") @db.VarChar(500)
+  customerGroupId   String?   @map("customer_group_id") @db.Uuid
+  customerSourceId  String?   @map("customer_source_id") @db.Uuid
+  iamEmployeeId     String?   @map("iam_employee_id") @db.Uuid
+  note              String?
+  status            Int       @default(0)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy         String    @map("created_by") @db.Uuid
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy         String    @map("updated_by") @db.Uuid
+  deletedAt         DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy         String?   @map("deleted_by") @db.Uuid
+  rowVersion        Int       @default(1) @map("row_version")
+
+  extraInfos      CustomerExtraInfo[]
+  customerGroup   CustomerGroup?   @relation(fields: [customerGroupId], references: [id])
+  customerSource  CustomerSource?  @relation(fields: [customerSourceId], references: [id])
+
+  @@map("customers")
+  @@schema("iam")
+}
+
+model CustomerGroup {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  name       String    @db.VarChar(255)
+  position   Int       @default(0)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy  String    @map("created_by") @db.Uuid
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy  String    @map("updated_by") @db.Uuid
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy  String?   @map("deleted_by") @db.Uuid
+  rowVersion Int       @default(1) @map("row_version")
+
+  customers Customer[]
+
+  @@map("customer_groups")
+  @@schema("iam")
+}
+
+model CustomerSource {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  name       String    @db.VarChar(255)
+  position   Int       @default(0)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy  String    @map("created_by") @db.Uuid
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy  String    @map("updated_by") @db.Uuid
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy  String?   @map("deleted_by") @db.Uuid
+  rowVersion Int       @default(1) @map("row_version")
+
+  customers Customer[]
+
+  @@map("customer_sources")
+  @@schema("iam")
+}
+
+model CustomerAttribute {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  parentId     String?   @map("parent_id") @db.Uuid
+  name         String    @db.VarChar(100)
+  fieldName    String    @map("field_name") @db.VarChar(100)
+  dataType     String    @map("data_type") @db.VarChar(30)
+  isRequired   Boolean   @default(false) @map("is_required")
+  isReadonly   Boolean   @default(false) @map("is_readonly")
+  isUnique     Boolean   @default(false) @map("is_unique")
+  options      Json?
+  numberFormat String?   @map("number_format") @db.VarChar(30)
+  position     Int       @default(0)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy    String    @map("created_by") @db.Uuid
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy    String    @map("updated_by") @db.Uuid
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy    String?   @map("deleted_by") @db.Uuid
+  rowVersion   Int       @default(1) @map("row_version")
+
+  parent     CustomerAttribute?  @relation("CustAttrParent", fields: [parentId], references: [id])
+  children   CustomerAttribute[] @relation("CustAttrParent")
+  extraInfos CustomerExtraInfo[]
+
+  @@unique([tenantId, fieldName])
+  @@map("customer_attributes")
+  @@schema("iam")
+}
+
+model CustomerExtraInfo {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  customerId     String   @map("customer_id") @db.Uuid
+  attributeDefId String   @map("attribute_def_id") @db.Uuid
+  value          String?
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy      String   @map("updated_by") @db.Uuid
+
+  customer     Customer          @relation(fields: [customerId], references: [id])
+  attributeDef CustomerAttribute @relation(fields: [attributeDefId], references: [id])
+
+  @@unique([customerId, attributeDefId])
+  @@map("customer_extra_infos")
+  @@schema("iam")
+}
+
+model CustomerScheduler {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  customerId   String    @map("customer_id") @db.Uuid
+  iamEmployeeId String?  @map("iam_employee_id") @db.Uuid
+  title        String    @db.VarChar(500)
+  content      String?
+  scheduledAt  DateTime  @map("scheduled_at") @db.Timestamptz
+  completedAt  DateTime? @map("completed_at") @db.Timestamptz
+  status       String    @default("pending") @db.VarChar(30)
+  result       String?
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy    String    @map("created_by") @db.Uuid
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy    String    @map("updated_by") @db.Uuid
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy    String?   @map("deleted_by") @db.Uuid
+  rowVersion   Int       @default(1) @map("row_version")
+
+  @@index([tenantId, customerId])
+  @@map("customer_schedulers")
+  @@schema("iam")
+}
+
+model CustomerExchange {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  customerId    String    @map("customer_id") @db.Uuid
+  iamAuthorId   String    @map("iam_author_id") @db.Uuid
+  exchangeType  String    @default("note") @map("exchange_type") @db.VarChar(30)
+  content       String?
+  contentDelta  Json?     @map("content_delta")
+  mediaUrls     Json?     @map("media_urls")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy     String?   @map("deleted_by") @db.Uuid
+
+  @@index([tenantId, customerId])
+  @@map("customer_exchanges")
+  @@schema("iam")
+}
+
+model CustomerViewer {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  customerId  String    @map("customer_id") @db.Uuid
+  iamUserId   String    @map("iam_user_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+
+  @@unique([customerId, iamUserId])
+  @@map("customer_viewers")
+  @@schema("iam")
+}
+
+model CustomerRelationship {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  customerId      String    @map("customer_id") @db.Uuid
+  relatedId       String    @map("related_id") @db.Uuid
+  relationshipType String   @map("relationship_type") @db.VarChar(100)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy       String    @map("created_by") @db.Uuid
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz
+
+  @@index([tenantId, customerId])
+  @@map("customer_relationships")
+  @@schema("iam")
+}
+
+model TelesaleCall {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  customerId    String    @map("customer_id") @db.Uuid
+  iamEmployeeId String    @map("iam_employee_id") @db.Uuid
+  callType      String    @default("outbound") @map("call_type") @db.VarChar(20)
+  duration      Int?
+  status        String    @default("completed") @db.VarChar(30)
+  note          String?
+  recordingUrl  String?   @map("recording_url") @db.VarChar(500)
+  calledAt      DateTime  @default(now()) @map("called_at") @db.Timestamptz
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy     String    @map("created_by") @db.Uuid
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy     String    @map("updated_by") @db.Uuid
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz
+
+  @@index([tenantId, customerId])
+  @@map("telesale_calls")
+  @@schema("iam")
+}
+
+model CustomerField {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  name       String    @db.VarChar(255)
+  fieldKey   String    @map("field_key") @db.VarChar(100)
+  fieldType  String    @default("text") @map("field_type") @db.VarChar(30)
+  isRequired Boolean   @default(false) @map("is_required")
+  isActive   Boolean   @default(true) @map("is_active")
+  position   Int       @default(0)
+  options    Json?
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy  String    @map("created_by") @db.Uuid
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy  String    @map("updated_by") @db.Uuid
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy  String?   @map("deleted_by") @db.Uuid
+
+  @@unique([tenantId, fieldKey])
+  @@map("customer_fields")
+  @@schema("iam")
+}
+
+model BoughtCard {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  customerId     String    @map("customer_id") @db.Uuid
+  cardId         String?   @map("card_id") @db.Uuid
+  cardNumber     String?   @map("card_number") @db.VarChar(100)
+  issuedAt       DateTime? @map("issued_at") @db.Timestamptz
+  expiredAt      DateTime? @map("expired_at") @db.Timestamptz
+  points         Int       @default(0)
+  status         String    @default("active") @db.VarChar(30)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy      String    @map("created_by") @db.Uuid
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy      String    @map("updated_by") @db.Uuid
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy      String?   @map("deleted_by") @db.Uuid
+
+  services BoughtCardService[]
+
+  @@index([tenantId, customerId])
+  @@map("bought_cards")
+  @@schema("iam")
+}
+
+model BoughtCardService {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  customerId    String    @map("customer_id") @db.Uuid
+  boughtCardId  String?   @map("bought_card_id") @db.Uuid
+  serviceName   String    @map("service_name") @db.VarChar(500)
+  serviceCode   String?   @map("service_code") @db.VarChar(100)
+  quantity      Int       @default(1)
+  usedQuantity  Int       @default(0) @map("used_quantity")
+  price         Decimal?  @db.Decimal(18, 2)
+  expiredAt     DateTime? @map("expired_at") @db.Timestamptz
+  status        String    @default("active") @db.VarChar(30)
+  note          String?
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy     String    @map("created_by") @db.Uuid
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy     String    @map("updated_by") @db.Uuid
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy     String?   @map("deleted_by") @db.Uuid
+
+  boughtCard BoughtCard? @relation(fields: [boughtCardId], references: [id])
+
+  @@index([tenantId, customerId])
+  @@map("bought_card_services")
+  @@schema("iam")
+}
+
+model BoughtProduct {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  customerId    String    @map("customer_id") @db.Uuid
+  productName   String    @map("product_name") @db.VarChar(500)
+  productCode   String?   @map("product_code") @db.VarChar(100)
+  quantity      Int       @default(1)
+  price         Decimal?  @db.Decimal(18, 2)
+  totalAmount   Decimal?  @map("total_amount") @db.Decimal(18, 2)
+  purchasedAt   DateTime  @default(now()) @map("purchased_at") @db.Timestamptz
+  invoiceCode   String?   @map("invoice_code") @db.VarChar(100)
+  status        String    @default("active") @db.VarChar(30)
+  note          String?
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy     String    @map("created_by") @db.Uuid
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy     String    @map("updated_by") @db.Uuid
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy     String?   @map("deleted_by") @db.Uuid
+
+  @@index([tenantId, customerId])
+  @@map("bought_products")
+  @@schema("iam")
+}
+
+model BoughtService {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  customerId    String    @map("customer_id") @db.Uuid
+  serviceName   String    @map("service_name") @db.VarChar(500)
+  serviceCode   String?   @map("service_code") @db.VarChar(100)
+  quantity      Int       @default(1)
+  price         Decimal?  @db.Decimal(18, 2)
+  totalAmount   Decimal?  @map("total_amount") @db.Decimal(18, 2)
+  purchasedAt   DateTime  @default(now()) @map("purchased_at") @db.Timestamptz
+  invoiceCode   String?   @map("invoice_code") @db.VarChar(100)
+  status        String    @default("active") @db.VarChar(30)
+  note          String?
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy     String    @map("created_by") @db.Uuid
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy     String    @map("updated_by") @db.Uuid
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy     String?   @map("deleted_by") @db.Uuid
+
+  @@index([tenantId, customerId])
+  @@map("bought_services")
+  @@schema("iam")
+}
+
+model LoyaltyPointLedger {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  customerId   String    @map("customer_id") @db.Uuid
+  transType    String    @default("earn") @map("trans_type") @db.VarChar(20)
+  points       Int       @default(0)
+  balanceAfter Int       @default(0) @map("balance_after")
+  refType      String?   @map("ref_type") @db.VarChar(50)
+  refId        String?   @map("ref_id") @db.Uuid
+  note         String?
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy    String    @map("created_by") @db.Uuid
+
+  @@index([tenantId, customerId])
+  @@map("loyalty_point_ledger")
+  @@schema("iam")
+}
+
+model Area {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  parentId   String?   @map("parent_id") @db.Uuid
+  name       String    @db.VarChar(255)
+  code       String?   @db.VarChar(50)
+  areaType   String    @default("province") @map("area_type") @db.VarChar(30)
+  position   Int       @default(0)
+  isActive   Boolean   @default(true) @map("is_active")
+
+  parent   Area?  @relation("AreaChildren", fields: [parentId], references: [id])
+  children Area[] @relation("AreaChildren")
+
+  @@map("areas")
+  @@schema("iam")
+}
+
+model WorkProject {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  code          String?   @db.VarChar(50)
+  name          String    @db.VarChar(500)
+  description   String?
+  projectTypeId String?   @map("project_type_id") @db.Uuid
+  iamManagerId  String?   @map("iam_manager_id") @db.Uuid
+  status        String    @default("active") @db.VarChar(30)
+  startDate     DateTime? @map("start_date") @db.Date
+  endDate       DateTime? @map("end_date") @db.Date
+  config        Json?
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy     String    @map("created_by") @db.Uuid
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy     String    @map("updated_by") @db.Uuid
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy     String?   @map("deleted_by") @db.Uuid
+  rowVersion    Int       @default(1) @map("row_version")
+
+  workOrders       WorkOrder[]
+  projectEmployees WorkProjectEmployee[]
+
+  @@index([tenantId])
+  @@map("work_projects")
+  @@schema("iam")
+}
+
+model WorkProjectEmployee {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  workProjectId String    @map("work_project_id") @db.Uuid
+  iamEmployeeId String    @map("iam_employee_id") @db.Uuid
+  role          String?   @db.VarChar(50)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy     String    @map("created_by") @db.Uuid
+
+  workProject WorkProject @relation(fields: [workProjectId], references: [id])
+
+  @@unique([workProjectId, iamEmployeeId])
+  @@map("work_project_employees")
+  @@schema("iam")
+}
+
+model WorkOrder {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  workProjectId   String?   @map("work_project_id") @db.Uuid
+  workTypeId      String?   @map("work_type_id") @db.Uuid
+  code            String?   @db.VarChar(50)
+  title           String    @db.VarChar(500)
+  content         String?
+  iamAssigneeId   String?   @map("iam_assignee_id") @db.Uuid
+  iamManagerId    String?   @map("iam_manager_id") @db.Uuid
+  customerId      String?   @map("customer_id") @db.Uuid
+  status          String    @default("pending") @db.VarChar(30)
+  priority        Int       @default(0)
+  priorityLevel   String?   @map("priority_level") @db.VarChar(30)
+  dueDate         DateTime? @map("due_date") @db.Timestamptz
+  startDate       DateTime? @map("start_date") @db.Timestamptz
+  completedAt     DateTime? @map("completed_at") @db.Timestamptz
+  pausedAt        DateTime? @map("paused_at") @db.Timestamptz
+  rating          Int?
+  ratingNote      String?   @map("rating_note")
+  tags            Json?
+  attachments     Json?
+  note            String?
+  bpmInstanceId   String?   @map("bpm_instance_id") @db.Uuid
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy       String    @map("created_by") @db.Uuid
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy       String    @map("updated_by") @db.Uuid
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy       String?   @map("deleted_by") @db.Uuid
+  rowVersion      Int       @default(1) @map("row_version")
+
+  workProject  WorkProject?    @relation(fields: [workProjectId], references: [id])
+  workType     WorkType?       @relation(fields: [workTypeId], references: [id])
+  exchanges    WorkExchange[]
+  participants WorkParticipant[]
+  inprogress   WorkInprogress[]
+  relatedOrders WorkOrderRelation[] @relation("WorkOrderMain")
+  otherOrders   WorkOrderRelation[] @relation("WorkOrderRelated")
+
+  @@index([tenantId, status])
+  @@index([tenantId, iamAssigneeId])
+  @@map("work_orders")
+  @@schema("iam")
+}
+
+model WorkOrderRelation {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  workOrderId String   @map("work_order_id") @db.Uuid
+  relatedId   String   @map("related_id") @db.Uuid
+  relType     String   @default("related") @map("rel_type") @db.VarChar(30)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String   @map("created_by") @db.Uuid
+
+  workOrder WorkOrder @relation("WorkOrderMain", fields: [workOrderId], references: [id])
+  related   WorkOrder @relation("WorkOrderRelated", fields: [relatedId], references: [id])
+
+  @@unique([workOrderId, relatedId])
+  @@map("work_order_relations")
+  @@schema("iam")
+}
+
+model WorkExchange {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  workOrderId String    @map("work_order_id") @db.Uuid
+  iamAuthorId String    @map("iam_author_id") @db.Uuid
+  content     String?
+  mediaUrls   Json?     @map("media_urls")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id])
+
+  @@index([workOrderId])
+  @@map("work_exchanges")
+  @@schema("iam")
+}
+
+model WorkParticipant {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  workOrderId String    @map("work_order_id") @db.Uuid
+  iamUserId   String    @map("iam_user_id") @db.Uuid
+  role        String?   @db.VarChar(50)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id])
+
+  @@unique([workOrderId, iamUserId])
+  @@map("work_participants")
+  @@schema("iam")
+}
+
+model WorkInprogress {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  workOrderId String    @map("work_order_id") @db.Uuid
+  iamActorId  String    @map("iam_actor_id") @db.Uuid
+  action      String    @db.VarChar(50)
+  note        String?
+  data        Json?
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id])
+
+  @@index([workOrderId])
+  @@map("work_inprogress")
+  @@schema("iam")
+}
+
+model WorkType {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  name       String    @db.VarChar(255)
+  code       String?   @db.VarChar(50)
+  position   Int       @default(0)
+  isActive   Boolean   @default(true) @map("is_active")
+  config     Json?
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy  String    @map("created_by") @db.Uuid
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy  String    @map("updated_by") @db.Uuid
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy  String?   @map("deleted_by") @db.Uuid
+
+  workOrders WorkOrder[]
+
+  @@map("work_types")
+  @@schema("iam")
+}
+
+model ProjectType {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  name       String    @db.VarChar(255)
+  code       String?   @db.VarChar(50)
+  position   Int       @default(0)
+  isActive   Boolean   @default(true) @map("is_active")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy  String    @map("created_by") @db.Uuid
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy  String    @map("updated_by") @db.Uuid
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy  String?   @map("deleted_by") @db.Uuid
+
+  @@map("project_types")
+  @@schema("iam")
+}
+
+model Group {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  name        String    @db.VarChar(255)
+  code        String?   @db.VarChar(50)
+  description String?
+  iamLeaderId String?   @map("iam_leader_id") @db.Uuid
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+  rowVersion  Int       @default(1) @map("row_version")
+
+  employees GroupEmployee[]
+
+  @@index([tenantId])
+  @@map("groups")
+  @@schema("iam")
+}
+
+model GroupEmployee {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  groupId       String    @map("group_id") @db.Uuid
+  iamEmployeeId String    @map("iam_employee_id") @db.Uuid
+  role          String?   @db.VarChar(50)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy     String    @map("created_by") @db.Uuid
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz
+
+  group Group @relation(fields: [groupId], references: [id])
+
+  @@unique([groupId, iamEmployeeId])
+  @@map("group_employees")
+  @@schema("iam")
+}
+
+model BeautyBranch {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  parentId     String?   @map("parent_id") @db.Uuid
+  code         String?   @db.VarChar(50)
+  name         String    @db.VarChar(255)
+  address      String?
+  phone        String?   @db.VarChar(30)
+  managerId    String?   @map("manager_id") @db.Uuid
+  isActive     Boolean   @default(true) @map("is_active")
+  config       Json?
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy    String    @map("created_by") @db.Uuid
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy    String    @map("updated_by") @db.Uuid
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy    String?   @map("deleted_by") @db.Uuid
+  rowVersion   Int       @default(1) @map("row_version")
+
+  parent   BeautyBranch?  @relation("BranchChildren", fields: [parentId], references: [id])
+  children BeautyBranch[] @relation("BranchChildren")
+
+  @@index([tenantId])
+  @@map("beauty_branches")
+  @@schema("iam")
+}
+
+model BeautySalon {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  code        String?   @db.VarChar(50)
+  name        String    @db.VarChar(255)
+  address     String?
+  phone       String?   @db.VarChar(30)
+  status      String    @default("pending") @db.VarChar(30)
+  approvedAt  DateTime? @map("approved_at") @db.Timestamptz
+  approvedBy  String?   @map("approved_by") @db.Uuid
+  config      Json?
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+
+  @@index([tenantId])
+  @@map("beauty_salons")
+  @@schema("iam")
+}
+
+model Artifact {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  code        String    @db.VarChar(100)
+  name        String    @db.VarChar(255)
+  description String?
+  value       Json?
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+
+  @@unique([tenantId, code])
+  @@map("artifacts")
+  @@schema("iam")
+}
+
+model BrandName {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  name       String    @db.VarChar(100)
+  provider   String?   @db.VarChar(100)
+  isActive   Boolean   @default(true) @map("is_active")
+  config     Json?
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy  String    @map("created_by") @db.Uuid
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy  String    @map("updated_by") @db.Uuid
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy  String?   @map("deleted_by") @db.Uuid
+
+  whitelists BrandNameWhitelist[]
+
+  @@map("brand_names")
+  @@schema("iam")
+}
+
+model BrandNameWhitelist {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  brandNameId  String    @map("brand_name_id") @db.Uuid
+  contactPhone String    @map("contact_phone") @db.VarChar(30)
+  isActive     Boolean   @default(true) @map("is_active")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy    String    @map("created_by") @db.Uuid
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy    String    @map("updated_by") @db.Uuid
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy    String?   @map("deleted_by") @db.Uuid
+
+  brandName BrandName @relation(fields: [brandNameId], references: [id])
+
+  @@index([tenantId, brandNameId])
+  @@map("brand_name_whitelists")
+  @@schema("iam")
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// CRM SCHEMA
+// ═════════════════════════════════════════════════════════════════════════════
+
+model CareCategory {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  name       String    @db.VarChar(255)
+  position   Int       @default(0)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy  String    @map("created_by") @db.Uuid
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy  String    @map("updated_by") @db.Uuid
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy  String?   @map("deleted_by") @db.Uuid
+  rowVersion Int       @default(1) @map("row_version")
+
+  careHistories CareHistory[]
+
+  @@map("care_categories")
+  @@schema("crm")
+}
+
+model MarketingSource {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  name       String    @db.VarChar(255)
+  sourceType String?   @map("source_type") @db.VarChar(30)
+  position   Int       @default(0)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy  String    @map("created_by") @db.Uuid
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy  String    @map("updated_by") @db.Uuid
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy  String?   @map("deleted_by") @db.Uuid
+
+  opportunities Opportunity[]
+
+  @@map("marketing_sources")
+  @@schema("crm")
+}
+
+model ContactPipeline {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  name       String    @db.VarChar(255)
+  position   Int       @default(0)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy  String    @map("created_by") @db.Uuid
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy  String    @map("updated_by") @db.Uuid
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy  String?   @map("deleted_by") @db.Uuid
+  rowVersion Int       @default(1) @map("row_version")
+
+  statuses      ContactStatus[]
+  contacts      Contact[]
+  opportunities Opportunity[]
+
+  @@map("contact_pipelines")
+  @@schema("crm")
+}
+
+model ContactStatus {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId          String    @map("tenant_id") @db.Uuid
+  contactPipelineId String    @map("contact_pipeline_id") @db.Uuid
+  name              String    @db.VarChar(255)
+  position          Int       @default(0)
+  colorHex          String?   @map("color_hex") @db.VarChar(30)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy         String    @map("created_by") @db.Uuid
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy         String    @map("updated_by") @db.Uuid
+  deletedAt         DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy         String?   @map("deleted_by") @db.Uuid
+
+  pipeline ContactPipeline @relation(fields: [contactPipelineId], references: [id])
+  contacts Contact[]
+
+  @@map("contact_statuses")
+  @@schema("crm")
+}
+
+model ContactAttributeDefinition {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  parentId     String?   @map("parent_id") @db.Uuid
+  name         String    @db.VarChar(100)
+  fieldName    String    @map("field_name") @db.VarChar(100)
+  dataType     String    @map("data_type") @db.VarChar(30)
+  isRequired   Boolean   @default(false) @map("is_required")
+  isReadonly   Boolean   @default(false) @map("is_readonly")
+  isUnique     Boolean   @default(false) @map("is_unique")
+  options      Json?
+  numberFormat String?   @map("number_format") @db.VarChar(30)
+  position     Int       @default(0)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy    String    @map("created_by") @db.Uuid
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy    String    @map("updated_by") @db.Uuid
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy    String?   @map("deleted_by") @db.Uuid
+  rowVersion   Int       @default(1) @map("row_version")
+
+  parent     ContactAttributeDefinition?  @relation("ContactAttrParent", fields: [parentId], references: [id])
+  children   ContactAttributeDefinition[] @relation("ContactAttrParent")
+  extraInfos ContactExtraInfo[]
+
+  @@unique([tenantId, fieldName])
+  @@map("contact_attribute_definitions")
+  @@schema("crm")
+}
+
+model Contact {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId          String    @map("tenant_id") @db.Uuid
+  name              String    @db.VarChar(255)
+  phone             String?   @db.VarChar(50)
+  email             String?   @db.VarChar(255)
+  note              String?
+  avatarUrl         String?   @map("avatar_url") @db.VarChar(500)
+  cardVisitFrontUrl String?   @map("card_visit_front_url") @db.VarChar(500)
+  cardVisitBackUrl  String?   @map("card_visit_back_url") @db.VarChar(500)
+  department        String?   @db.VarChar(100)
+  iamOwnerId        String?   @map("iam_owner_id") @db.Uuid
+  contactPipelineId String?   @map("contact_pipeline_id") @db.Uuid
+  contactStatusId   String?   @map("contact_status_id") @db.Uuid
+  primaryCustomerId String?   @map("primary_customer_id") @db.Uuid
+  extraAttributes   Json?     @map("extra_attributes")
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy         String    @map("created_by") @db.Uuid
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy         String    @map("updated_by") @db.Uuid
+  deletedAt         DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy         String?   @map("deleted_by") @db.Uuid
+  rowVersion        Int       @default(1) @map("row_version")
+
+  pipeline         ContactPipeline?      @relation(fields: [contactPipelineId], references: [id])
+  status           ContactStatus?        @relation(fields: [contactStatusId], references: [id])
+  extraInfos       ContactExtraInfo[]
+  exchanges        ContactExchange[]
+  customerLinks    ContactCustomerLink[]
+  opportunities    Opportunity[]
+  opportunityLinks OpportunityContact[]
+  careHistories    CareHistory[]
+
+  @@map("contacts")
+  @@schema("crm")
+}
+
+model ContactExtraInfo {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  contactId      String   @map("contact_id") @db.Uuid
+  attributeDefId String   @map("attribute_def_id") @db.Uuid
+  value          String?
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy      String   @map("updated_by") @db.Uuid
+
+  contact      Contact                    @relation(fields: [contactId], references: [id])
+  attributeDef ContactAttributeDefinition @relation(fields: [attributeDefId], references: [id])
+
+  @@unique([contactId, attributeDefId])
+  @@map("contact_extra_infos")
+  @@schema("crm")
+}
+
+model ContactExchange {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  contactId   String    @map("contact_id") @db.Uuid
+  iamAuthorId String    @map("iam_author_id") @db.Uuid
+  content     String?
+  contentDelta String?  @map("content_delta")
+  mediaUrls   Json?     @map("media_urls")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+
+  contact Contact @relation(fields: [contactId], references: [id])
+
+  @@map("contact_exchanges")
+  @@schema("crm")
+}
+
+model ContactCustomerLink {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  contactId  String    @map("contact_id") @db.Uuid
+  customerId String    @map("customer_id") @db.Uuid
+  isPrimary  Boolean   @default(false) @map("is_primary")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy  String    @map("created_by") @db.Uuid
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz
+
+  contact Contact @relation(fields: [contactId], references: [id])
+
+  @@unique([contactId, customerId])
+  @@map("contact_customer_links")
+  @@schema("crm")
+}
+
+model Campaign {
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId             String    @map("tenant_id") @db.Uuid
+  code                 String    @db.VarChar(20)
+  name                 String    @db.VarChar(255)
+  type                 String?   @db.VarChar(50)
+  status               String    @default("draft") @db.VarChar(50)
+  saleDistributionType String?   @map("sale_distribution_type") @db.VarChar(50)
+  divisionMethod       Int?      @map("division_method")
+  coverUrl             String?   @map("cover_url") @db.VarChar(500)
+  startDate            DateTime? @map("start_date") @db.Date
+  endDate              DateTime? @map("end_date") @db.Date
+  position             Int       @default(0)
+  iamOwnerId           String    @map("iam_owner_id") @db.Uuid
+  approachNote         String?   @map("approach_note")
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy            String    @map("created_by") @db.Uuid
+  updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy            String    @map("updated_by") @db.Uuid
+  deletedAt            DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy            String?   @map("deleted_by") @db.Uuid
+  rowVersion           Int       @default(1) @map("row_version")
+
+  approaches    CampaignApproach[]
+  sales         CampaignSale[]
+  scoreConfigs  CampaignScoreConfig[]
+  slaConfigs    CampaignSlaConfig[]
+  opportunities Opportunity[]
+  maMappings    MaMapping[]
+
+  @@unique([tenantId, code])
+  @@map("campaigns")
+  @@schema("crm")
+}
+
+model CampaignApproach {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  campaignId  String    @map("campaign_id") @db.Uuid
+  name        String    @db.VarChar(255)
+  step        Int
+  slaHours    Int?      @map("sla_hours")
+  activities  Json?
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+  rowVersion  Int       @default(1) @map("row_version")
+
+  campaign      Campaign             @relation(fields: [campaignId], references: [id])
+  activities_   CampaignActivity[]   @relation("ApproachActivities")
+  slaConfigs    CampaignSlaConfig[]
+  opportunities Opportunity[]
+
+  @@unique([campaignId, step])
+  @@map("campaign_approaches")
+  @@schema("crm")
+}
+
+model CampaignActivity {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId           String    @map("tenant_id") @db.Uuid
+  campaignApproachId String    @map("campaign_approach_id") @db.Uuid
+  name               String    @db.VarChar(255)
+  position           Int       @default(0)
+  config             Json?
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy          String    @map("created_by") @db.Uuid
+  deletedAt          DateTime? @map("deleted_at") @db.Timestamptz
+  rowVersion         Int       @default(1) @map("row_version")
+
+  approach CampaignApproach @relation("ApproachActivities", fields: [campaignApproachId], references: [id])
+
+  @@map("campaign_activities")
+  @@schema("crm")
+}
+
+model CampaignSale {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  campaignId  String    @map("campaign_id") @db.Uuid
+  iamUserId   String    @map("iam_user_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+
+  campaign Campaign @relation(fields: [campaignId], references: [id])
+
+  @@unique([campaignId, iamUserId])
+  @@map("campaign_sales")
+  @@schema("crm")
+}
+
+model CampaignScoreConfig {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  campaignId  String   @map("campaign_id") @db.Uuid
+  actionType  String   @map("action_type") @db.VarChar(100)
+  scoreValue  Int      @default(0) @map("score_value")
+  condition   Json?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String   @map("created_by") @db.Uuid
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String   @map("updated_by") @db.Uuid
+  rowVersion  Int      @default(1) @map("row_version")
+
+  campaign Campaign @relation(fields: [campaignId], references: [id])
+
+  @@map("campaign_score_configs")
+  @@schema("crm")
+}
+
+model CampaignSlaConfig {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId           String    @map("tenant_id") @db.Uuid
+  campaignId         String    @map("campaign_id") @db.Uuid
+  campaignApproachId String?   @map("campaign_approach_id") @db.Uuid
+  slaHours           Int       @map("sla_hours")
+  escalationRule     Json?     @map("escalation_rule")
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy          String    @map("created_by") @db.Uuid
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy          String    @map("updated_by") @db.Uuid
+  rowVersion         Int       @default(1) @map("row_version")
+
+  campaign Campaign         @relation(fields: [campaignId], references: [id])
+  approach CampaignApproach? @relation(fields: [campaignApproachId], references: [id])
+
+  @@map("campaign_sla_configs")
+  @@schema("crm")
+}
+
+model Opportunity {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId           String    @map("tenant_id") @db.Uuid
+  campaignId         String    @map("campaign_id") @db.Uuid
+  campaignApproachId String?   @map("campaign_approach_id") @db.Uuid
+  contactPipelineId  String?   @map("contact_pipeline_id") @db.Uuid
+  refType            String    @default("customer") @map("ref_type") @db.VarChar(50)
+  customerId         String?   @map("customer_id") @db.Uuid
+  contactId          String?   @map("contact_id") @db.Uuid
+  iamOwnerId         String    @map("iam_owner_id") @db.Uuid
+  iamSaleId          String?   @map("iam_sale_id") @db.Uuid
+  crmSourceId        String?   @map("crm_source_id") @db.Uuid
+  expectedRevenue    Decimal   @default(0) @map("expected_revenue") @db.Decimal(18, 2)
+  startDate          DateTime? @map("start_date") @db.Date
+  endDate            DateTime? @map("end_date") @db.Date
+  percent            Int       @default(0)
+  status             String    @default("open") @db.VarChar(50)
+  note               String?
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy          String    @map("created_by") @db.Uuid
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy          String    @map("updated_by") @db.Uuid
+  deletedAt          DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy          String?   @map("deleted_by") @db.Uuid
+  rowVersion         Int       @default(1) @map("row_version")
+
+  campaign  Campaign          @relation(fields: [campaignId], references: [id])
+  approach  CampaignApproach? @relation(fields: [campaignApproachId], references: [id])
+  contact   Contact?          @relation(fields: [contactId], references: [id])
+  source    MarketingSource?  @relation(fields: [crmSourceId], references: [id])
+  pipeline  ContactPipeline?  @relation(fields: [contactPipelineId], references: [id])
+  processes OpportunityProcess[]
+  exchanges OpportunityExchange[]
+  viewers   OpportunityViewer[]
+  contacts  OpportunityContact[]
+
+  @@map("opportunities")
+  @@schema("crm")
+}
+
+model OpportunityProcess {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId           String    @map("tenant_id") @db.Uuid
+  opportunityId      String    @map("opportunity_id") @db.Uuid
+  campaignApproachId String?   @map("campaign_approach_id") @db.Uuid
+  note               String?
+  percent            Int?
+  status             String?   @db.VarChar(50)
+  occurredAt         DateTime  @default(now()) @map("occurred_at") @db.Timestamptz
+  createdBy          String    @map("created_by") @db.Uuid
+  deletedAt          DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy          String?   @map("deleted_by") @db.Uuid
+
+  opportunity Opportunity @relation(fields: [opportunityId], references: [id])
+
+  @@map("opportunity_processes")
+  @@schema("crm")
+}
+
+model OpportunityExchange {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  opportunityId String    @map("opportunity_id") @db.Uuid
+  iamAuthorId   String    @map("iam_author_id") @db.Uuid
+  content       String?
+  contentDelta  String?   @map("content_delta")
+  mediaUrls     Json?     @map("media_urls")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy     String?   @map("deleted_by") @db.Uuid
+
+  opportunity Opportunity @relation(fields: [opportunityId], references: [id])
+
+  @@map("opportunity_exchanges")
+  @@schema("crm")
+}
+
+model OpportunityViewer {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  opportunityId String   @map("opportunity_id") @db.Uuid
+  iamUserId     String   @map("iam_user_id") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  opportunity Opportunity @relation(fields: [opportunityId], references: [id])
+
+  @@unique([opportunityId, iamUserId])
+  @@map("opportunity_viewers")
+  @@schema("crm")
+}
+
+model OpportunityContact {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  opportunityId String    @map("opportunity_id") @db.Uuid
+  contactId     String    @map("contact_id") @db.Uuid
+  isPrimary     Boolean   @default(false) @map("is_primary")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy     String    @map("created_by") @db.Uuid
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz
+
+  opportunity Opportunity @relation(fields: [opportunityId], references: [id])
+  contact     Contact     @relation(fields: [contactId], references: [id])
+
+  @@unique([opportunityId, contactId])
+  @@map("opportunity_contacts")
+  @@schema("crm")
+}
+
+model CareHistory {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  careCategoryId String?   @map("care_category_id") @db.Uuid
+  objectType     String    @map("object_type") @db.VarChar(50)
+  customerId     String?   @map("customer_id") @db.Uuid
+  contactId      String?   @map("contact_id") @db.Uuid
+  iamEmployeeId  String    @map("iam_employee_id") @db.Uuid
+  content        String?
+  status         Int       @default(0)
+  occurredAt     DateTime  @default(now()) @map("occurred_at") @db.Timestamptz
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy      String    @map("created_by") @db.Uuid
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy      String?   @map("deleted_by") @db.Uuid
+
+  category CareCategory? @relation(fields: [careCategoryId], references: [id])
+  contact  Contact?      @relation(fields: [contactId], references: [id])
+
+  @@map("care_histories")
+  @@schema("crm")
+}
+
+model MarketingAutomation {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  name          String    @db.VarChar(255)
+  status        String    @default("draft") @db.VarChar(50)
+  triggerConfig Json?     @map("trigger_config")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy     String    @map("created_by") @db.Uuid
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy     String    @map("updated_by") @db.Uuid
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy     String?   @map("deleted_by") @db.Uuid
+  rowVersion    Int       @default(1) @map("row_version")
+
+  nodes     MaNode[]
+  customers MaCustomer[]
+  mappings  MaMapping[]
+
+  @@map("marketing_automations")
+  @@schema("crm")
+}
+
+model MaNode {
+  id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId              String    @map("tenant_id") @db.Uuid
+  marketingAutomationId String    @map("marketing_automation_id") @db.Uuid
+  nodeType              String    @map("node_type") @db.VarChar(100)
+  positionX             Int       @default(0) @map("position_x")
+  positionY             Int       @default(0) @map("position_y")
+  nodeConfig            Json?     @map("node_config")
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy             String    @map("created_by") @db.Uuid
+  deletedAt             DateTime? @map("deleted_at") @db.Timestamptz
+
+  automation MarketingAutomation @relation(fields: [marketingAutomationId], references: [id])
+
+  @@map("ma_nodes")
+  @@schema("crm")
+}
+
+model MaCustomer {
+  id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId              String    @map("tenant_id") @db.Uuid
+  marketingAutomationId String    @map("marketing_automation_id") @db.Uuid
+  customerId            String    @map("customer_id") @db.Uuid
+  status                String    @default("enrolled") @db.VarChar(50)
+  resultData            Json?     @map("result_data")
+  enrolledAt            DateTime  @default(now()) @map("enrolled_at") @db.Timestamptz
+  completedAt           DateTime? @map("completed_at") @db.Timestamptz
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy             String    @map("created_by") @db.Uuid
+  deletedAt             DateTime? @map("deleted_at") @db.Timestamptz
+
+  automation MarketingAutomation @relation(fields: [marketingAutomationId], references: [id])
+
+  @@unique([marketingAutomationId, customerId])
+  @@map("ma_customers")
+  @@schema("crm")
+}
+
+model MaMapping {
+  id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId              String   @map("tenant_id") @db.Uuid
+  marketingAutomationId String   @map("marketing_automation_id") @db.Uuid
+  campaignId            String?  @map("campaign_id") @db.Uuid
+  mappingConfig         Json?    @map("mapping_config")
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz
+  createdBy             String   @map("created_by") @db.Uuid
+  updatedAt             DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy             String   @map("updated_by") @db.Uuid
+
+  automation MarketingAutomation @relation(fields: [marketingAutomationId], references: [id])
+  campaign   Campaign?           @relation(fields: [campaignId], references: [id])
+
+  @@map("ma_mappings")
+  @@schema("crm")
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// TICKET SCHEMA
+// ═════════════════════════════════════════════════════════════════════════════
+
+model TicketCategory {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  name       String    @db.VarChar(255)
+  type       Int       @default(0)
+  position   Int       @default(0)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy  String    @map("created_by") @db.Uuid
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy  String    @map("updated_by") @db.Uuid
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy  String?   @map("deleted_by") @db.Uuid
+  rowVersion Int       @default(1) @map("row_version")
+
+  tickets Ticket[]
+
+  @@map("ticket_categories")
+  @@schema("ticket")
+}
+
+model TicketProcedure {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  name          String    @db.VarChar(255)
+  code          String?   @db.VarChar(50)
+  status        Int       @default(0)
+  divisionMethod Int?     @map("division_method")
+  description   String?
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy     String    @map("created_by") @db.Uuid
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy     String    @map("updated_by") @db.Uuid
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy     String?   @map("deleted_by") @db.Uuid
+  rowVersion    Int       @default(1) @map("row_version")
+
+  steps   TicketProcedureStep[]
+  links   TicketProcedureLink[]
+  configs SupportConfig[]
+  tickets Ticket[]
+
+  @@map("ticket_procedures")
+  @@schema("ticket")
+}
+
+model TicketProcedureStep {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  procedureId     String    @map("procedure_id") @db.Uuid
+  name            String    @db.VarChar(255)
+  stepType        String    @default("task") @map("step_type") @db.VarChar(30)
+  iamDepartmentId String?   @map("iam_department_id") @db.Uuid
+  period          Int?
+  periodUnit      String?   @map("period_unit") @db.VarChar(20)
+  position        Int       @default(0)
+  config          Json?
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy       String    @map("created_by") @db.Uuid
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy       String    @map("updated_by") @db.Uuid
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy       String?   @map("deleted_by") @db.Uuid
+
+  procedure    TicketProcedure              @relation(fields: [procedureId], references: [id])
+  assignees    TicketProcedureStepAssignee[]
+  fromLinks    TicketProcedureLink[]        @relation("LinkFrom")
+  toLinks      TicketProcedureLink[]        @relation("LinkTo")
+  supportObjects SupportObject[]
+
+  @@map("ticket_procedure_steps")
+  @@schema("ticket")
+}
+
+model TicketProcedureStepAssignee {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  stepId     String    @map("step_id") @db.Uuid
+  iamUserId  String    @map("iam_user_id") @db.Uuid
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz
+
+  step TicketProcedureStep @relation(fields: [stepId], references: [id])
+
+  @@map("ticket_procedure_step_assignees")
+  @@schema("ticket")
+}
+
+model TicketProcedureLink {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  procedureId String   @map("procedure_id") @db.Uuid
+  fromStepId  String   @map("from_step_id") @db.Uuid
+  toStepId    String   @map("to_step_id") @db.Uuid
+  condition   Json?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String   @map("created_by") @db.Uuid
+
+  procedure TicketProcedure     @relation(fields: [procedureId], references: [id])
+  fromStep  TicketProcedureStep @relation("LinkFrom", fields: [fromStepId], references: [id])
+  toStep    TicketProcedureStep @relation("LinkTo", fields: [toStepId], references: [id])
+
+  @@map("ticket_procedure_links")
+  @@schema("ticket")
+}
+
+model SupportConfig {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  procedureId String    @map("procedure_id") @db.Uuid
+  configKey   String    @map("config_key") @db.VarChar(100)
+  configValue Json?     @map("config_value")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+
+  procedure TicketProcedure @relation(fields: [procedureId], references: [id])
+
+  @@map("support_configs")
+  @@schema("ticket")
+}
+
+model Ticket {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  code            String?   @db.VarChar(50)
+  title           String    @db.VarChar(500)
+  content         String?
+  customerId      String?   @map("customer_id") @db.Uuid
+  phone           String?   @db.VarChar(30)
+  categoryId      String?   @map("category_id") @db.Uuid
+  procedureId     String?   @map("procedure_id") @db.Uuid
+  iamEmployeeId   String?   @map("iam_employee_id") @db.Uuid
+  iamCreatorId    String?   @map("iam_creator_id") @db.Uuid
+  iamExecutorId   String?   @map("iam_executor_id") @db.Uuid
+  iamDepartmentId String?   @map("iam_department_id") @db.Uuid
+  status          Int       @default(0)
+  priority        Int       @default(0)
+  startDate       DateTime? @map("start_date") @db.Date
+  endDate         DateTime? @map("end_date") @db.Date
+  note            String?
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy       String    @map("created_by") @db.Uuid
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy       String    @map("updated_by") @db.Uuid
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy       String?   @map("deleted_by") @db.Uuid
+  rowVersion      Int       @default(1) @map("row_version")
+
+  category        TicketCategory?   @relation(fields: [categoryId], references: [id])
+  procedure       TicketProcedure?  @relation(fields: [procedureId], references: [id])
+  exchanges       TicketExchange[]
+  viewers         TicketViewer[]
+  supportObjects  SupportObject[]
+
+  @@map("tickets")
+  @@schema("ticket")
+}
+
+model TicketExchange {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  ticketId    String    @map("ticket_id") @db.Uuid
+  iamAuthorId String    @map("iam_author_id") @db.Uuid
+  content     String?
+  contentDelta String?  @map("content_delta")
+  mediaUrls   Json?     @map("media_urls")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+
+  ticket Ticket @relation(fields: [ticketId], references: [id])
+
+  @@map("ticket_exchanges")
+  @@schema("ticket")
+}
+
+model TicketViewer {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  ticketId  String   @map("ticket_id") @db.Uuid
+  iamUserId String   @map("iam_user_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  ticket Ticket @relation(fields: [ticketId], references: [id])
+
+  @@unique([ticketId, iamUserId])
+  @@map("ticket_viewers")
+  @@schema("ticket")
+}
+
+model SupportObject {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  ticketId    String    @map("ticket_id") @db.Uuid
+  stepId      String    @map("step_id") @db.Uuid
+  iamAssigneeId String? @map("iam_assignee_id") @db.Uuid
+  status      Int       @default(0)
+  note        String?
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+
+  ticket Ticket              @relation(fields: [ticketId], references: [id])
+  step   TicketProcedureStep @relation(fields: [stepId], references: [id])
+  logs   SupportLog[]
+
+  @@map("support_objects")
+  @@schema("ticket")
+}
+
+model SupportLog {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  supportObjectId String  @map("support_object_id") @db.Uuid
+  iamActorId     String   @map("iam_actor_id") @db.Uuid
+  action         Int      @default(0)
+  status         Int      @default(0)
+  note           String?
+  occurredAt     DateTime @default(now()) @map("occurred_at") @db.Timestamptz
+  createdBy      String   @map("created_by") @db.Uuid
+
+  supportObject SupportObject @relation(fields: [supportObjectId], references: [id])
+
+  @@map("support_logs")
+  @@schema("ticket")
+}
+
+model QrCode {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  name       String    @db.VarChar(100)
+  code       String    @unique @db.VarChar(100)
+  link       String    @db.VarChar(1000)
+  startDate  DateTime? @map("start_date") @db.Date
+  endDate    DateTime? @map("end_date") @db.Date
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy  String    @map("created_by") @db.Uuid
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy  String    @map("updated_by") @db.Uuid
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy  String?   @map("deleted_by") @db.Uuid
+  rowVersion Int       @default(1) @map("row_version")
+
+  @@map("qr_codes")
+  @@schema("ticket")
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// WARRANTY SCHEMA
+// ═════════════════════════════════════════════════════════════════════════════
+
+model WarrantyCategory {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  name          String    @db.VarChar(255)
+  categoryType  Int       @default(1) @map("category_type")
+  colorHex      String?   @map("color_hex") @db.VarChar(30)
+  position      Int       @default(0)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy     String    @map("created_by") @db.Uuid
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy     String    @map("updated_by") @db.Uuid
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy     String?   @map("deleted_by") @db.Uuid
+  rowVersion    Int       @default(1) @map("row_version")
+
+  warranties         Warranty[]         @relation("WarrantyStatus")
+  warrantyReasons    Warranty[]         @relation("WarrantyReason")
+  warrantyProcesses  WarrantyProcess[]
+
+  @@map("warranty_categories")
+  @@schema("warranty")
+}
+
+model WarrantyProcedure {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  name          String    @db.VarChar(255)
+  code          String?   @db.VarChar(50)
+  status        Int       @default(0)
+  divisionMethod Int?     @map("division_method")
+  description   String?
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy     String    @map("created_by") @db.Uuid
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy     String    @map("updated_by") @db.Uuid
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy     String?   @map("deleted_by") @db.Uuid
+  rowVersion    Int       @default(1) @map("row_version")
+
+  steps      WarrantyProcedureStep[]
+  links      WarrantyProcedureLink[]
+  warranties Warranty[]
+
+  @@map("warranty_procedures")
+  @@schema("warranty")
+}
+
+model WarrantyProcedureStep {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  procedureId     String    @map("procedure_id") @db.Uuid
+  name            String    @db.VarChar(255)
+  stepType        String    @default("task") @map("step_type") @db.VarChar(30)
+  iamDepartmentId String?   @map("iam_department_id") @db.Uuid
+  period          Int?
+  periodUnit      String?   @map("period_unit") @db.VarChar(20)
+  position        Int       @default(0)
+  config          Json?
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy       String    @map("created_by") @db.Uuid
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy       String    @map("updated_by") @db.Uuid
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy       String?   @map("deleted_by") @db.Uuid
+
+  procedure      WarrantyProcedure     @relation(fields: [procedureId], references: [id])
+  fromLinks      WarrantyProcedureLink[] @relation("WLinkFrom")
+  toLinks        WarrantyProcedureLink[] @relation("WLinkTo")
+  supportObjects WarrantySupportObject[]
+
+  @@map("warranty_procedure_steps")
+  @@schema("warranty")
+}
+
+model WarrantyProcedureLink {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  procedureId String   @map("procedure_id") @db.Uuid
+  fromStepId  String   @map("from_step_id") @db.Uuid
+  toStepId    String   @map("to_step_id") @db.Uuid
+  condition   Json?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String   @map("created_by") @db.Uuid
+
+  procedure WarrantyProcedure     @relation(fields: [procedureId], references: [id])
+  fromStep  WarrantyProcedureStep @relation("WLinkFrom", fields: [fromStepId], references: [id])
+  toStep    WarrantyProcedureStep @relation("WLinkTo", fields: [toStepId], references: [id])
+
+  @@map("warranty_procedure_links")
+  @@schema("warranty")
+}
+
+model Warranty {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  code            String?   @db.VarChar(50)
+  title           String    @db.VarChar(500)
+  content         String?
+  customerId      String?   @map("customer_id") @db.Uuid
+  phone           String?   @db.VarChar(30)
+  statusId        String?   @map("status_id") @db.Uuid
+  reasonId        String?   @map("reason_id") @db.Uuid
+  procedureId     String?   @map("procedure_id") @db.Uuid
+  iamEmployeeId   String?   @map("iam_employee_id") @db.Uuid
+  iamCreatorId    String?   @map("iam_creator_id") @db.Uuid
+  iamDepartmentId String?   @map("iam_department_id") @db.Uuid
+  status          Int       @default(0)
+  startDate       DateTime? @map("start_date") @db.Date
+  endDate         DateTime? @map("end_date") @db.Date
+  note            String?
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy       String    @map("created_by") @db.Uuid
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy       String    @map("updated_by") @db.Uuid
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy       String?   @map("deleted_by") @db.Uuid
+  rowVersion      Int       @default(1) @map("row_version")
+
+  warrantyStatus    WarrantyCategory? @relation("WarrantyStatus", fields: [statusId], references: [id])
+  warrantyReason    WarrantyCategory? @relation("WarrantyReason", fields: [reasonId], references: [id])
+  procedure         WarrantyProcedure? @relation(fields: [procedureId], references: [id])
+  exchanges         WarrantyExchange[]
+  viewers           WarrantyViewer[]
+  processes         WarrantyProcess[]
+  supportObjects    WarrantySupportObject[]
+
+  @@map("warranties")
+  @@schema("warranty")
+}
+
+model WarrantyExchange {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  warrantyId  String    @map("warranty_id") @db.Uuid
+  iamAuthorId String    @map("iam_author_id") @db.Uuid
+  content     String?
+  contentDelta String?  @map("content_delta")
+  mediaUrls   Json?     @map("media_urls")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+
+  warranty Warranty @relation(fields: [warrantyId], references: [id])
+
+  @@map("warranty_exchanges")
+  @@schema("warranty")
+}
+
+model WarrantyViewer {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  warrantyId String   @map("warranty_id") @db.Uuid
+  iamUserId  String   @map("iam_user_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  warranty Warranty @relation(fields: [warrantyId], references: [id])
+
+  @@unique([warrantyId, iamUserId])
+  @@map("warranty_viewers")
+  @@schema("warranty")
+}
+
+model WarrantyProcess {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  warrantyId String    @map("warranty_id") @db.Uuid
+  statusId   String?   @map("status_id") @db.Uuid
+  note       String?
+  occurredAt DateTime  @default(now()) @map("occurred_at") @db.Timestamptz
+  createdBy  String    @map("created_by") @db.Uuid
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz
+
+  warranty Warranty          @relation(fields: [warrantyId], references: [id])
+  status   WarrantyCategory? @relation(fields: [statusId], references: [id])
+
+  @@map("warranty_processes")
+  @@schema("warranty")
+}
+
+model WarrantySupportObject {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  warrantyId  String    @map("warranty_id") @db.Uuid
+  stepId      String    @map("step_id") @db.Uuid
+  iamAssigneeId String? @map("iam_assignee_id") @db.Uuid
+  status      Int       @default(0)
+  note        String?
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+
+  warranty Warranty              @relation(fields: [warrantyId], references: [id])
+  step     WarrantyProcedureStep @relation(fields: [stepId], references: [id])
+  logs     WarrantySupportLog[]
+
+  @@map("warranty_support_objects")
+  @@schema("warranty")
+}
+
+model WarrantySupportLog {
+  id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId              String   @map("tenant_id") @db.Uuid
+  warrantySupportObjectId String @map("warranty_support_object_id") @db.Uuid
+  iamActorId            String   @map("iam_actor_id") @db.Uuid
+  action                Int      @default(0)
+  status                Int      @default(0)
+  note                  String?
+  occurredAt            DateTime @default(now()) @map("occurred_at") @db.Timestamptz
+  createdBy             String   @map("created_by") @db.Uuid
+
+  supportObject WarrantySupportObject @relation(fields: [warrantySupportObjectId], references: [id])
+
+  @@map("warranty_support_logs")
+  @@schema("warranty")
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// BPM SCHEMA — Lightweight Workflow Engine
+// ═════════════════════════════════════════════════════════════════════════════
+
+model BpmProcessTemplate {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  name        String    @db.VarChar(255)
+  code        String?   @db.VarChar(100)
+  category    String?   @db.VarChar(100)
+  status      String    @default("draft") @db.VarChar(30)
+  description String?
+  version     Int       @default(1)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+  rowVersion  Int       @default(1) @map("row_version")
+
+  nodes     BpmNode[]
+  edges     BpmEdge[]
+  instances BpmProcessInstance[]
+
+  @@unique([tenantId, code])
+  @@map("bpm_process_templates")
+  @@schema("bpm")
+}
+
+model BpmNode {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  templateId  String    @map("template_id") @db.Uuid
+  nodeKey     String    @map("node_key") @db.VarChar(100)
+  nodeType    String    @map("node_type") @db.VarChar(50)
+  name        String    @db.VarChar(255)
+  positionX   Float     @default(0) @map("position_x")
+  positionY   Float     @default(0) @map("position_y")
+  config      Json?
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+
+  template    BpmProcessTemplate @relation(fields: [templateId], references: [id])
+  fromEdges   BpmEdge[]          @relation("EdgeFrom")
+  toEdges     BpmEdge[]          @relation("EdgeTo")
+  taskTokens  BpmTaskToken[]
+
+  @@unique([templateId, nodeKey])
+  @@map("bpm_nodes")
+  @@schema("bpm")
+}
+
+model BpmEdge {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  templateId String    @map("template_id") @db.Uuid
+  edgeKey    String    @map("edge_key") @db.VarChar(100)
+  fromNodeId String    @map("from_node_id") @db.Uuid
+  toNodeId   String    @map("to_node_id") @db.Uuid
+  label      String?   @db.VarChar(100)
+  condition  Json?
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy  String    @map("created_by") @db.Uuid
+
+  template BpmProcessTemplate @relation(fields: [templateId], references: [id])
+  fromNode BpmNode            @relation("EdgeFrom", fields: [fromNodeId], references: [id])
+  toNode   BpmNode            @relation("EdgeTo", fields: [toNodeId], references: [id])
+
+  @@map("bpm_edges")
+  @@schema("bpm")
+}
+
+model BpmProcessInstance {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  templateId  String    @map("template_id") @db.Uuid
+  refType     String?   @map("ref_type") @db.VarChar(50)
+  refId       String?   @map("ref_id") @db.Uuid
+  status      String    @default("running") @db.VarChar(30)
+  startedAt   DateTime  @default(now()) @map("started_at") @db.Timestamptz
+  completedAt DateTime? @map("completed_at") @db.Timestamptz
+  iamStartedBy String   @map("iam_started_by") @db.Uuid
+  variables   Json?
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+
+  template   BpmProcessTemplate @relation(fields: [templateId], references: [id])
+  tokens     BpmTaskToken[]
+  workOrders BpmWorkOrder[]
+  history    BpmInstanceHistory[]
+
+  @@map("bpm_process_instances")
+  @@schema("bpm")
+}
+
+model BpmTaskToken {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  instanceId  String    @map("instance_id") @db.Uuid
+  nodeId      String    @map("node_id") @db.Uuid
+  status      String    @default("active") @db.VarChar(30)
+  iamAssigneeId String? @map("iam_assignee_id") @db.Uuid
+  claimedAt   DateTime? @map("claimed_at") @db.Timestamptz
+  completedAt DateTime? @map("completed_at") @db.Timestamptz
+  variables   Json?
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+
+  instance BpmProcessInstance @relation(fields: [instanceId], references: [id])
+  node     BpmNode            @relation(fields: [nodeId], references: [id])
+
+  @@map("bpm_task_tokens")
+  @@schema("bpm")
+}
+
+model BpmWorkOrder {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  instanceId  String    @map("instance_id") @db.Uuid
+  code        String?   @db.VarChar(50)
+  title       String    @db.VarChar(500)
+  content     String?
+  iamAssigneeId String? @map("iam_assignee_id") @db.Uuid
+  status      String    @default("pending") @db.VarChar(30)
+  priority    Int       @default(0)
+  dueDate     DateTime? @map("due_date") @db.Timestamptz
+  completedAt DateTime? @map("completed_at") @db.Timestamptz
+  note        String?
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+  rowVersion  Int       @default(1) @map("row_version")
+
+  instance   BpmProcessInstance @relation(fields: [instanceId], references: [id])
+  exchanges  BpmWorkOrderExchange[]
+  approvals  BpmApproval[]
+
+  @@map("bpm_work_orders")
+  @@schema("bpm")
+}
+
+model BpmWorkOrderExchange {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  workOrderId String    @map("work_order_id") @db.Uuid
+  iamAuthorId String    @map("iam_author_id") @db.Uuid
+  content     String?
+  mediaUrls   Json?     @map("media_urls")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+
+  workOrder BpmWorkOrder @relation(fields: [workOrderId], references: [id])
+
+  @@map("bpm_work_order_exchanges")
+  @@schema("bpm")
+}
+
+model BpmApprovalDefinition {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  name        String    @db.VarChar(255)
+  code        String?   @db.VarChar(100)
+  approvalType String   @default("sequential") @map("approval_type") @db.VarChar(30)
+  config      Json?
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+  rowVersion  Int       @default(1) @map("row_version")
+
+  approvals BpmApproval[]
+
+  @@map("bpm_approval_definitions")
+  @@schema("bpm")
+}
+
+model BpmApproval {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  workOrderId    String?   @map("work_order_id") @db.Uuid
+  definitionId   String?   @map("definition_id") @db.Uuid
+  iamApproverId  String    @map("iam_approver_id") @db.Uuid
+  status         String    @default("pending") @db.VarChar(30)
+  comment        String?
+  approvedAt     DateTime? @map("approved_at") @db.Timestamptz
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy      String    @map("created_by") @db.Uuid
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy      String    @map("updated_by") @db.Uuid
+
+  workOrder  BpmWorkOrder?         @relation(fields: [workOrderId], references: [id])
+  definition BpmApprovalDefinition? @relation(fields: [definitionId], references: [id])
+
+  @@map("bpm_approvals")
+  @@schema("bpm")
+}
+
+model BpmInstanceHistory {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  instanceId String   @map("instance_id") @db.Uuid
+  eventType  String   @map("event_type") @db.VarChar(50)
+  fromNode   String?  @map("from_node") @db.VarChar(100)
+  toNode     String?  @map("to_node") @db.VarChar(100)
+  iamActorId String?  @map("iam_actor_id") @db.Uuid
+  data       Json?
+  occurredAt DateTime @default(now()) @map("occurred_at") @db.Timestamptz
+  createdBy  String   @map("created_by") @db.Uuid
+
+  instance BpmProcessInstance @relation(fields: [instanceId], references: [id])
+
+  @@map("bpm_instance_history")
+  @@schema("bpm")
+}
+
+model BusinessRule {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  name        String    @db.VarChar(255)
+  code        String?   @db.VarChar(100)
+  isActive    Boolean   @default(true) @map("is_active")
+  config      Json?
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+  rowVersion  Int       @default(1) @map("row_version")
+
+  items BusinessRuleItem[]
+
+  @@map("business_rules")
+  @@schema("bpm")
+}
+
+// ── BPM Form Models ───────────────────────────────────────────────────────────
+
+model BpmForm {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  name        String    @db.VarChar(255)
+  code        String?   @db.VarChar(100)
+  description String?
+  schema      Json?
+  isActive    Boolean   @default(true) @map("is_active")
+  version     Int       @default(1)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+  rowVersion  Int       @default(1) @map("row_version")
+
+  artifacts    BpmFormArtifact[]
+  formMappings BpmFormMapping[]
+  processes    BpmFormProcess[]
+
+  @@unique([tenantId, code])
+  @@map("bpm_forms")
+  @@schema("bpm")
+}
+
+model BpmFormArtifact {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  bpmFormId   String    @map("bpm_form_id") @db.Uuid
+  fieldKey    String    @map("field_key") @db.VarChar(100)
+  fieldLabel  String    @map("field_label") @db.VarChar(255)
+  fieldType   String    @default("text") @map("field_type") @db.VarChar(30)
+  position    Int       @default(0)
+  config      Json?
+  eformConfig Json?     @map("eform_config")
+  isRequired  Boolean   @default(false) @map("is_required")
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+
+  bpmForm BpmForm @relation(fields: [bpmFormId], references: [id])
+
+  @@index([bpmFormId])
+  @@map("bpm_form_artifacts")
+  @@schema("bpm")
+}
+
+model BpmFormMapping {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  bpmFormId   String    @map("bpm_form_id") @db.Uuid
+  sourceField String    @map("source_field") @db.VarChar(255)
+  targetField String    @map("target_field") @db.VarChar(255)
+  targetModel String?   @map("target_model") @db.VarChar(100)
+  mapType     String    @default("direct") @map("map_type") @db.VarChar(30)
+  config      Json?
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+
+  bpmForm BpmForm @relation(fields: [bpmFormId], references: [id])
+
+  @@index([bpmFormId])
+  @@map("bpm_form_mappings")
+  @@schema("bpm")
+}
+
+model BpmFormProcess {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  bpmFormId    String    @map("bpm_form_id") @db.Uuid
+  templateId   String?   @map("template_id") @db.Uuid
+  nodeKey      String?   @map("node_key") @db.VarChar(100)
+  triggerEvent String?   @map("trigger_event") @db.VarChar(100)
+  config       Json?
+  isActive     Boolean   @default(true) @map("is_active")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy    String    @map("created_by") @db.Uuid
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy    String    @map("updated_by") @db.Uuid
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy    String?   @map("deleted_by") @db.Uuid
+
+  bpmForm BpmForm @relation(fields: [bpmFormId], references: [id])
+
+  @@index([bpmFormId])
+  @@map("bpm_form_processes")
+  @@schema("bpm")
+}
+
+model BpmParticipant {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  templateId    String?   @map("template_id") @db.Uuid
+  nodeKey       String?   @map("node_key") @db.VarChar(100)
+  participantType String  @default("user") @map("participant_type") @db.VarChar(30)
+  iamUserId     String?   @map("iam_user_id") @db.Uuid
+  iamRoleId     String?   @map("iam_role_id") @db.Uuid
+  iamDeptId     String?   @map("iam_dept_id") @db.Uuid
+  isBlacklisted Boolean   @default(false) @map("is_blacklisted")
+  config        Json?
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy     String    @map("created_by") @db.Uuid
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy     String    @map("updated_by") @db.Uuid
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy     String?   @map("deleted_by") @db.Uuid
+
+  @@index([tenantId, templateId])
+  @@map("bpm_participants")
+  @@schema("bpm")
+}
+
+model EformMapping {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  eformCode    String    @map("eform_code") @db.VarChar(100)
+  eformName    String    @map("eform_name") @db.VarChar(255)
+  sourceField  String    @map("source_field") @db.VarChar(255)
+  targetField  String    @map("target_field") @db.VarChar(255)
+  targetModel  String?   @map("target_model") @db.VarChar(100)
+  config       Json?
+  isActive     Boolean   @default(true) @map("is_active")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy    String    @map("created_by") @db.Uuid
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy    String    @map("updated_by") @db.Uuid
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy    String?   @map("deleted_by") @db.Uuid
+
+  @@index([tenantId])
+  @@map("eform_mappings")
+  @@schema("bpm")
+}
+
+model ApprovedObjectLog {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  objectType  String   @map("object_type") @db.VarChar(100)
+  objectId    String   @map("object_id") @db.Uuid
+  action      String   @db.VarChar(50)
+  fromStatus  String?  @map("from_status") @db.VarChar(50)
+  toStatus    String?  @map("to_status") @db.VarChar(50)
+  iamActorId  String   @map("iam_actor_id") @db.Uuid
+  note        String?
+  data        Json?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([tenantId, objectType, objectId])
+  @@map("approved_object_logs")
+  @@schema("bpm")
+}
+
+// ── Adminapi Approval Models ──────────────────────────────────────────────────
+
+model Approval {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  name        String    @db.VarChar(255)
+  code        String?   @db.VarChar(100)
+  objectType  String?   @map("object_type") @db.VarChar(100)
+  status      Int       @default(1)
+  config      Json?
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+  rowVersion  Int       @default(1) @map("row_version")
+
+  configs  ApprovalConfig[]
+  links    ApprovalLink[]
+  objects  ApprovalObject[]
+  logs     ApprovalLog[]
+  alertConfig Json? @map("alert_config")
+
+  @@index([tenantId])
+  @@map("approvals")
+  @@schema("bpm")
+}
+
+model ApprovalConfig {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  approvalId  String    @map("approval_id") @db.Uuid
+  stepNo      Int       @default(1) @map("step_no")
+  name        String    @db.VarChar(255)
+  approverType String   @default("user") @map("approver_type") @db.VarChar(30)
+  approverId  String?   @map("approver_id") @db.Uuid
+  isParallel  Boolean   @default(false) @map("is_parallel")
+  config      Json?
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+
+  approval Approval @relation(fields: [approvalId], references: [id])
+
+  @@index([approvalId])
+  @@map("approval_configs")
+  @@schema("bpm")
+}
+
+model ApprovalLink {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  approvalId  String    @map("approval_id") @db.Uuid
+  objectType  String    @map("object_type") @db.VarChar(100)
+  condition   Json?
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+
+  approval Approval @relation(fields: [approvalId], references: [id])
+
+  @@index([approvalId])
+  @@map("approval_links")
+  @@schema("bpm")
+}
+
+model ApprovalObject {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  approvalId  String    @map("approval_id") @db.Uuid
+  objectType  String    @map("object_type") @db.VarChar(100)
+  objectId    String    @map("object_id") @db.Uuid
+  currentStep Int       @default(1) @map("current_step")
+  status      String    @default("pending") @db.VarChar(30)
+  isApproved  Boolean   @default(false) @map("is_approved")
+  data        Json?
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+
+  approval Approval @relation(fields: [approvalId], references: [id])
+  logs     ApprovalLog[]
+
+  @@index([tenantId, objectType, objectId])
+  @@map("approval_objects")
+  @@schema("bpm")
+}
+
+model ApprovalLog {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId         String    @map("tenant_id") @db.Uuid
+  approvalId       String    @map("approval_id") @db.Uuid
+  approvalObjectId String?   @map("approval_object_id") @db.Uuid
+  stepNo           Int       @default(1) @map("step_no")
+  iamActorId       String    @map("iam_actor_id") @db.Uuid
+  action           String    @db.VarChar(30)
+  comment          String?
+  data             Json?
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy        String    @map("created_by") @db.Uuid
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy        String    @map("updated_by") @db.Uuid
+  deletedAt        DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy        String?   @map("deleted_by") @db.Uuid
+
+  approval       Approval       @relation(fields: [approvalId], references: [id])
+  approvalObject ApprovalObject? @relation(fields: [approvalObjectId], references: [id])
+
+  @@index([approvalId])
+  @@map("approval_logs")
+  @@schema("bpm")
+}
+
+model BusinessRuleItem {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  businessRuleId String    @map("business_rule_id") @db.Uuid
+  name           String    @db.VarChar(255)
+  condition      Json?
+  action         Json?
+  position       Int       @default(0)
+  isActive       Boolean   @default(true) @map("is_active")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy      String    @map("created_by") @db.Uuid
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy      String    @map("updated_by") @db.Uuid
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy      String?   @map("deleted_by") @db.Uuid
+
+  businessRule BusinessRule @relation(fields: [businessRuleId], references: [id])
+
+  @@map("business_rule_items")
+  @@schema("bpm")
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// NOTIFICATION SCHEMA
+// ═════════════════════════════════════════════════════════════════════════════
+
+model FcmDevice {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  fcmToken   String    @map("fcm_token")
+  deviceType String?   @map("device_type") @db.VarChar(30)
+  isActive   Boolean   @default(true) @map("is_active")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("fcm_devices")
+  @@schema("notification")
+}
+
+model NotificationHistory {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  title      String    @db.VarChar(255)
+  body       String?
+  data       Json?
+  isRead     Boolean   @default(false) @map("is_read")
+  readAt     DateTime? @map("read_at") @db.Timestamptz
+  refType    String?   @map("ref_type") @db.VarChar(50)
+  refId      String?   @map("ref_id") @db.Uuid
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy  String?   @map("deleted_by") @db.Uuid
+
+  @@map("notification_histories")
+  @@schema("notification")
+}
+
+model NotificationTemplate {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  name        String    @db.VarChar(255)
+  code        String    @db.VarChar(100)
+  titleTemplate String  @map("title_template")
+  bodyTemplate  String  @map("body_template")
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+
+  @@unique([tenantId, code])
+  @@map("notification_templates")
+  @@schema("notification")
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// CRM EXTENDED — Contract, Saleflow, KPI, Schedule, Marketing
+// ═════════════════════════════════════════════════════════════════════════════
+
+model ContractPipeline {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  name       String    @db.VarChar(255)
+  position   Int       @default(0)
+  isActive   Boolean   @default(true) @map("is_active")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy  String    @map("created_by") @db.Uuid
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy  String    @map("updated_by") @db.Uuid
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy  String?   @map("deleted_by") @db.Uuid
+
+  stages ContractStage[]
+  contracts Contract[]
+
+  @@index([tenantId])
+  @@map("contract_pipelines")
+  @@schema("crm")
+}
+
+model ContractStage {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  pipelineId   String    @map("pipeline_id") @db.Uuid
+  name         String    @db.VarChar(255)
+  position     Int       @default(0)
+  colorHex     String?   @map("color_hex") @db.VarChar(30)
+  isWon        Boolean   @default(false) @map("is_won")
+  isLost       Boolean   @default(false) @map("is_lost")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy    String    @map("created_by") @db.Uuid
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy    String    @map("updated_by") @db.Uuid
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy    String?   @map("deleted_by") @db.Uuid
+
+  pipeline  ContractPipeline @relation(fields: [pipelineId], references: [id])
+  contracts Contract[]
+
+  @@index([pipelineId])
+  @@map("contract_stages")
+  @@schema("crm")
+}
+
+model Contract {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId         String    @map("tenant_id") @db.Uuid
+  code             String?   @db.VarChar(100)
+  title            String    @db.VarChar(500)
+  customerId       String?   @map("customer_id") @db.Uuid
+  contactId        String?   @map("contact_id") @db.Uuid
+  pipelineId       String?   @map("pipeline_id") @db.Uuid
+  stageId          String?   @map("stage_id") @db.Uuid
+  iamOwnerId       String?   @map("iam_owner_id") @db.Uuid
+  status           String    @default("draft") @db.VarChar(50)
+  contractDate     DateTime? @map("contract_date") @db.Date
+  expiryDate       DateTime? @map("expiry_date") @db.Date
+  totalValue       Decimal?  @map("total_value") @db.Decimal(18, 2)
+  currency         String?   @db.VarChar(10)
+  description      String?
+  note             String?
+  tags             Json?
+  attachments      Json?
+  extraFields      Json?     @map("extra_fields")
+  bpmInstanceId    String?   @map("bpm_instance_id") @db.Uuid
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy        String    @map("created_by") @db.Uuid
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy        String    @map("updated_by") @db.Uuid
+  deletedAt        DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy        String?   @map("deleted_by") @db.Uuid
+  rowVersion       Int       @default(1) @map("row_version")
+
+  pipeline    ContractPipeline? @relation(fields: [pipelineId], references: [id])
+  stage       ContractStage?    @relation(fields: [stageId], references: [id])
+  activities  ContractActivity[]
+  appendices  ContractAppendix[]
+  payments    ContractPayment[]
+  exchanges   ContractExchange[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, customerId])
+  @@map("contracts")
+  @@schema("crm")
+}
+
+model ContractActivity {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  contractId String    @map("contract_id") @db.Uuid
+  actType    String    @default("note") @map("act_type") @db.VarChar(30)
+  content    String?
+  data       Json?
+  iamActorId String    @map("iam_actor_id") @db.Uuid
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz
+
+  contract Contract @relation(fields: [contractId], references: [id])
+
+  @@index([contractId])
+  @@map("contract_activities")
+  @@schema("crm")
+}
+
+model ContractAppendix {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  contractId   String    @map("contract_id") @db.Uuid
+  code         String?   @db.VarChar(100)
+  title        String    @db.VarChar(500)
+  content      String?
+  signedDate   DateTime? @map("signed_date") @db.Date
+  totalValue   Decimal?  @map("total_value") @db.Decimal(18, 2)
+  status       String    @default("draft") @db.VarChar(50)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy    String    @map("created_by") @db.Uuid
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy    String    @map("updated_by") @db.Uuid
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy    String?   @map("deleted_by") @db.Uuid
+
+  contract Contract @relation(fields: [contractId], references: [id])
+
+  @@index([contractId])
+  @@map("contract_appendices")
+  @@schema("crm")
+}
+
+model ContractPayment {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  contractId   String    @map("contract_id") @db.Uuid
+  amount       Decimal   @db.Decimal(18, 2)
+  paymentDate  DateTime? @map("payment_date") @db.Date
+  dueDate      DateTime? @map("due_date") @db.Date
+  status       String    @default("pending") @db.VarChar(30)
+  note         String?
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy    String    @map("created_by") @db.Uuid
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy    String    @map("updated_by") @db.Uuid
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy    String?   @map("deleted_by") @db.Uuid
+
+  contract Contract @relation(fields: [contractId], references: [id])
+
+  @@index([contractId])
+  @@map("contract_payments")
+  @@schema("crm")
+}
+
+model ContractExchange {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  contractId String    @map("contract_id") @db.Uuid
+  iamAuthorId String   @map("iam_author_id") @db.Uuid
+  content    String?
+  mediaUrls  Json?     @map("media_urls")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy  String?   @map("deleted_by") @db.Uuid
+
+  contract Contract @relation(fields: [contractId], references: [id])
+
+  @@index([contractId])
+  @@map("contract_exchanges")
+  @@schema("crm")
+}
+
+model Saleflow {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  code        String?   @db.VarChar(50)
+  name        String    @db.VarChar(255)
+  customerId  String?   @map("customer_id") @db.Uuid
+  contactId   String?   @map("contact_id") @db.Uuid
+  iamOwnerId  String?   @map("iam_owner_id") @db.Uuid
+  status      String    @default("open") @db.VarChar(50)
+  totalValue  Decimal?  @map("total_value") @db.Decimal(18, 2)
+  closedAt    DateTime? @map("closed_at") @db.Timestamptz
+  note        String?
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+  rowVersion  Int       @default(1) @map("row_version")
+
+  activities  SaleflowActivity[]
+  exchanges   SaleflowExchange[]
+
+  @@index([tenantId, status])
+  @@map("saleflows")
+  @@schema("crm")
+}
+
+model SaleflowActivity {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  saleflowId String    @map("saleflow_id") @db.Uuid
+  actType    String    @default("note") @map("act_type") @db.VarChar(30)
+  content    String?
+  data       Json?
+  iamActorId String    @map("iam_actor_id") @db.Uuid
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz
+
+  saleflow Saleflow @relation(fields: [saleflowId], references: [id])
+
+  @@index([saleflowId])
+  @@map("saleflow_activities")
+  @@schema("crm")
+}
+
+model SaleflowExchange {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  saleflowId  String    @map("saleflow_id") @db.Uuid
+  iamAuthorId String    @map("iam_author_id") @db.Uuid
+  content     String?
+  mediaUrls   Json?     @map("media_urls")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+
+  saleflow Saleflow @relation(fields: [saleflowId], references: [id])
+
+  @@index([saleflowId])
+  @@map("saleflow_exchanges")
+  @@schema("crm")
+}
+
+model ScheduleCommon {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  scheduleType   String    @default("common") @map("schedule_type") @db.VarChar(30)
+  customerId     String?   @map("customer_id") @db.Uuid
+  contactId      String?   @map("contact_id") @db.Uuid
+  iamEmployeeId  String?   @map("iam_employee_id") @db.Uuid
+  title          String    @db.VarChar(500)
+  content        String?
+  scheduledAt    DateTime  @map("scheduled_at") @db.Timestamptz
+  endAt          DateTime? @map("end_at") @db.Timestamptz
+  status         String    @default("pending") @db.VarChar(30)
+  result         String?
+  note           String?
+  remindAt       DateTime? @map("remind_at") @db.Timestamptz
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy      String    @map("created_by") @db.Uuid
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy      String    @map("updated_by") @db.Uuid
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy      String?   @map("deleted_by") @db.Uuid
+  rowVersion     Int       @default(1) @map("row_version")
+
+  @@index([tenantId, scheduledAt])
+  @@map("schedule_commons")
+  @@schema("crm")
+}
+
+model ScheduleConsultant {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  customerId     String?   @map("customer_id") @db.Uuid
+  iamConsultantId String?  @map("iam_consultant_id") @db.Uuid
+  title          String    @db.VarChar(500)
+  content        String?
+  scheduledAt    DateTime  @map("scheduled_at") @db.Timestamptz
+  status         String    @default("pending") @db.VarChar(30)
+  roomId         String?   @map("room_id") @db.Uuid
+  note           String?
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy      String    @map("created_by") @db.Uuid
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy      String    @map("updated_by") @db.Uuid
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy      String?   @map("deleted_by") @db.Uuid
+
+  @@index([tenantId])
+  @@map("schedule_consultants")
+  @@schema("crm")
+}
+
+model TreatmentRoom {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  name       String    @db.VarChar(255)
+  code       String?   @db.VarChar(50)
+  capacity   Int       @default(1)
+  isActive   Boolean   @default(true) @map("is_active")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy  String    @map("created_by") @db.Uuid
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy  String    @map("updated_by") @db.Uuid
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy  String?   @map("deleted_by") @db.Uuid
+
+  histories TreatmentHistory[]
+
+  @@map("treatment_rooms")
+  @@schema("crm")
+}
+
+model TreatmentHistory {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  customerId     String?   @map("customer_id") @db.Uuid
+  roomId         String?   @map("room_id") @db.Uuid
+  iamDoctorId    String?   @map("iam_doctor_id") @db.Uuid
+  treatmentDate  DateTime  @map("treatment_date") @db.Timestamptz
+  serviceName    String?   @map("service_name") @db.VarChar(500)
+  diagnosis      String?
+  prescription   String?
+  note           String?
+  status         String    @default("completed") @db.VarChar(30)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy      String    @map("created_by") @db.Uuid
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy      String    @map("updated_by") @db.Uuid
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy      String?   @map("deleted_by") @db.Uuid
+
+  room TreatmentRoom? @relation(fields: [roomId], references: [id])
+
+  @@index([tenantId, customerId])
+  @@map("treatment_histories")
+  @@schema("crm")
+}
+
+model KpiTemplate {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  name        String    @db.VarChar(255)
+  code        String?   @db.VarChar(100)
+  description String?
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+
+  goals KpiTemplateGoal[]
+  setups KpiSetup[]
+
+  @@index([tenantId])
+  @@map("kpi_templates")
+  @@schema("crm")
+}
+
+model KpiTemplateGoal {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  templateId   String    @map("template_id") @db.Uuid
+  name         String    @db.VarChar(255)
+  metricKey    String    @map("metric_key") @db.VarChar(100)
+  targetValue  Decimal?  @map("target_value") @db.Decimal(18, 4)
+  unit         String?   @db.VarChar(30)
+  weight       Decimal?  @db.Decimal(5, 2)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy    String    @map("created_by") @db.Uuid
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy    String    @map("updated_by") @db.Uuid
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy    String?   @map("deleted_by") @db.Uuid
+
+  template KpiTemplate @relation(fields: [templateId], references: [id])
+
+  @@index([templateId])
+  @@map("kpi_template_goals")
+  @@schema("crm")
+}
+
+model KpiSetup {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  templateId   String?   @map("template_id") @db.Uuid
+  iamEmployeeId String?  @map("iam_employee_id") @db.Uuid
+  period       String    @db.VarChar(20)
+  periodStart  DateTime  @map("period_start") @db.Date
+  periodEnd    DateTime  @map("period_end") @db.Date
+  status       String    @default("draft") @db.VarChar(30)
+  totalScore   Decimal?  @map("total_score") @db.Decimal(5, 2)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy    String    @map("created_by") @db.Uuid
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy    String    @map("updated_by") @db.Uuid
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy    String?   @map("deleted_by") @db.Uuid
+
+  template KpiTemplate? @relation(fields: [templateId], references: [id])
+  goals    KpiGoal[]
+
+  @@index([tenantId])
+  @@map("kpi_setups")
+  @@schema("crm")
+}
+
+model KpiGoal {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  kpiSetupId    String    @map("kpi_setup_id") @db.Uuid
+  name          String    @db.VarChar(255)
+  metricKey     String    @map("metric_key") @db.VarChar(100)
+  targetValue   Decimal?  @map("target_value") @db.Decimal(18, 4)
+  actualValue   Decimal?  @map("actual_value") @db.Decimal(18, 4)
+  unit          String?   @db.VarChar(30)
+  weight        Decimal?  @db.Decimal(5, 2)
+  score         Decimal?  @db.Decimal(5, 2)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy     String    @map("created_by") @db.Uuid
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy     String    @map("updated_by") @db.Uuid
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy     String?   @map("deleted_by") @db.Uuid
+
+  kpiSetup KpiSetup @relation(fields: [kpiSetupId], references: [id])
+
+  @@index([kpiSetupId])
+  @@map("kpi_goals")
+  @@schema("crm")
+}
+
+model CxmSurvey {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  name        String    @db.VarChar(255)
+  code        String?   @db.VarChar(100)
+  description String?
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+
+  questions CxmQuestion[]
+
+  @@map("cxm_surveys")
+  @@schema("crm")
+}
+
+model CxmQuestion {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  surveyId    String    @map("survey_id") @db.Uuid
+  content     String
+  questionType String   @default("single") @map("question_type") @db.VarChar(30)
+  position    Int       @default(0)
+  isRequired  Boolean   @default(false) @map("is_required")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+
+  survey  CxmSurvey   @relation(fields: [surveyId], references: [id])
+  options CxmOption[]
+
+  @@index([surveyId])
+  @@map("cxm_questions")
+  @@schema("crm")
+}
+
+model CxmOption {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  questionId  String    @map("question_id") @db.Uuid
+  content     String    @db.VarChar(500)
+  score       Int?
+  position    Int       @default(0)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+
+  question CxmQuestion @relation(fields: [questionId], references: [id])
+
+  @@index([questionId])
+  @@map("cxm_options")
+  @@schema("crm")
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// IAM EXTENDED — Career, Position, Competency, Building, CodeSequence, etc.
+// ═════════════════════════════════════════════════════════════════════════════
+
+model Career {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  name       String    @db.VarChar(255)
+  code       String?   @db.VarChar(50)
+  position   Int       @default(0)
+  isActive   Boolean   @default(true) @map("is_active")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy  String    @map("created_by") @db.Uuid
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy  String    @map("updated_by") @db.Uuid
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy  String?   @map("deleted_by") @db.Uuid
+
+  @@map("careers")
+  @@schema("iam")
+}
+
+model Position {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  name        String    @db.VarChar(255)
+  code        String?   @db.VarChar(50)
+  level       Int       @default(0)
+  departmentId String?  @map("department_id") @db.Uuid
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+
+  @@index([tenantId])
+  @@map("positions")
+  @@schema("iam")
+}
+
+model Competency {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  name        String    @db.VarChar(255)
+  code        String?   @db.VarChar(50)
+  description String?
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+
+  @@map("competencies")
+  @@schema("iam")
+}
+
+model Building {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  name       String    @db.VarChar(255)
+  code       String?   @db.VarChar(50)
+  address    String?
+  isActive   Boolean   @default(true) @map("is_active")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy  String    @map("created_by") @db.Uuid
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy  String    @map("updated_by") @db.Uuid
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy  String?   @map("deleted_by") @db.Uuid
+
+  floors BuildingFloor[]
+
+  @@map("buildings")
+  @@schema("iam")
+}
+
+model BuildingFloor {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  buildingId String    @map("building_id") @db.Uuid
+  name       String    @db.VarChar(100)
+  floorNo    Int       @default(1) @map("floor_no")
+  isActive   Boolean   @default(true) @map("is_active")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy  String    @map("created_by") @db.Uuid
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy  String    @map("updated_by") @db.Uuid
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy  String?   @map("deleted_by") @db.Uuid
+
+  building Building @relation(fields: [buildingId], references: [id])
+
+  @@index([buildingId])
+  @@map("building_floors")
+  @@schema("iam")
+}
+
+model CodeSequence {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  entityName  String    @map("entity_name") @db.VarChar(100)
+  prefix      String?   @db.VarChar(20)
+  suffix      String?   @db.VarChar(20)
+  currentNo   Int       @default(0) @map("current_no")
+  padLength   Int       @default(5) @map("pad_length")
+  resetPeriod String?   @map("reset_period") @db.VarChar(20)
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+
+  @@unique([tenantId, entityName])
+  @@map("code_sequences")
+  @@schema("iam")
+}
+
+model Bank {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  name       String    @db.VarChar(255)
+  code       String?   @db.VarChar(50)
+  shortName  String?   @map("short_name") @db.VarChar(50)
+  logoUrl    String?   @map("logo_url") @db.VarChar(500)
+  isActive   Boolean   @default(true) @map("is_active")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy  String    @map("created_by") @db.Uuid
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy  String    @map("updated_by") @db.Uuid
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy  String?   @map("deleted_by") @db.Uuid
+
+  @@map("banks")
+  @@schema("iam")
+}
+
+model Category {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  name       String    @db.VarChar(255)
+  code       String?   @db.VarChar(100)
+  type       String?   @db.VarChar(50)
+  parentId   String?   @map("parent_id") @db.Uuid
+  position   Int       @default(0)
+  isActive   Boolean   @default(true) @map("is_active")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy  String    @map("created_by") @db.Uuid
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy  String    @map("updated_by") @db.Uuid
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy  String?   @map("deleted_by") @db.Uuid
+
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryTree")
+  items    CategoryItem[]
+
+  @@index([tenantId, type])
+  @@map("categories")
+  @@schema("iam")
+}
+
+model CategoryItem {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  categoryId String    @map("category_id") @db.Uuid
+  name       String    @db.VarChar(255)
+  code       String?   @db.VarChar(100)
+  value      String?   @db.VarChar(500)
+  position   Int       @default(0)
+  isActive   Boolean   @default(true) @map("is_active")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy  String    @map("created_by") @db.Uuid
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy  String    @map("updated_by") @db.Uuid
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy  String?   @map("deleted_by") @db.Uuid
+
+  category Category @relation(fields: [categoryId], references: [id])
+
+  @@index([categoryId])
+  @@map("category_items")
+  @@schema("iam")
+}
+
+model Card {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  name        String    @db.VarChar(255)
+  code        String?   @db.VarChar(50)
+  cardType    String    @default("loyalty") @map("card_type") @db.VarChar(30)
+  pointMultiplier Decimal? @map("point_multiplier") @db.Decimal(5, 2)
+  discountPct Decimal?  @map("discount_pct") @db.Decimal(5, 2)
+  isActive    Boolean   @default(true) @map("is_active")
+  config      Json?
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+
+  services CardServiceDef[]
+
+  @@map("cards")
+  @@schema("iam")
+}
+
+model CardServiceDef {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  cardId      String    @map("card_id") @db.Uuid
+  name        String    @db.VarChar(255)
+  code        String?   @db.VarChar(100)
+  sessions    Int?
+  validDays   Int?      @map("valid_days")
+  price       Decimal?  @db.Decimal(18, 2)
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+
+  card Card @relation(fields: [cardId], references: [id])
+
+  @@index([cardId])
+  @@map("card_service_defs")
+  @@schema("iam")
+}
+
+model Product {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  name        String    @db.VarChar(500)
+  code        String?   @db.VarChar(100)
+  sku         String?   @db.VarChar(100)
+  categoryId  String?   @map("category_id") @db.Uuid
+  unitId      String?   @map("unit_id") @db.Uuid
+  price       Decimal?  @db.Decimal(18, 2)
+  costPrice   Decimal?  @map("cost_price") @db.Decimal(18, 2)
+  description String?
+  imageUrl    String?   @map("image_url") @db.VarChar(500)
+  isActive    Boolean   @default(true) @map("is_active")
+  stock       Int?
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+  rowVersion  Int       @default(1) @map("row_version")
+
+  @@index([tenantId])
+  @@map("products")
+  @@schema("iam")
+}
+
+model ServiceItem {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  name        String    @db.VarChar(500)
+  code        String?   @db.VarChar(100)
+  categoryId  String?   @map("category_id") @db.Uuid
+  price       Decimal?  @db.Decimal(18, 2)
+  duration    Int?
+  description String?
+  imageUrl    String?   @map("image_url") @db.VarChar(500)
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+  rowVersion  Int       @default(1) @map("row_version")
+
+  @@index([tenantId])
+  @@map("service_items")
+  @@schema("iam")
+}
+
+model Unit {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  name        String    @db.VarChar(100)
+  code        String?   @db.VarChar(30)
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+
+  @@map("units")
+  @@schema("iam")
+}
+
+model Cashbook {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  code         String?   @db.VarChar(50)
+  transType    String    @default("income") @map("trans_type") @db.VarChar(20)
+  amount       Decimal   @db.Decimal(18, 2)
+  description  String?
+  customerId   String?   @map("customer_id") @db.Uuid
+  refType      String?   @map("ref_type") @db.VarChar(50)
+  refId        String?   @map("ref_id") @db.Uuid
+  transDate    DateTime  @default(now()) @map("trans_date") @db.Timestamptz
+  iamActorId   String    @map("iam_actor_id") @db.Uuid
+  categoryId   String?   @map("category_id") @db.Uuid
+  note         String?
+  attachments  Json?
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy    String    @map("created_by") @db.Uuid
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy    String    @map("updated_by") @db.Uuid
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy    String?   @map("deleted_by") @db.Uuid
+
+  @@index([tenantId, transDate])
+  @@map("cashbooks")
+  @@schema("iam")
+}
+
+model FilterSetting {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  iamUserId   String    @map("iam_user_id") @db.Uuid
+  name        String    @db.VarChar(255)
+  entityType  String    @map("entity_type") @db.VarChar(50)
+  filterData  Json      @map("filter_data")
+  isDefault   Boolean   @default(false) @map("is_default")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+
+  @@index([tenantId, iamUserId, entityType])
+  @@map("filter_settings")
+  @@schema("iam")
+}
+
+model Attachment {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  refType     String    @map("ref_type") @db.VarChar(50)
+  refId       String    @map("ref_id") @db.Uuid
+  fileName    String    @map("file_name") @db.VarChar(500)
+  fileUrl     String    @map("file_url") @db.VarChar(1000)
+  fileSize    Int?      @map("file_size")
+  mimeType    String?   @map("mime_type") @db.VarChar(100)
+  iamAuthorId String    @map("iam_author_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+
+  @@index([tenantId, refType, refId])
+  @@map("attachments")
+  @@schema("iam")
+}
+
+model TipGroup {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  name        String    @db.VarChar(255)
+  code        String?   @db.VarChar(50)
+  description String?
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+
+  employees TipGroupEmployee[]
+  configs   TipGroupConfig[]
+
+  @@map("tip_groups")
+  @@schema("iam")
+}
+
+model TipGroupEmployee {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  tipGroupId    String    @map("tip_group_id") @db.Uuid
+  iamEmployeeId String    @map("iam_employee_id") @db.Uuid
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy     String    @map("created_by") @db.Uuid
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz
+
+  tipGroup TipGroup @relation(fields: [tipGroupId], references: [id])
+
+  @@unique([tipGroupId, iamEmployeeId])
+  @@map("tip_group_employees")
+  @@schema("iam")
+}
+
+model TipGroupConfig {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  tipGroupId  String    @map("tip_group_id") @db.Uuid
+  key         String    @db.VarChar(100)
+  value       String?
+  config      Json?
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+
+  tipGroup TipGroup @relation(fields: [tipGroupId], references: [id])
+
+  @@map("tip_group_configs")
+  @@schema("iam")
+}
+
+model TipUser {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  iamUserId     String    @map("iam_user_id") @db.Uuid
+  key           String    @db.VarChar(100)
+  value         String?
+  config        Json?
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy     String    @map("created_by") @db.Uuid
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy     String    @map("updated_by") @db.Uuid
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy     String?   @map("deleted_by") @db.Uuid
+
+  @@index([tenantId, iamUserId])
+  @@map("tip_users")
+  @@schema("iam")
+}
+
+model TemplateEmail {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  name        String    @db.VarChar(255)
+  code        String?   @db.VarChar(100)
+  subject     String    @db.VarChar(500)
+  body        String
+  isActive    Boolean   @default(true) @map("is_active")
+  categoryId  String?   @map("category_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+
+  @@map("template_emails")
+  @@schema("iam")
+}
+
+model TemplateSms {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  name        String    @db.VarChar(255)
+  code        String?   @db.VarChar(100)
+  content     String
+  brandNameId String?   @map("brand_name_id") @db.Uuid
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+
+  @@map("template_sms")
+  @@schema("iam")
+}
+
+model TemplateZalo {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  name        String    @db.VarChar(255)
+  templateId  String?   @map("template_id") @db.VarChar(100)
+  content     String?
+  params      Json?
+  isActive    Boolean   @default(true) @map("is_active")
+  zaloOaId    String?   @map("zalo_oa_id") @db.VarChar(100)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+
+  @@map("template_zalos")
+  @@schema("iam")
+}
+
+model EmailConfig {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  name        String    @db.VarChar(255)
+  host        String    @db.VarChar(255)
+  port        Int
+  fromEmail   String    @map("from_email") @db.VarChar(255)
+  fromName    String?   @map("from_name") @db.VarChar(255)
+  username    String    @db.VarChar(255)
+  isActive    Boolean   @default(true) @map("is_active")
+  iamUserId   String?   @map("iam_user_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+
+  @@map("email_configs")
+  @@schema("iam")
+}
+
+model Webhook {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  name        String    @db.VarChar(255)
+  url         String    @db.VarChar(1000)
+  eventTypes  Json      @map("event_types")
+  headers     Json?
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+
+  @@map("webhooks")
+  @@schema("iam")
+}
+
+model CallConfig {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  name         String    @db.VarChar(255)
+  provider     String    @db.VarChar(50)
+  apiUrl       String?   @map("api_url") @db.VarChar(500)
+  apiKey       String?   @map("api_key") @db.VarChar(500)
+  config       Json?
+  isActive     Boolean   @default(true) @map("is_active")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy    String    @map("created_by") @db.Uuid
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy    String    @map("updated_by") @db.Uuid
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy    String?   @map("deleted_by") @db.Uuid
+
+  @@map("call_configs")
+  @@schema("iam")
+}
+
+model CallActivity {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  customerId    String?   @map("customer_id") @db.Uuid
+  contactId     String?   @map("contact_id") @db.Uuid
+  iamActorId    String    @map("iam_actor_id") @db.Uuid
+  callType      String    @default("outbound") @map("call_type") @db.VarChar(20)
+  fromNumber    String?   @map("from_number") @db.VarChar(30)
+  toNumber      String?   @map("to_number") @db.VarChar(30)
+  duration      Int?
+  status        String    @default("completed") @db.VarChar(30)
+  recordingUrl  String?   @map("recording_url") @db.VarChar(500)
+  callId        String?   @map("call_id") @db.VarChar(100)
+  note          String?
+  calledAt      DateTime  @default(now()) @map("called_at") @db.Timestamptz
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy     String    @map("updated_by") @db.Uuid
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz
+
+  @@index([tenantId, customerId])
+  @@map("call_activities")
+  @@schema("iam")
+}
+
+model DecisionTable {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  name        String    @db.VarChar(255)
+  code        String?   @db.VarChar(100)
+  isActive    Boolean   @default(true) @map("is_active")
+  config      Json?
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+
+  inputs  DecisionTableInput[]
+  outputs DecisionTableOutput[]
+
+  @@index([tenantId])
+  @@map("decision_tables")
+  @@schema("bpm")
+}
+
+model DecisionTableInput {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  decisionTableId String    @map("decision_table_id") @db.Uuid
+  name            String    @db.VarChar(255)
+  fieldKey        String    @map("field_key") @db.VarChar(100)
+  operator        String    @default("eq") @db.VarChar(20)
+  value           String?
+  dataType        String    @default("string") @map("data_type") @db.VarChar(30)
+  isActive        Boolean   @default(true) @map("is_active")
+  position        Int       @default(0)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy       String    @map("created_by") @db.Uuid
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy       String    @map("updated_by") @db.Uuid
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy       String?   @map("deleted_by") @db.Uuid
+
+  decisionTable DecisionTable @relation(fields: [decisionTableId], references: [id])
+
+  @@index([decisionTableId])
+  @@map("decision_table_inputs")
+  @@schema("bpm")
+}
+
+model DecisionTableOutput {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  decisionTableId String    @map("decision_table_id") @db.Uuid
+  name            String    @db.VarChar(255)
+  fieldKey        String    @map("field_key") @db.VarChar(100)
+  value           String?
+  dataType        String    @default("string") @map("data_type") @db.VarChar(30)
+  isActive        Boolean   @default(true) @map("is_active")
+  position        Int       @default(0)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy       String    @map("created_by") @db.Uuid
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy       String    @map("updated_by") @db.Uuid
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy       String?   @map("deleted_by") @db.Uuid
+
+  decisionTable DecisionTable @relation(fields: [decisionTableId], references: [id])
+
+  @@index([decisionTableId])
+  @@map("decision_table_outputs")
+  @@schema("bpm")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CRM EXTENDED 2 — BusinessPartner, Invoice, ContractWarranty
+// ─────────────────────────────────────────────────────────────────────────────
+
+model BusinessPartner {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId         String    @map("tenant_id") @db.Uuid
+  code             String?   @db.VarChar(50)
+  name             String    @db.VarChar(500)
+  taxCode          String?   @map("tax_code") @db.VarChar(50)
+  phone            String?   @db.VarChar(30)
+  email            String?   @db.VarChar(255)
+  address          String?
+  website          String?   @db.VarChar(500)
+  avatarUrl        String?   @map("avatar_url") @db.VarChar(500)
+  categoryId       String?   @map("category_id") @db.Uuid
+  customerSourceId String?   @map("customer_source_id") @db.Uuid
+  iamEmployeeId    String?   @map("iam_employee_id") @db.Uuid
+  status           Int       @default(0)
+  note             String?
+  extraFields      Json?     @map("extra_fields")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy        String    @map("created_by") @db.Uuid
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy        String    @map("updated_by") @db.Uuid
+  deletedAt        DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy        String?   @map("deleted_by") @db.Uuid
+  rowVersion       Int       @default(1) @map("row_version")
+
+  exchanges BusinessPartnerExchange[]
+
+  @@index([tenantId])
+  @@map("business_partners")
+  @@schema("crm")
+}
+
+model BusinessPartnerExchange {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId         String    @map("tenant_id") @db.Uuid
+  businessPartnerId String   @map("business_partner_id") @db.Uuid
+  iamAuthorId      String    @map("iam_author_id") @db.Uuid
+  content          String?
+  mediaUrls        Json?     @map("media_urls")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  deletedAt        DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy        String?   @map("deleted_by") @db.Uuid
+
+  businessPartner BusinessPartner @relation(fields: [businessPartnerId], references: [id])
+
+  @@index([businessPartnerId])
+  @@map("business_partner_exchanges")
+  @@schema("crm")
+}
+
+model Invoice {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  code            String?   @db.VarChar(50)
+  customerId      String?   @map("customer_id") @db.Uuid
+  businessPartnerId String? @map("business_partner_id") @db.Uuid
+  contractId      String?   @map("contract_id") @db.Uuid
+  saleflowId      String?   @map("saleflow_id") @db.Uuid
+  iamOwnerId      String?   @map("iam_owner_id") @db.Uuid
+  invoiceDate     DateTime? @map("invoice_date") @db.Date
+  dueDate         DateTime? @map("due_date") @db.Date
+  totalAmount     Decimal?  @map("total_amount") @db.Decimal(18, 2)
+  paidAmount      Decimal?  @map("paid_amount") @db.Decimal(18, 2)
+  status          String    @default("draft") @db.VarChar(30)
+  note            String?
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy       String    @map("created_by") @db.Uuid
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy       String    @map("updated_by") @db.Uuid
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy       String?   @map("deleted_by") @db.Uuid
+
+  items InvoiceDetail[]
+
+  @@index([tenantId, customerId])
+  @@map("invoices")
+  @@schema("crm")
+}
+
+model InvoiceDetail {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  invoiceId   String    @map("invoice_id") @db.Uuid
+  itemName    String    @map("item_name") @db.VarChar(500)
+  itemCode    String?   @map("item_code") @db.VarChar(100)
+  quantity    Decimal   @db.Decimal(10, 2)
+  unitPrice   Decimal   @map("unit_price") @db.Decimal(18, 2)
+  discount    Decimal?  @db.Decimal(5, 2)
+  totalAmount Decimal   @map("total_amount") @db.Decimal(18, 2)
+  note        String?
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id])
+
+  @@index([invoiceId])
+  @@map("invoice_details")
+  @@schema("crm")
+}
+
+model ContractWarranty {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  code        String?   @db.VarChar(50)
+  contractId  String?   @map("contract_id") @db.Uuid
+  customerId  String?   @map("customer_id") @db.Uuid
+  title       String    @db.VarChar(500)
+  status      String    @default("active") @db.VarChar(30)
+  startDate   DateTime? @map("start_date") @db.Date
+  endDate     DateTime? @map("end_date") @db.Date
+  note        String?
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+
+  @@index([tenantId, contractId])
+  @@map("contract_warranties")
+  @@schema("crm")
+}
+
+model GuaranteeType {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  name       String    @db.VarChar(255)
+  code       String?   @db.VarChar(50)
+  isActive   Boolean   @default(true) @map("is_active")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy  String    @map("created_by") @db.Uuid
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy  String    @map("updated_by") @db.Uuid
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy  String?   @map("deleted_by") @db.Uuid
+
+  guarantees Guarantee[]
+
+  @@map("guarantee_types")
+  @@schema("crm")
+}
+
+model Guarantee {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  code           String?   @db.VarChar(50)
+  guaranteeTypeId String?  @map("guarantee_type_id") @db.Uuid
+  contractId     String?   @map("contract_id") @db.Uuid
+  customerId     String?   @map("customer_id") @db.Uuid
+  name           String    @db.VarChar(500)
+  value          Decimal?  @db.Decimal(18, 2)
+  startDate      DateTime? @map("start_date") @db.Date
+  endDate        DateTime? @map("end_date") @db.Date
+  status         String    @default("active") @db.VarChar(30)
+  note           String?
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy      String    @map("created_by") @db.Uuid
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy      String    @map("updated_by") @db.Uuid
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy      String?   @map("deleted_by") @db.Uuid
+
+  guaranteeType GuaranteeType? @relation(fields: [guaranteeTypeId], references: [id])
+
+  @@index([tenantId, contractId])
+  @@map("guarantees")
+  @@schema("crm")
+}
+
+model ZaloOA {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  oaId        String    @map("oa_id") @db.VarChar(100)
+  oaName      String    @map("oa_name") @db.VarChar(255)
+  accessToken String?   @map("access_token")
+  refreshToken String?  @map("refresh_token")
+  isActive    Boolean   @default(true) @map("is_active")
+  expiresAt   DateTime? @map("expires_at") @db.Timestamptz
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+
+  @@unique([tenantId, oaId])
+  @@map("zalo_oas")
+  @@schema("iam")
+}
+
+model TreatmentTime {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  roomId        String?   @map("room_id") @db.Uuid
+  iamDoctorId   String?   @map("iam_doctor_id") @db.Uuid
+  dayOfWeek     Int?      @map("day_of_week")
+  startTime     String?   @map("start_time") @db.VarChar(8)
+  endTime       String?   @map("end_time") @db.VarChar(8)
+  capacity      Int       @default(1)
+  isActive      Boolean   @default(true) @map("is_active")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy     String    @map("created_by") @db.Uuid
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy     String    @map("updated_by") @db.Uuid
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy     String?   @map("deleted_by") @db.Uuid
+
+  @@index([tenantId])
+  @@map("treatment_times")
+  @@schema("crm")
+}
+
+model ObjectAttribute {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  objectType  String    @map("object_type") @db.VarChar(100)
+  fieldKey    String    @map("field_key") @db.VarChar(100)
+  fieldLabel  String    @map("field_label") @db.VarChar(255)
+  fieldType   String    @default("text") @map("field_type") @db.VarChar(30)
+  isRequired  Boolean   @default(false) @map("is_required")
+  isActive    Boolean   @default(true) @map("is_active")
+  position    Int       @default(0)
+  options     Json?
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+
+  @@unique([tenantId, objectType, fieldKey])
+  @@index([tenantId, objectType])
+  @@map("object_attributes")
+  @@schema("iam")
+}
+
+model Report {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  name        String    @db.VarChar(255)
+  code        String?   @db.VarChar(100)
+  reportType  String    @map("report_type") @db.VarChar(50)
+  config      Json?
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+
+  @@index([tenantId])
+  @@map("reports")
+  @@schema("iam")
+}
