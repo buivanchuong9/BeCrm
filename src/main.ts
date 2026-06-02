@@ -48,17 +48,36 @@ async function bootstrap() {
     new TransformInterceptor(),
   );
 
-  // Swagger Setup (Protected by Basic Auth)
-  app.use(['/api/docs', '/api-json'], (req: Request, res: Response, next: NextFunction) => {
-    const b64auth = (req.headers.authorization || '').split(' ')[1] || '';
-    const [login, password] = Buffer.from(b64auth, 'base64').toString().split(':');
-
-    if (login === 'buivanchuong' && password === '123456@') {
+  // Swagger Setup (Protected by Custom Login to avoid Nginx 401 interception)
+  app.use(['/api/docs', '/api-json', '/api/docs-json'], (req: Request, res: Response, next: NextFunction) => {
+    const authCookie = req.cookies['swagger-auth'];
+    if (authCookie === 'valid') {
       return next();
     }
 
-    res.set('WWW-Authenticate', 'Basic realm="Swagger Docs"');
-    res.status(401).send('Authentication required.');
+    if (req.query.username === 'buivanchuong' && req.query.password === '123456@') {
+      res.cookie('swagger-auth', 'valid', { maxAge: 86400000 });
+      return res.redirect('/api/docs');
+    }
+
+    res.status(200).send(`
+      <!DOCTYPE html>
+      <html>
+      <head><title>Swagger Login</title></head>
+      <body style="display:flex;justify-content:center;align-items:center;height:100vh;background:#f0f2f5;font-family:sans-serif;margin:0;">
+        <form method="GET" action="/api/docs" style="background:#fff;padding:2rem;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.1);width:300px;">
+          <h2 style="margin-top:0;text-align:center;color:#333;">CareFollow API</h2>
+          <div style="margin-bottom:1rem;">
+            <input type="text" name="username" placeholder="Username" required style="width:100%;padding:0.75rem;border:1px solid #d9d9d9;border-radius:4px;box-sizing:border-box;" />
+          </div>
+          <div style="margin-bottom:1rem;">
+            <input type="password" name="password" placeholder="Password" required style="width:100%;padding:0.75rem;border:1px solid #d9d9d9;border-radius:4px;box-sizing:border-box;" />
+          </div>
+          <button type="submit" style="width:100%;padding:0.75rem;background:#1890ff;color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:bold;">Login to Docs</button>
+        </form>
+      </body>
+      </html>
+    `);
   });
 
   const config = new DocumentBuilder()
