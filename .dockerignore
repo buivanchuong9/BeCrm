@@ -13,3 +13,7 @@ yarn-error.log*
 .vscode
 .idea
 *.md
+*.log
+.DS_Store
+tmp
+uploads
