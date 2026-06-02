@@ -67,7 +67,7 @@ export class BpmParticipantService {
     const [users, roles] = await Promise.all([
       this.prisma.user.findMany({
         where: { tenantId, deletedAt: null, isActive: true },
-        select: { id: true, username: true, fullName: true, email: true },
+        select: { id: true, username: true, name: true, email: true },
       }),
       this.prisma.role.findMany({
         where: { tenantId, deletedAt: null },
