@@ -1,0 +1,60 @@
+# Copy lên server Ubuntu (nginx/1.18.0 — KHÔNG phải Postman trên Mac):
+#   sudo cp nginx/dermahealth.host.conf.example /etc/nginx/sites-available/dermahealth.conf
+#   sudo ln -sf /etc/nginx/sites-available/dermahealth.conf /etc/nginx/sites-enabled/
+#   sudo nginx -t && sudo systemctl reload nginx
+#
+# Backend Docker map host 43000 -> container 3000 (docker compose ports: "43000:3000")
+
+upstream carefollow_be_host {
+    server 127.0.0.1:43000;
+    keepalive 32;
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name dermahealth.fitdnu.id.vn;
+
+    # Certbot / Let's Encrypt — bỏ comment sau khi có SSL
+    # return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name dermahealth.fitdnu.id.vn;
+
+    # ssl_certificate     /etc/letsencrypt/live/dermahealth.fitdnu.id.vn/fullchain.pem;
+    # ssl_certificate_key /etc/letsencrypt/live/dermahealth.fitdnu.id.vn/privkey.pem;
+
+    client_max_body_size 25m;
+
+    # ── API Nest (POST bắt buộc — đặt TRƯỚC location /) ──
+    location ~ ^/(authenticator|adminapi|bpmapi|notification|health|sale|api)(/|$) {
+        proxy_pass http://carefollow_be;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Connection "";
+        proxy_read_timeout 120s;
+        proxy_send_timeout 120s;
+    }
+
+    # ── Frontend SPA (nếu build nằm trên host) ──
+    # root /var/www/dermahealth;
+    # location / {
+    #     try_files $uri $uri/ /index.html;
+    # }
+
+    # Tạm: mọi request khác cũng proxy BE (nếu chưa có static riêng)
+    location / {
+        proxy_pass http://carefollow_be;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
