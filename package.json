@@ -18,7 +18,8 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
-    "db:seed": "ts-node prisma/seed.ts",
+    "db:seed": "node prisma/dist/seed.js",
+    "db:seed:dev": "ts-node prisma/seed.ts",
     "build:seed": "tsc -p tsconfig.seed.json",
     "db:studio": "prisma studio"
   },
