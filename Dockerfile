@@ -37,6 +37,9 @@ COPY --from=builder --chown=nestjs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
 COPY --from=builder --chown=nestjs:nodejs /app/prisma ./prisma
 
+# WORKDIR /app is root-owned; nestjs must write uploads at runtime
+RUN mkdir -p /app/uploads && chown -R nestjs:nodejs /app
+
 USER nestjs
 
 EXPOSE 3000
