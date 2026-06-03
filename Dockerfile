@@ -18,6 +18,7 @@ COPY . .
 
 RUN npm run db:generate
 RUN npm run build
+RUN npm run build:seed
 RUN npm prune --omit=dev
 
 FROM node:18-alpine AS runner
