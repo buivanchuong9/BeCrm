@@ -27,8 +27,9 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=3000
+ENV UPLOAD_DEST=/app/uploads
 
-RUN apk add --no-cache openssl \
+RUN apk add --no-cache openssl su-exec \
   && addgroup -S nodejs \
   && adduser -S nestjs -G nodejs
 
@@ -37,11 +38,12 @@ COPY --from=builder --chown=nestjs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
 COPY --from=builder --chown=nestjs:nodejs /app/prisma ./prisma
 
-# WORKDIR /app is root-owned; nestjs must write uploads at runtime
-RUN mkdir -p /app/uploads && chown -R nestjs:nodejs /app
-
-USER nestjs
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
+  && mkdir -p /app/uploads \
+  && chown -R nestjs:nodejs /app/uploads
 
 EXPOSE 3000
 
+ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["node", "dist/src/main.js"]

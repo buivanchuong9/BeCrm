@@ -2,8 +2,15 @@ import { Module } from '@nestjs/common';
 import { MulterModule } from '@nestjs/platform-express';
 import { ConfigService } from '@nestjs/config';
 import { diskStorage } from 'multer';
+import * as fs from 'fs';
 import * as path from 'path';
 import { UploadController } from './upload.controller';
+
+function resolveUploadDest(cfg: ConfigService): string {
+  const dest = path.resolve(cfg.get<string>('UPLOAD_DEST', './uploads'));
+  fs.mkdirSync(dest, { recursive: true });
+  return dest;
+}
 
 @Module({
   imports: [
@@ -11,7 +18,7 @@ import { UploadController } from './upload.controller';
       inject: [ConfigService],
       useFactory: (cfg: ConfigService) => ({
         storage: diskStorage({
-          destination: cfg.get<string>('UPLOAD_DEST', './uploads'),
+          destination: resolveUploadDest(cfg),
           filename: (_req, file, cb) => {
             const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
             cb(null, `${unique}${path.extname(file.originalname)}`);
