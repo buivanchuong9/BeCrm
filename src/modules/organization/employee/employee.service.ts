@@ -57,6 +57,7 @@ export class EmployeeService {
       ...emp,
       branchId: emp.departmentId ?? null,
       branchName: emp.department?.name ?? null,
+      defaultRedirect: '/customer',
       lstOrgApp: [{ endDate: '2099-12-31T23:59:59Z', packageName: 'Gói Vĩnh Viễn' }],
     };
   }

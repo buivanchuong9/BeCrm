@@ -77,7 +77,18 @@ export class WorkController {
   @Get('workOrder/listV2')
   @ApiOperation({ summary: 'List work orders v2' })
   listWorkOrdersV2(@TenantId() tenantId: string, @Query() query: Record<string, string>) {
-    return this.workService.listWorkOrdersV2(tenantId, query);
+    return this.workService.listWorkOrdersV2(tenantId, {
+      workProjectId: query.workProjectId,
+      workTypeId: query.workTypeId,
+      iamAssigneeId: query.iamAssigneeId,
+      status: query.status,
+      keyword: query.keyword,
+      customerId: query.customerId,
+      page: query.page ? Number(query.page) : undefined,
+      limit: query.limit ? Number(query.limit) : undefined,
+      pageIndex: query.pageIndex ? Number(query.pageIndex) : undefined,
+      pageSize: query.pageSize ? Number(query.pageSize) : undefined,
+    });
   }
 
   @Get('workOrder/groups')

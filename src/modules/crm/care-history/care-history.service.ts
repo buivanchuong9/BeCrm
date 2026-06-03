@@ -62,11 +62,20 @@ export class CareHistoryService {
   }
 
   // Care categories
-  async listCategories(tenantId: string) {
-    return this.prisma.careCategory.findMany({
-      where: { tenantId, deletedAt: null },
-      orderBy: { position: 'asc' },
-    });
+  async listCategories(tenantId: string, query?: { page?: number; limit?: number }) {
+    const page = parsePage(query?.page);
+    const limit = parseLimit(query?.limit);
+    const where = { tenantId, deletedAt: null };
+    const [items, total] = await Promise.all([
+      this.prisma.careCategory.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { position: 'asc' },
+      }),
+      this.prisma.careCategory.count({ where }),
+    ]);
+    return buildPagedResult(items, total, page, limit);
   }
 
   async upsertCategory(dto: { id?: string; name: string; position?: number }, actor: RequestUser) {

@@ -49,8 +49,11 @@ export class CareHistoryController {
   // Care categories
   @Get('crmCampaign/list')
   @ApiOperation({ summary: 'List care categories (crmCampaign)' })
-  listCategories(@TenantId() tenantId: string) {
-    return this.careHistoryService.listCategories(tenantId);
+  listCategories(@TenantId() tenantId: string, @Query() query: Record<string, string>) {
+    return this.careHistoryService.listCategories(tenantId, {
+      page: query.page ? Number(query.page) : undefined,
+      limit: query.limit ? Number(query.limit) : undefined,
+    });
   }
 
   @Post('crmCampaign/update')

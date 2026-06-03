@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
+import { seedDemoVolume } from './seed-demo-volume';
 
 const prisma = new PrismaClient();
 
@@ -245,22 +246,31 @@ async function main() {
     { name: 'Phạm Thị Lan', phone: '0923456789', email: 'lan@example.com', gender: 'female', customerGroupId: vipGroup.id, customerSourceId: websiteSource.id },
   ];
 
-  for (const cust of customers) {
-    await prisma.customer.create({
-      data: {
-        tenantId: tenant.id,
-        iamEmployeeId: saleUser.id,
-        ...cust,
-        createdBy: adminUser.id,
-        updatedBy: adminUser.id,
-      },
-    });
+  const baseCustomerCount = await prisma.customer.count({
+    where: { tenantId: tenant.id, NOT: { code: { startsWith: 'DEMO-C-' } } },
+  });
+  if (baseCustomerCount < 3) {
+    for (const cust of customers) {
+      await prisma.customer.create({
+        data: {
+          tenantId: tenant.id,
+          iamEmployeeId: saleUser.id,
+          ...cust,
+          createdBy: adminUser.id,
+          updatedBy: adminUser.id,
+        },
+      });
+    }
+    console.log(`✅ ${customers.length} sample customers seeded`);
+  } else {
+    console.log(`⏭️  Sample customers already present (${baseCustomerCount})`);
   }
-  console.log(`✅ ${customers.length} sample customers seeded`);
 
   // ── CRM Campaign ──────────────────────────────────────────────────────────
-  const campaign = await prisma.campaign.create({
-    data: {
+  const campaign = await prisma.campaign.upsert({
+    where: { tenantId_code: { tenantId: tenant.id, code: 'CP-001' } },
+    update: {},
+    create: {
       tenantId: tenant.id,
       code: 'CP-001',
       name: 'Q2 2026 Sales Campaign',
@@ -276,32 +286,36 @@ async function main() {
     },
   });
 
-  const approach1 = await prisma.campaignApproach.create({
-    data: {
-      tenantId: tenant.id,
-      campaignId: campaign.id,
-      name: 'Initial Contact',
-      step: 1,
-      slaHours: 24,
-      createdBy: adminUser.id,
-      updatedBy: adminUser.id,
-    },
-  });
-
-  await prisma.campaignApproach.create({
-    data: {
-      tenantId: tenant.id,
-      campaignId: campaign.id,
-      name: 'Follow-up',
-      step: 2,
-      slaHours: 48,
-      createdBy: adminUser.id,
-      updatedBy: adminUser.id,
-    },
-  });
+  const existingApproaches = await prisma.campaignApproach.count({ where: { campaignId: campaign.id } });
+  if (existingApproaches === 0) {
+    await prisma.campaignApproach.create({
+      data: {
+        tenantId: tenant.id,
+        campaignId: campaign.id,
+        name: 'Initial Contact',
+        step: 1,
+        slaHours: 24,
+        createdBy: adminUser.id,
+        updatedBy: adminUser.id,
+      },
+    });
+    await prisma.campaignApproach.create({
+      data: {
+        tenantId: tenant.id,
+        campaignId: campaign.id,
+        name: 'Follow-up',
+        step: 2,
+        slaHours: 48,
+        createdBy: adminUser.id,
+        updatedBy: adminUser.id,
+      },
+    });
+  }
   console.log(`✅ Campaign seeded: ${campaign.name}`);
 
   // ── Ticket Category ───────────────────────────────────────────────────────
+  const ticketCatCount = await prisma.ticketCategory.count({ where: { tenantId: tenant.id } });
+  if (ticketCatCount === 0) {
   await prisma.ticketCategory.create({
     data: {
       tenantId: tenant.id,
@@ -324,8 +338,11 @@ async function main() {
     },
   });
   console.log(`✅ Ticket categories seeded`);
+  }
 
   // ── Warranty Categories ───────────────────────────────────────────────────
+  const warrantyCatCount = await prisma.warrantyCategory.count({ where: { tenantId: tenant.id } });
+  if (warrantyCatCount === 0) {
   await prisma.warrantyCategory.create({
     data: {
       tenantId: tenant.id,
@@ -361,87 +378,97 @@ async function main() {
     },
   });
   console.log(`✅ Warranty categories seeded`);
+  }
 
   // ── BPM Demo Template ─────────────────────────────────────────────────────
-  const bpmTemplate = await prisma.bpmProcessTemplate.create({
-    data: {
-      tenantId: tenant.id,
-      code: 'LEAVE_APPROVAL',
-      name: 'Leave Approval Process',
-      category: 'HR',
-      description: 'Standard leave request approval workflow',
-      status: 'published',
-      version: 1,
-      createdBy: adminUser.id,
-      updatedBy: adminUser.id,
-    },
+  let bpmTemplate = await prisma.bpmProcessTemplate.findFirst({
+    where: { tenantId: tenant.id, code: 'LEAVE_APPROVAL' },
   });
+  if (!bpmTemplate) {
+    bpmTemplate = await prisma.bpmProcessTemplate.create({
+      data: {
+        tenantId: tenant.id,
+        code: 'LEAVE_APPROVAL',
+        name: 'Leave Approval Process',
+        category: 'HR',
+        description: 'Standard leave request approval workflow',
+        status: 'published',
+        version: 1,
+        createdBy: adminUser.id,
+        updatedBy: adminUser.id,
+      },
+    });
 
-  const startNode = await prisma.bpmNode.create({
-    data: {
-      tenantId: tenant.id,
-      templateId: bpmTemplate.id,
-      nodeKey: 'start',
-      nodeType: 'Start',
-      name: 'Start',
-      positionX: 100,
-      positionY: 200,
-      createdBy: adminUser.id,
-    },
-  });
+    const startNode = await prisma.bpmNode.create({
+      data: {
+        tenantId: tenant.id,
+        templateId: bpmTemplate.id,
+        nodeKey: 'start',
+        nodeType: 'Start',
+        name: 'Start',
+        positionX: 100,
+        positionY: 200,
+        createdBy: adminUser.id,
+      },
+    });
 
-  const reviewTask = await prisma.bpmNode.create({
-    data: {
-      tenantId: tenant.id,
-      templateId: bpmTemplate.id,
-      nodeKey: 'manager_review',
-      nodeType: 'UserTask',
-      name: 'Manager Review',
-      positionX: 350,
-      positionY: 200,
-      config: { assigneeRole: 'manager' },
-      createdBy: adminUser.id,
-    },
-  });
+    const reviewTask = await prisma.bpmNode.create({
+      data: {
+        tenantId: tenant.id,
+        templateId: bpmTemplate.id,
+        nodeKey: 'manager_review',
+        nodeType: 'UserTask',
+        name: 'Manager Review',
+        positionX: 350,
+        positionY: 200,
+        config: { assigneeRole: 'manager' },
+        createdBy: adminUser.id,
+      },
+    });
 
-  const endNode = await prisma.bpmNode.create({
-    data: {
-      tenantId: tenant.id,
-      templateId: bpmTemplate.id,
-      nodeKey: 'end',
-      nodeType: 'End',
-      name: 'End',
-      positionX: 600,
-      positionY: 200,
-      createdBy: adminUser.id,
-    },
-  });
+    const endNode = await prisma.bpmNode.create({
+      data: {
+        tenantId: tenant.id,
+        templateId: bpmTemplate.id,
+        nodeKey: 'end',
+        nodeType: 'End',
+        name: 'End',
+        positionX: 600,
+        positionY: 200,
+        createdBy: adminUser.id,
+      },
+    });
 
-  await prisma.bpmEdge.create({
-    data: {
-      tenantId: tenant.id,
-      templateId: bpmTemplate.id,
-      edgeKey: 'start_to_review',
-      fromNodeId: startNode.id,
-      toNodeId: reviewTask.id,
-      createdBy: adminUser.id,
-    },
-  });
+    await prisma.bpmEdge.create({
+      data: {
+        tenantId: tenant.id,
+        templateId: bpmTemplate.id,
+        edgeKey: 'start_to_review',
+        fromNodeId: startNode.id,
+        toNodeId: reviewTask.id,
+        createdBy: adminUser.id,
+      },
+    });
 
-  await prisma.bpmEdge.create({
-    data: {
-      tenantId: tenant.id,
-      templateId: bpmTemplate.id,
-      edgeKey: 'review_to_end',
-      fromNodeId: reviewTask.id,
-      toNodeId: endNode.id,
-      label: 'Approved',
-      createdBy: adminUser.id,
-    },
-  });
-  console.log(`✅ BPM demo template seeded: ${bpmTemplate.name}`);
+    await prisma.bpmEdge.create({
+      data: {
+        tenantId: tenant.id,
+        templateId: bpmTemplate.id,
+        edgeKey: 'review_to_end',
+        fromNodeId: reviewTask.id,
+        toNodeId: endNode.id,
+        label: 'Approved',
+        createdBy: adminUser.id,
+      },
+    });
+    console.log(`✅ BPM demo template seeded: ${bpmTemplate.name}`);
+  } else {
+    console.log(`⏭️  BPM template LEAVE_APPROVAL already exists`);
+  }
 
   // ── Contact Pipeline ──────────────────────────────────────────────────────
+  const pipelineCount = await prisma.contactPipeline.count({ where: { tenantId: tenant.id } });
+  if (pipelineCount === 0) {
   const pipeline = await prisma.contactPipeline.create({
     data: {
       tenantId: tenant.id,
@@ -466,8 +493,11 @@ async function main() {
     });
   }
   console.log(`✅ Contact pipeline seeded: ${pipeline.name}`);
+  }
 
   // ── Marketing Source ──────────────────────────────────────────────────────
+  const mktCount = await prisma.marketingSource.count({ where: { tenantId: tenant.id } });
+  if (mktCount === 0) {
   for (const [i, name] of ['Facebook Ads', 'Google Ads', 'Email Campaign', 'Cold Call'].entries()) {
     await prisma.marketingSource.create({
       data: {
@@ -480,8 +510,11 @@ async function main() {
     });
   }
   console.log(`✅ Marketing sources seeded`);
+  }
 
   // ── Care Categories ───────────────────────────────────────────────────────
+  const careCount = await prisma.careCategory.count({ where: { tenantId: tenant.id } });
+  if (careCount < 4) {
   for (const [i, name] of ['Phone Call', 'Email', 'Meeting', 'WhatsApp'].entries()) {
     await prisma.careCategory.create({
       data: {
@@ -494,6 +527,21 @@ async function main() {
     });
   }
   console.log(`✅ Care categories seeded`);
+  }
+
+  const demoStats = await seedDemoVolume({
+    prisma,
+    tenantId: tenant.id,
+    adminUserId: adminUser.id,
+    saleUserId: saleUser.id,
+    salesDeptId: salesDept.id,
+    supportDeptId: supportDept.id,
+    vipGroupId: vipGroup.id,
+    standardGroupId: standardGroup.id,
+    websiteSourceId: websiteSource.id,
+    referralSourceId: referralSource.id,
+  });
+  console.log('📊 Demo volume counts:', demoStats);
 
   console.log('\n🎉 Seed completed successfully!');
   console.log('─'.repeat(50));
