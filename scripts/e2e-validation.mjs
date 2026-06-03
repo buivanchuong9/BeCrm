@@ -3,7 +3,7 @@
  * Phase 3 — E2E API flow validation (no FE rescan).
  */
 const BE = process.env.API_BASE || 'http://localhost:43000';
-const HOST = 'localhost';
+const HOST = process.env.TENANT_HOST || 'localhost';
 
 async function req(method, path, { token, body } = {}) {
   const headers = { Accept: 'application/json', Hostname: HOST };
@@ -18,7 +18,7 @@ const flows = [];
 
 async function main() {
   const login = await req('POST', '/authenticator/user/login', {
-    body: { username: 'admin', password: 'Admin@123456' },
+    body: { username: 'admin', password: 'Admin@123456', hostname: HOST },
   });
   const token = login.json?.result?.token;
   flows.push({

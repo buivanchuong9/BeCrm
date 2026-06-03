@@ -3,13 +3,13 @@
  * Phase 2 — Automated API validation against real BE (no mocks).
  */
 const BE = process.env.API_BASE || 'http://localhost:43000';
-const HOST = 'localhost';
+const HOST = process.env.TENANT_HOST || 'localhost';
 const USER = process.env.TEST_USER || 'admin';
 const PASS = process.env.TEST_PASS || 'Admin@123456';
 
 const ENDPOINTS = [
   // AUTH
-  { group: 'AUTH', name: 'login', method: 'POST', path: '/authenticator/user/login', auth: false, body: { username: USER, password: PASS } },
+  { group: 'AUTH', name: 'login', method: 'POST', path: '/authenticator/user/login', auth: false, body: { username: USER, password: PASS, hostname: HOST } },
   { group: 'AUTH', name: 'me', method: 'GET', path: '/authenticator/user/me', needsToken: true },
   { group: 'AUTH', name: 'refresh', method: 'POST', path: '/authenticator/user/refresh', auth: false, body: { refreshToken: '__REFRESH__' }, dynamic: true },
   // CUSTOMER
@@ -56,7 +56,11 @@ async function call(ep, token, vars) {
       method: ep.method,
       headers,
       body: ep.body ? JSON.stringify(
-        ep.name === 'refresh' ? { refreshToken: vars.REFRESH } : ep.body,
+        ep.name === 'refresh'
+          ? { refreshToken: vars.REFRESH }
+          : ep.name === 'login'
+            ? { ...ep.body, hostname: HOST }
+            : ep.body,
       ) : undefined,
       signal: AbortSignal.timeout(12000),
     });
