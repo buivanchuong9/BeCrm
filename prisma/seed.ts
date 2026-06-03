@@ -4,6 +4,68 @@ import { seedDemoVolume } from './seed-demo-volume';
 
 const prisma = new PrismaClient();
 
+const SUPER_ADMIN_ACCOUNTS = [
+  {
+    username: 'daovanduong',
+    email: 'daovanduong4112006a@gmail.com',
+    name: 'Đào Văn Dương',
+  },
+  {
+    username: 'hongchuc',
+    email: 'hongchuc@gmail.com',
+    name: 'Hồng Chúc',
+  },
+  {
+    username: 'nguyencuong',
+    email: ' cng101078@gmail.com',
+    name: 'Nguyễn Cường',
+  },
+] as const;
+
+async function upsertSuperAdminUser(params: {
+  tenantId: string;
+  adminRoleId: string;
+  adminUserId: string;
+  passwordHash: string;
+  username: string;
+  email: string;
+  name: string;
+}) {
+  const user = await prisma.user.upsert({
+    where: { tenantId_username: { tenantId: params.tenantId, username: params.username } },
+    update: {
+      email: params.email,
+      name: params.name,
+      isSuperAdmin: true,
+      isActive: true,
+    },
+    create: {
+      tenantId: params.tenantId,
+      username: params.username,
+      email: params.email,
+      name: params.name,
+      passwordHash: params.passwordHash,
+      isActive: true,
+      isSuperAdmin: true,
+      createdBy: params.adminUserId,
+      updatedBy: params.adminUserId,
+    },
+  });
+
+  await prisma.userRole.upsert({
+    where: { userId_roleId: { userId: user.id, roleId: params.adminRoleId } },
+    update: {},
+    create: {
+      tenantId: params.tenantId,
+      userId: user.id,
+      roleId: params.adminRoleId,
+      createdBy: params.adminUserId,
+    },
+  });
+
+  return user;
+}
+
 async function main() {
   console.log('🌱 Seeding CareFollow database...');
 
@@ -66,7 +128,7 @@ async function main() {
   const adminHash = await bcrypt.hash('Admin@123456', 10);
   const adminUser = await prisma.user.upsert({
     where: { tenantId_username: { tenantId: tenant.id, username: 'admin' } },
-    update: {},
+    update: { isSuperAdmin: true, isActive: true },
     create: {
       tenantId: tenant.id,
       username: 'admin',
@@ -91,6 +153,17 @@ async function main() {
     },
   });
   console.log(`✅ Admin user: admin / Admin@123456`);
+
+  for (const account of SUPER_ADMIN_ACCOUNTS) {
+    await upsertSuperAdminUser({
+      tenantId: tenant.id,
+      adminRoleId: adminRole.id,
+      adminUserId: adminUser.id,
+      passwordHash: adminHash,
+      ...account,
+    });
+    console.log(`✅ Super Admin: ${account.username} / Admin@123456 (${account.email})`);
+  }
 
   // ── Demo Sale User ────────────────────────────────────────────────────────
   const saleHash = await bcrypt.hash('Sale@123456', 10);
@@ -545,8 +618,11 @@ async function main() {
 
   console.log('\n🎉 Seed completed successfully!');
   console.log('─'.repeat(50));
-  console.log('🔑 Login credentials:');
+  console.log('🔑 Login credentials (tenant hostname: demo hoặc localhost):');
   console.log('   admin / Admin@123456   (Super Admin)');
+  for (const account of SUPER_ADMIN_ACCOUNTS) {
+    console.log(`   ${account.username} / Admin@123456   (Super Admin — ${account.email})`);
+  }
   console.log('   sale1 / Sale@123456    (Sales)');
   console.log('─'.repeat(50));
 }
