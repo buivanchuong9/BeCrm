@@ -91,7 +91,7 @@ async function bootstrap() {
   const config = new DocumentBuilder()
     .setTitle('CareFollow CRM API')
     .setDescription('CareFollow Platform — Backend API Documentation')
-    .setVersion('1.0.0')
+    .setVersion('1.1.0')
     .addBearerAuth(
       { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
       'JWT',
