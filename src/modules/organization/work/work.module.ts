@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
-import { WorkController, WorkBpmController } from './work.controller';
+import { WorkController, WorkBpmController, WorkSaleController } from './work.controller';
 import { WorkService } from './work.service';
 
 @Module({
-  controllers: [WorkController, WorkBpmController],
+  controllers: [WorkController, WorkBpmController, WorkSaleController],
   providers: [WorkService],
   exports: [WorkService],
 })

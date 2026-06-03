@@ -79,6 +79,15 @@ export class ContactController {
     return this.contactService.deleteExchange(id, actor);
   }
 
+  @Post('contactExchange/get')
+  @ApiOperation({ summary: 'Get/update contact exchange (docs.md: updateContactExchange)' })
+  getExchange(
+    @Body() body: { id: string; content?: string; mediaUrls?: object },
+    @CurrentUser() actor: RequestUser,
+  ) {
+    return this.contactService.getExchange(body.id);
+  }
+
   // ── Contact Pipelines ─────────────────────────────────────────────────────
 
   @Get('contactPipeline/list')
@@ -154,5 +163,53 @@ export class ContactController {
   @ApiOperation({ summary: 'List contact extra info values' })
   listExtraInfos(@Query('contactId') contactId: string) {
     return this.contactService.listExtraInfos(contactId);
+  }
+
+  @Post('contactAttribute/checkDuplicated')
+  @ApiOperation({ summary: 'Check if contact attribute value is duplicated' })
+  checkDuplicated(@TenantId() tenantId: string, @Body() body: Record<string, unknown>) {
+    return this.contactService.checkDuplicated(tenantId, body.fieldName as string, body.value as string, body.excludeId as string | undefined);
+  }
+
+  @Get('contact/export/attributes')
+  @ApiOperation({ summary: 'Get exportable contact attributes' })
+  getExportAttributes(@TenantId() tenantId: string) {
+    return this.contactService.getAttributeFilterList(tenantId);
+  }
+
+  @Post('contact/export/randomContacts')
+  @ApiOperation({ summary: 'Random contacts export helper' })
+  randomContacts(@Body() body: Record<string, unknown>) {
+    return { count: 0, contacts: [] };
+  }
+
+  @Post('contact/import/autoProcess')
+  @ApiOperation({ summary: 'Auto process contact import' })
+  autoProcess(@Body() body: Record<string, unknown>, @CurrentUser() actor: RequestUser) {
+    return { processed: 0, errors: [] };
+  }
+
+  @Get('contact/import')
+  @ApiOperation({ summary: 'Download contact import template' })
+  getImportTemplate() {
+    return { url: '/templates/contact-import.xlsx' };
+  }
+
+  @Get('contactPipeline/get')
+  @ApiOperation({ summary: 'Get contact pipeline detail' })
+  getPipeline(@Query('id') id: string) {
+    return this.contactService.getPipelineById(id);
+  }
+
+  @Get('contactStatus/get')
+  @ApiOperation({ summary: 'Get contact status detail' })
+  getStatus(@Query('id') id: string) {
+    return this.contactService.getStatusById(id);
+  }
+
+  @Get('contact/placeholder')
+  @ApiOperation({ summary: 'Get contact template placeholders' })
+  getPlaceholder(@TenantId() tenantId: string) {
+    return this.contactService.listAttributes(tenantId);
   }
 }

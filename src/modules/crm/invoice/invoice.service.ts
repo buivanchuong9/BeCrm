@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { buildPagedResult, parsePage, parseLimit } from '../../../shared/kernel/pagination';
 import { PrismaService } from '../../../shared/database/prisma.service';
 import { NotFoundException } from '../../../shared/exceptions/domain.exception';
 import { RequestUser } from '../../../shared/guards/jwt.strategy';
@@ -16,7 +17,7 @@ export class InvoiceService {
       this.prisma.invoice.findMany({ where, skip: (page - 1) * limit, take: limit, orderBy: { createdAt: 'desc' }, include: { items: true } }),
       this.prisma.invoice.count({ where }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async getById(id: string) {
@@ -43,5 +44,11 @@ export class InvoiceService {
   async deleteDetail(id: string) {
     await this.prisma.invoiceDetail.delete({ where: { id } });
     return { message: 'Deleted' };
+  }
+
+  async getTop(tenantId: string, dimension: string, q: Record<string, string>) {
+    const limit = Number(q.limit ?? 10);
+    // Return empty analytics stub — real implementation would aggregate invoice data
+    return { dimension, tenantId, data: [], total: 0, limit };
   }
 }

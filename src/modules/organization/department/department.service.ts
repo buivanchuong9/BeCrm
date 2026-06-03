@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../shared/database/prisma.service';
 import { NotFoundException } from '../../../shared/exceptions/domain.exception';
 import { RequestUser } from '../../../shared/guards/jwt.strategy';
+import { buildPagedResult, parsePage, parseLimit } from '../../../shared/kernel/pagination';
 
 @Injectable()
 export class DepartmentService {
@@ -24,7 +25,7 @@ export class DepartmentService {
       }),
       this.prisma.department.count({ where }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async getById(id: string, tenantId: string) {

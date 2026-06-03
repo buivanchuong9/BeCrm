@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { buildPagedResult, parsePage, parseLimit } from '../../../shared/kernel/pagination';
 import { PrismaService } from '../../../shared/database/prisma.service';
 import { NotFoundException } from '../../../shared/exceptions/domain.exception';
 import { RequestUser } from '../../../shared/guards/jwt.strategy';
@@ -23,7 +24,7 @@ export class BpmFormService {
       this.prisma.bpmForm.findMany({ where, skip: (page - 1) * limit, take: limit, orderBy: { createdAt: 'desc' } }),
       this.prisma.bpmForm.count({ where }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async listEforms(tenantId: string, query?: { keyword?: string; page?: number; limit?: number }) {
@@ -87,7 +88,7 @@ export class BpmFormService {
       this.prisma.bpmFormArtifact.findMany({ where, skip: (page - 1) * limit, take: limit, orderBy: { position: 'asc' } }),
       this.prisma.bpmFormArtifact.count({ where }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async getArtifact(id: string) {
@@ -162,7 +163,7 @@ export class BpmFormService {
       this.prisma.bpmFormMapping.findMany({ where, skip: (page - 1) * limit, take: limit }),
       this.prisma.bpmFormMapping.count({ where }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async listFormMappingsSource(tenantId: string, query?: Record<string, unknown>) {
@@ -176,7 +177,7 @@ export class BpmFormService {
       this.prisma.bpmFormMapping.findMany({ where: { bpmFormId, tenantId, deletedAt: null }, skip: 0, take: limit }),
       this.prisma.bpmFormMapping.count({ where: { bpmFormId, tenantId, deletedAt: null } }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async getFormMapping(id: string) {
@@ -228,7 +229,7 @@ export class BpmFormService {
       this.prisma.bpmFormProcess.findMany({ where, skip: (page - 1) * limit, take: limit }),
       this.prisma.bpmFormProcess.count({ where }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async getFormProcess(id: string) {

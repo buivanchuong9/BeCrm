@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { buildPagedResult, parsePage, parseLimit } from '../../../shared/kernel/pagination';
 import { PrismaService } from '../../../shared/database/prisma.service';
 import { RequestUser } from '../../../shared/guards/jwt.strategy';
 type Dto = Record<string, unknown>;
@@ -15,7 +16,7 @@ export class ContractWarrantyService {
       this.prisma.contractWarranty.findMany({ where, skip: (page - 1) * limit, take: limit, orderBy: { createdAt: 'desc' } }),
       this.prisma.contractWarranty.count({ where }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async getById(id: string) { return this.prisma.contractWarranty.findUnique({ where: { id } }); }

@@ -1,7 +1,8 @@
-import { Controller, Get, Post, Delete, Body, Query, Param } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Query } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { UserService } from './user.service';
 import { CreateUserDto, UpdateUserDto, ListUserDto, ResetPasswordDto, FcmDeviceDto } from './user.dto';
+import { AuthService } from '../auth/auth.service';
 import { CurrentUser } from '../../../shared/decorators/current-user.decorator';
 import { TenantId } from '../../../shared/decorators/tenant.decorator';
 import { RequestUser } from '../../../shared/guards/jwt.strategy';
@@ -10,7 +11,16 @@ import { RequestUser } from '../../../shared/guards/jwt.strategy';
 @ApiBearerAuth('JWT')
 @Controller()
 export class UserController {
-  constructor(private userService: UserService) {}
+  constructor(
+    private userService: UserService,
+    private authService: AuthService,
+  ) {}
+
+  @Get('adminapi/user/profile')
+  @ApiOperation({ summary: 'Get current user profile (MSW compat)' })
+  getAdminProfile(@CurrentUser() user: RequestUser) {
+    return this.authService.getAdminProfile(user.id);
+  }
 
   @Post('authenticator/user/create')
   @ApiOperation({ summary: 'Create user' })

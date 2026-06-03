@@ -4,7 +4,7 @@ import { BpmTemplateService } from './template/bpm-template.service';
 import { BpmInstanceController } from './instance/bpm-instance.controller';
 import { BpmInstanceService } from './instance/bpm-instance.service';
 import { BpmEngineService } from './instance/bpm-engine.service';
-import { BpmWorkOrderController, BpmUserTaskRuntimeController } from './work-order/bpm-work-order.controller';
+import { BpmWorkOrderController, BpmUserTaskRuntimeController, BpmWorkOrderLowercaseController } from './work-order/bpm-work-order.controller';
 import { BpmWorkOrderService } from './work-order/bpm-work-order.service';
 import { BpmApprovalController } from './approval/bpm-approval.controller';
 import { BpmApprovalService } from './approval/bpm-approval.service';
@@ -33,6 +33,7 @@ import { BpmNodeModule } from './generic-node/bpm-node.module';
     BpmInstanceController,
     BpmWorkOrderController,
     BpmUserTaskRuntimeController,
+    BpmWorkOrderLowercaseController,
     BpmApprovalController,
     BusinessRuleController,
   ],

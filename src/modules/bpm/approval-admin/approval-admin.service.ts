@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { buildPagedResult, parsePage, parseLimit } from '../../../shared/kernel/pagination';
 import { PrismaService } from '../../../shared/database/prisma.service';
 import { NotFoundException } from '../../../shared/exceptions/domain.exception';
 import { RequestUser } from '../../../shared/guards/jwt.strategy';
@@ -32,7 +33,7 @@ export class ApprovalAdminService {
       }),
       this.prisma.approval.count({ where }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async upsert(dto: Record<string, unknown>, actor: RequestUser) {
@@ -99,7 +100,7 @@ export class ApprovalAdminService {
       this.prisma.approvalConfig.findMany({ where, skip: (page - 1) * limit, take: limit, orderBy: { stepNo: 'asc' } }),
       this.prisma.approvalConfig.count({ where }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async upsertConfig(dto: Record<string, unknown>, actor: RequestUser) {
@@ -146,7 +147,7 @@ export class ApprovalAdminService {
       this.prisma.approvalLink.findMany({ where, skip: (page - 1) * limit, take: limit }),
       this.prisma.approvalLink.count({ where }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async upsertLink(dto: Record<string, unknown>, actor: RequestUser) {
@@ -195,7 +196,7 @@ export class ApprovalAdminService {
       this.prisma.approvalObject.findMany({ where, skip: (page - 1) * limit, take: limit, orderBy: { createdAt: 'desc' } }),
       this.prisma.approvalObject.count({ where }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async getObject(id: string) {
@@ -265,7 +266,7 @@ export class ApprovalAdminService {
       this.prisma.approvalLog.findMany({ where, skip: (page - 1) * limit, take: limit, orderBy: { createdAt: 'desc' } }),
       this.prisma.approvalLog.count({ where }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async upsertLog(dto: Record<string, unknown>, actor: RequestUser) {

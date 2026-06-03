@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { buildPagedResult, parsePage, parseLimit } from '../../../shared/kernel/pagination';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../shared/database/prisma.service';
 import { NotFoundException, OptimisticLockException } from '../../../shared/exceptions/domain.exception';
@@ -45,7 +46,7 @@ export class BpmTemplateService {
       }),
       this.prisma.bpmProcessTemplate.count({ where }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async getById(id: string, tenantId: string) {
@@ -57,7 +58,28 @@ export class BpmTemplateService {
       },
     });
     if (!template) throw new NotFoundException('BpmProcessTemplate', id);
-    return template;
+
+    // FE reads result.configs (not result.edges) — RESPONSE_CONTRACT_GAPS GAP-03
+    // FE also reads: result.nodes[i].{id, typeNode, position, code, name, configData, point}
+    const nodes = (template.nodes as Array<Record<string, unknown>>).map((n) => ({
+      id: n['nodeKey'] ?? n['id'],
+      processId: id,
+      typeNode: n['nodeType'] ?? 'default',
+      name: n['name'] ?? '',
+      code: (n['nodeType'] as string ?? '').toLowerCase().replace('task', '').replace('event', '') || 'do',
+      position: { x: Number(n['positionX'] ?? 0), y: Number(n['positionY'] ?? 0) },
+      point: null,
+      configData: n['config'] ?? null,
+    }));
+
+    const configs = (template.edges as Array<Record<string, unknown>>).map((e) => ({
+      id: e['id'],
+      fromNodeId: e['fromNodeKey'] ?? e['fromNodeId'],
+      toNodeId: e['toNodeKey'] ?? e['toNodeId'],
+      condition: e['condition'] ? 1 : 0,
+    }));
+
+    return { ...template, nodes, configs };
   }
 
   async create(dto: CreateProcessTemplateDto, actor: RequestUser) {

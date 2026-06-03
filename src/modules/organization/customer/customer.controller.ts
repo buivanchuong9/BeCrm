@@ -13,20 +13,16 @@ export class CustomerController {
 
   // ── Customers ─────────────────────────────────────────────────────────────
 
+  @Get('customer/list')
+  @ApiOperation({ summary: 'List customers (MSW compat path)' })
+  listMsw(@TenantId() tenantId: string, @Query() query: Record<string, string>) {
+    return this.customerService.list(tenantId, query);
+  }
+
   @Get('customer/list_paid')
   @ApiOperation({ summary: 'List customers' })
   list(@TenantId() tenantId: string, @Query() query: Record<string, string>) {
-    return this.customerService.list(tenantId, {
-      name: query.name,
-      phone: query.phone,
-      keyword: query.keyword,
-      status: query.status !== undefined ? Number(query.status) : undefined,
-      customerGroupId: query.customerGroupId,
-      customerSourceId: query.customerSourceId,
-      iamEmployeeId: query.iamEmployeeId,
-      page: query.pageIndex ? Number(query.pageIndex) : query.page ? Number(query.page) : undefined,
-      limit: query.pageSize ? Number(query.pageSize) : query.limit ? Number(query.limit) : undefined,
-    });
+    return this.customerService.list(tenantId, query);
   }
 
   @Get('customer/list_paid/shared')
@@ -41,8 +37,13 @@ export class CustomerController {
 
   @Get('customer/list_by_id')
   @ApiOperation({ summary: 'Get multiple customers by IDs' })
-  listByIds(@TenantId() tenantId: string, @Query('ids') ids: string) {
-    return this.customerService.listByIds(tenantId, ids ? ids.split(',') : []);
+  listByIds(
+    @TenantId() tenantId: string,
+    @Query('lstId') lstId: string,
+    @Query('ids') ids: string,
+  ) {
+    const raw = lstId ?? ids ?? '';
+    return this.customerService.listByIds(tenantId, raw ? raw.split(',').map((s) => s.trim()).filter(Boolean) : []);
   }
 
   @Get('customer/get')
@@ -447,5 +448,28 @@ export class CustomerController {
   @ApiOperation({ summary: 'Delete customer source' })
   deleteSource(@Query('id') id: string, @CurrentUser() actor: RequestUser) {
     return this.customerService.deleteSource(id, actor);
+  }
+
+  // ── MSW compat endpoints ──────────────────────────────────────────────────
+
+  @Get('careAfterVisit/list')
+  @ApiOperation({ summary: 'List care after visit records (MSW compat)' })
+  listCareAfterVisit(
+    @TenantId() tenantId: string,
+    @Query('customerId') customerId?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.customerService.listCareAfterVisit(tenantId, customerId, Number(page ?? 1), Number(limit ?? 20));
+  }
+
+  @Get('customer/medical_record')
+  @ApiOperation({ summary: 'Get customer medical record' })
+  getMedicalRecord(
+    @TenantId() tenantId: string,
+    @Query('customerId') customerId: string,
+    @Query('id') id: string,
+  ) {
+    return this.customerService.getMedicalRecord(tenantId, customerId ?? id);
   }
 }

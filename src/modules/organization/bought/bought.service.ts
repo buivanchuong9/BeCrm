@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../shared/database/prisma.service';
 import { NotFoundException } from '../../../shared/exceptions/domain.exception';
 import { RequestUser } from '../../../shared/guards/jwt.strategy';
+import { buildPagedResult, parsePage, parseLimit } from '../../../shared/kernel/pagination';
 
 @Injectable()
 export class BoughtService {
@@ -27,7 +28,7 @@ export class BoughtService {
       }),
       this.prisma.boughtCardService.count({ where }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async listByCustomerId(customerId: string, tenantId: string, page = 1, limit = 20) {
@@ -40,7 +41,7 @@ export class BoughtService {
       }),
       this.prisma.boughtCardService.count({ where: { customerId, tenantId, deletedAt: null } }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async upsertBoughtCardService(dto: Record<string, unknown>, actor: RequestUser) {
@@ -121,7 +122,7 @@ export class BoughtService {
       this.prisma.loyaltyPointLedger.findMany({ where, skip: (page - 1) * limit, take: limit, orderBy: { createdAt: 'desc' } }),
       this.prisma.loyaltyPointLedger.count({ where }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   // ── BoughtProduct ──────────────────────────────────────────────────────────
@@ -139,7 +140,7 @@ export class BoughtService {
       this.prisma.boughtProduct.findMany({ where, skip: (page - 1) * limit, take: limit, orderBy: { createdAt: 'desc' } }),
       this.prisma.boughtProduct.count({ where }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async getBoughtProduct(id: string) {

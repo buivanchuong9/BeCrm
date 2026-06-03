@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../shared/database/prisma.service';
 import { NotFoundException } from '../../../shared/exceptions/domain.exception';
 import { RequestUser } from '../../../shared/guards/jwt.strategy';
+import { buildPagedResult, parsePage, parseLimit } from '../../../shared/kernel/pagination';
 
 @Injectable()
 export class GroupService {
@@ -23,7 +24,7 @@ export class GroupService {
       }),
       this.prisma.group.count({ where }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async getGroup(id: string, tenantId: string) {
@@ -73,7 +74,7 @@ export class GroupService {
       }),
       this.prisma.groupEmployee.count({ where: { groupId, deletedAt: null } }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async addGroupEmployee(dto: { groupId: string; iamEmployeeId: string; role?: string }, actor: RequestUser) {

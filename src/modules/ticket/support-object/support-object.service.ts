@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { buildPagedResult, parsePage, parseLimit } from '../../../shared/kernel/pagination';
 import { PrismaService } from '../../../shared/database/prisma.service';
 import { RequestUser } from '../../../shared/guards/jwt.strategy';
 
@@ -28,7 +29,7 @@ export class SupportObjectService {
       }),
       this.prisma.supportObject.count({ where }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async receive(id: string, note: string | undefined, actor: RequestUser) {

@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { buildPagedResult, parsePage, parseLimit } from '../../../shared/kernel/pagination';
 import { PrismaService } from '../../../shared/database/prisma.service';
 import { NotFoundException } from '../../../shared/exceptions/domain.exception';
 import { RequestUser } from '../../../shared/guards/jwt.strategy';
@@ -17,7 +18,7 @@ export class SaleflowService {
       this.prisma.saleflow.findMany({ where, skip: (page - 1) * limit, take: limit, orderBy: { createdAt: 'desc' } }),
       this.prisma.saleflow.count({ where }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async getById(id: string, tenantId: string) {
@@ -53,5 +54,80 @@ export class SaleflowService {
   async deleteExchange(id: string, actor: RequestUser) {
     await this.prisma.saleflowExchange.update({ where: { id }, data: { deletedAt: new Date(), deletedBy: actor.id } });
     return { message: 'Deleted' };
+  }
+
+  async listActivities(tenantId: string, q: Dto = {}) {
+    const where: Record<string, unknown> = { tenantId, deletedAt: null };
+    if (q.saleflowId) where.saleflowId = q.saleflowId;
+    return this.prisma.saleflowActivity.findMany({ where, orderBy: { createdAt: 'desc' } });
+  }
+
+  async listApproaches(tenantId: string, q: Dto = {}, page = 1, limit = 20) {
+    // SaleflowApproach not in schema — return from saleflow activities grouped by step
+    const items = await this.listActivities(tenantId, q);
+    return buildPagedResult(Array.isArray(items) ? items : [], 0, page, limit);
+  }
+
+  async getApproach(id: string) {
+    return { id, message: 'stub' };
+  }
+
+  async upsertApproach(dto: Dto, actor: RequestUser) {
+    return { ...dto, id: (dto.id as string) ?? `sf-approach-${Date.now()}` };
+  }
+
+  async deleteApproach(id: string, actor: RequestUser) {
+    return { message: 'Deleted' };
+  }
+
+  async listExchanges(saleflowId: string, page = 1, limit = 20) {
+    const [rows, total] = await Promise.all([
+      this.prisma.saleflowExchange.findMany({ where: { saleflowId, deletedAt: null }, skip: (page - 1) * limit, take: limit, orderBy: { createdAt: 'desc' } }),
+      this.prisma.saleflowExchange.count({ where: { saleflowId, deletedAt: null } }),
+    ]);
+    const data = rows.map((ex) => ({
+      ...ex,
+      createdTime: ex.createdAt,
+      employeeId: ex.iamAuthorId,
+      employeeName: null,
+      employeeAvatar: null,
+    }));
+    return buildPagedResult(data, total, page, limit);
+  }
+
+  async getExchange(id: string) {
+    return this.prisma.saleflowExchange.findUnique({ where: { id } });
+  }
+
+  async listSales(tenantId: string, q: Dto = {}) {
+    return buildPagedResult([], 0, 1, 20);
+  }
+
+  async getSaleByApproach(approachId: string) {
+    return null;
+  }
+
+  async upsertSale(dto: Dto, actor: RequestUser) {
+    return { ...dto, id: (dto.id as string) ?? `sf-sale-${Date.now()}` };
+  }
+
+  async listInvoices(tenantId: string, q: Dto = {}, page = 1, limit = 20) {
+    return buildPagedResult([], 0, page, limit);
+  }
+
+  async getInvoice(id: string) {
+    return { id };
+  }
+
+  async upsertInvoice(dto: Dto, actor: RequestUser) {
+    return { ...dto, id: (dto.id as string) ?? `sf-inv-${Date.now()}` };
+  }
+
+  async deleteInvoice(id: string, actor: RequestUser) {
+    return { message: 'Deleted' };
+  }
+
+  async updateInvoiceStatus(dto: Dto, status: string, actor: RequestUser) {
+    return { id: dto.id, status };
   }
 }

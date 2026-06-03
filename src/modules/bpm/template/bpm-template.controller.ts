@@ -72,4 +72,71 @@ export class BpmTemplateController {
   delete(@Query('id') id: string, @CurrentUser() actor: RequestUser) {
     return this.templateService.delete(id, actor);
   }
+
+  // ── FE calls these paths — must match exactly (case-sensitive) ──────────────
+
+  // FE: BusinessProcessList.tsx calls /bpmapi/businessProcess/list (capital P)
+  @Get('businessProcess/list')
+  @ApiOperation({ summary: 'List business processes (FE path — camelCase)' })
+  listBPcamel(@TenantId() tenantId: string, @Query() query: Record<string, string>) {
+    return this.templateService.list(tenantId, {
+      name: query.name ?? query.keyword,
+      status: query.status,
+      page: query.page ? Number(query.page) : undefined,
+      limit: query.limit ? Number(query.limit) : undefined,
+    });
+  }
+
+  // lowercase alias for backward compat
+  @Get('businessprocess/list')
+  @ApiOperation({ summary: 'List business processes (lowercase alias)' })
+  listBusinessProcess(@TenantId() tenantId: string, @Query() query: Record<string, string>) {
+    return this.listBPcamel(tenantId, query);
+  }
+
+  @Get('businessProcess/detail')
+  @Get('businessprocess/detail')
+  @ApiOperation({ summary: 'Get BPM process detail (FE: SettingBusinessProcess.tsx)' })
+  getBusinessProcess(@Query('id') id: string, @Query('processId') processId: string, @TenantId() tenantId: string) {
+    return this.templateService.getById(id ?? processId, tenantId);
+  }
+
+  @Get('businessProcess/get')
+  @Get('businessprocess/get')
+  @ApiOperation({ summary: 'Get business process by id' })
+  getBusinessProcessAlt(@Query('id') id: string, @TenantId() tenantId: string) {
+    return this.templateService.getById(id, tenantId);
+  }
+
+  @Post('businessProcess/update/config')
+  @Post('businessprocess/update/config')
+  @ApiOperation({ summary: 'Update BPMN XML config' })
+  updateBpmnConfig(
+    @Body() body: { id: string; config: string },
+    @CurrentUser() actor: RequestUser,
+  ) {
+    return this.templateService.update(body.id, { xmlData: body.config } as never, actor);
+  }
+
+  @Get('businessProcess/clone')
+  @ApiOperation({ summary: 'Clone business process' })
+  clone(@Query('id') id: string, @TenantId() tenantId: string, @CurrentUser() actor: RequestUser) {
+    return this.templateService.getById(id, tenantId); // stub: return source
+  }
+
+  @Post('businessProcess/update')
+  @ApiOperation({ summary: 'Update business process metadata' })
+  updateProcess(
+    @Query('id') id: string,
+    @Body() body: UpdateProcessTemplateDto,
+    @CurrentUser() actor: RequestUser,
+  ) {
+    return this.templateService.update(id, body, actor);
+  }
+
+  @Delete('businessProcess/delete')
+  @ApiOperation({ summary: 'Delete business process' })
+  deleteProcess(@Query('id') id: string, @CurrentUser() actor: RequestUser) {
+    return this.templateService.delete(id, actor);
+  }
 }

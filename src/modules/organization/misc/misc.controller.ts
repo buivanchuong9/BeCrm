@@ -209,12 +209,16 @@ export class MiscController {
   @Delete('emailRequest/delete') deleteEmailRequest(@Query('id') id: string) { return { message: 'Deleted' }; }
   @Get('emailRequest/get') getEmailRequest(@Query('id') id: string) { return this.svc.getById('emailRequest', id); }
   @Post('emailRequest/update') upsertEmailRequest(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.upsert('emailRequest', b, a); }
+  @Post('emailRequest/approve') approveEmailRequest(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.updateCommunicationRequestStatus('emailRequest', b, 'approved', a); }
+  @Post('emailRequest/cancel') cancelEmailRequest(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.updateCommunicationRequestStatus('emailRequest', b, 'cancelled', a); }
 
   @Get('smsRequest/list') listSmsRequests(@TenantId() t: string, @Query() q: Record<string, string>) { return this.svc.list('smsRequest', t, q); }
   @Post('smsRequest/send') sendSmsRequest(@Body() b: Record<string, unknown>) { return { sent: true, queued: true }; }
   @Delete('smsRequest/delete') deleteSmsRequest(@Query('id') id: string) { return { message: 'Deleted' }; }
   @Get('smsRequest/get') getSmsRequest(@Query('id') id: string) { return this.svc.getById('smsRequest', id); }
   @Post('smsRequest/update') upsertSmsRequest(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.upsert('smsRequest', b, a); }
+  @Post('smsRequest/approve') approveSmsRequest(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.updateCommunicationRequestStatus('smsRequest', b, 'approved', a); }
+  @Post('smsRequest/cancel') cancelSmsRequest(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.updateCommunicationRequestStatus('smsRequest', b, 'cancelled', a); }
 
   @Get('email/list') listEmails(@TenantId() t: string, @Query() q: Record<string, string>) { return this.svc.list('email', t, q); }
   @Post('email/update') upsertEmail(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.upsert('email', b, a); }
@@ -278,8 +282,8 @@ export class MiscController {
   @Post('paymentHistory/update') upsertPaymentHistory(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.upsert('paymentHistory', b, a); }
   @Delete('paymentHistory/delete') deletePaymentHistory(@Query('id') id: string) { return { message: 'Deleted' }; }
 
-  // ── Relationship ──────────────────────────────────────────────────────────
-  @Get('relationship/list') listRelationships(@TenantId() t: string) { return []; }
+  // ── Relationship = ContactPipeline ────────────────────────────────────────
+  @Get('relationship/list') listRelationships(@TenantId() t: string) { return this.svc.listRelationships(t); }
   @Post('relationship/update') upsertRelationship(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.upsert('relationship', b, a); }
   @Delete('relationship/delete') deleteRelationship(@Query('id') id: string) { return { message: 'Deleted' }; }
 

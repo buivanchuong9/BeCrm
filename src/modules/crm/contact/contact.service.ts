@@ -2,28 +2,31 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../shared/database/prisma.service';
 import { NotFoundException, OptimisticLockException } from '../../../shared/exceptions/domain.exception';
 import { RequestUser } from '../../../shared/guards/jwt.strategy';
+import { buildPagedResult, parsePage, parseLimit } from '../../../shared/kernel/pagination';
 
 @Injectable()
 export class ContactService {
   constructor(private prisma: PrismaService) {}
 
   async list(tenantId: string, query?: {
-    name?: string; phone?: string; email?: string;
+    name?: string; keyword?: string; phone?: string; email?: string;
     contactPipelineId?: string; contactStatusId?: string; iamOwnerId?: string;
-    page?: number; limit?: number;
+    pipelineId?: string; statusId?: string;
+    page?: number | string; limit?: number | string;
   }) {
-    const page = query?.page ?? 1;
-    const limit = query?.limit ?? 20;
+    const page = parsePage(query?.page);
+    const limit = parseLimit(query?.limit);
 
     const where: Record<string, unknown> = { tenantId, deletedAt: null };
-    if (query?.name) where.name = { contains: query.name, mode: 'insensitive' };
+    const keyword = query?.keyword ?? query?.name;
+    if (keyword) where.name = { contains: keyword, mode: 'insensitive' };
     if (query?.phone) where.phone = { contains: query.phone };
     if (query?.email) where.email = { contains: query.email, mode: 'insensitive' };
-    if (query?.contactPipelineId) where.contactPipelineId = query.contactPipelineId;
-    if (query?.contactStatusId) where.contactStatusId = query.contactStatusId;
+    if (query?.contactPipelineId ?? query?.pipelineId) where.contactPipelineId = query.contactPipelineId ?? query?.pipelineId;
+    if (query?.contactStatusId ?? query?.statusId) where.contactStatusId = query.contactStatusId ?? query?.statusId;
     if (query?.iamOwnerId) where.iamOwnerId = query.iamOwnerId;
 
-    const [data, total] = await Promise.all([
+    const [items, total] = await Promise.all([
       this.prisma.contact.findMany({
         where,
         skip: (page - 1) * limit,
@@ -36,7 +39,7 @@ export class ContactService {
       }),
       this.prisma.contact.count({ where }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(items, total, page, limit);
   }
 
   async getById(id: string, tenantId: string) {
@@ -125,6 +128,17 @@ export class ContactService {
       data: { deletedAt: new Date(), deletedBy: actor.id },
     });
     return { message: 'Pipeline deleted' };
+  }
+
+  async getPipelineById(id: string) {
+    return this.prisma.contactPipeline.findUnique({
+      where: { id },
+      include: { statuses: { where: { deletedAt: null }, orderBy: { position: 'asc' } } },
+    });
+  }
+
+  async getStatusById(id: string) {
+    return this.prisma.contactStatus.findUnique({ where: { id } });
   }
 
   // Contact statuses
@@ -246,6 +260,17 @@ export class ContactService {
       data: { deletedAt: new Date(), deletedBy: actor.id },
     });
     return { message: 'Exchange deleted' };
+  }
+
+  async getExchange(id: string) {
+    return this.prisma.contactExchange.findUnique({ where: { id } });
+  }
+
+  async checkDuplicated(tenantId: string, fieldName: string, value: string, excludeId?: string) {
+    const existing = await this.prisma.contactAttributeDefinition.findFirst({
+      where: { tenantId, fieldName, deletedAt: null, ...(excludeId ? { id: { not: excludeId } } : {}) },
+    });
+    return { isDuplicated: !!existing };
   }
 
   async getAttributeFilterList(tenantId: string) {

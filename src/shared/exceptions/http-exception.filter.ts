@@ -6,8 +6,19 @@ import {
   HttpStatus,
   Logger,
 } from '@nestjs/common';
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
+
+// Error code mapping: HTTP status → frontend error code
+const ERROR_CODES: Record<number, number> = {
+  400: 1001,
+  401: 1002,
+  403: 1003,
+  404: 1004,
+  409: 1005,
+  422: 1006,
+  500: 9999,
+};
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
@@ -16,11 +27,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
-    const request = ctx.getRequest<Request>();
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message = 'Internal server error';
-    let errors: unknown = undefined;
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
@@ -29,8 +38,13 @@ export class HttpExceptionFilter implements ExceptionFilter {
         message = res;
       } else if (typeof res === 'object' && res !== null) {
         const r = res as Record<string, unknown>;
-        message = (r['message'] as string) || message;
-        errors = r['errors'];
+        const msg = r['message'];
+        // ValidationPipe returns message as array of strings
+        if (Array.isArray(msg)) {
+          message = msg.join('; ');
+        } else {
+          message = (msg as string) || message;
+        }
       }
     } else if (exception instanceof PrismaClientKnownRequestError) {
       switch (exception.code) {
@@ -55,13 +69,11 @@ export class HttpExceptionFilter implements ExceptionFilter {
       this.logger.error(`Unhandled: ${exception.message}`, exception.stack);
     }
 
+    // Return CareFollow standard error envelope (docs.md contract)
     response.status(status).json({
-      success: false,
-      statusCode: status,
+      code: ERROR_CODES[status] ?? 9999,
       message,
-      ...(errors ? { errors } : {}),
-      path: request.url,
-      timestamp: new Date().toISOString(),
+      result: null,
     });
   }
 }

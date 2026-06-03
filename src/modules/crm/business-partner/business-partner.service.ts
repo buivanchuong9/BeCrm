@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../shared/database/prisma.service';
 import { NotFoundException } from '../../../shared/exceptions/domain.exception';
 import { RequestUser } from '../../../shared/guards/jwt.strategy';
+import { buildPagedResult, parsePage, parseLimit } from '../../../shared/kernel/pagination';
 type Dto = Record<string, unknown>;
 
 @Injectable()
@@ -17,7 +18,7 @@ export class BusinessPartnerService {
       this.prisma.businessPartner.findMany({ where, skip: (page - 1) * limit, take: limit, orderBy: { createdAt: 'desc' } }),
       this.prisma.businessPartner.count({ where }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async getById(id: string, tenantId: string) {
@@ -61,7 +62,7 @@ export class BusinessPartnerService {
       this.prisma.businessPartnerExchange.findMany({ where: { businessPartnerId, deletedAt: null }, skip: (page - 1) * limit, take: limit, orderBy: { createdAt: 'desc' } }),
       this.prisma.businessPartnerExchange.count({ where: { businessPartnerId, deletedAt: null } }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async addExchange(dto: Dto, actor: RequestUser) {

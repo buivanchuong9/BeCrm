@@ -177,9 +177,27 @@ export class IntegrationController {
   @Delete('reportRole/delete') deleteReportRole(@Query('id') id: string, @CurrentUser() a: RequestUser) { return this.svc.deleteReport(id, a); }
 
   // ── Mailbox ───────────────────────────────────────────────────────────────
-  @Get('mailbox/list') listMailbox(@TenantId() t: string) { return []; }
-  @Get('mailboxExchange/list') listMailboxEx(@Query('mailboxId') id: string) { return []; }
+  @Get('mailbox/list') @ApiOperation({ summary: 'List mailboxes' })
+  listMailbox(@TenantId() t: string, @Query() q: Record<string, string>) { return this.svc.listMailboxes(t, q); }
+  @Get('mailbox/get') @ApiOperation({ summary: 'Get mailbox detail' })
+  getMailbox(@Query('id') id: string) { return this.svc.getMailbox(id); }
+  @Post('mailbox/update') @ApiOperation({ summary: 'Create or update mailbox' })
+  upsertMailbox(@TenantId() t: string, @Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.upsertMailbox(t, b, a); }
+  @Delete('mailbox/delete') @ApiOperation({ summary: 'Delete mailbox' })
+  deleteMailbox(@Query('id') id: string) { return this.svc.deleteMailbox(id); }
+  @Get('mailbox/viewer') @ApiOperation({ summary: 'List mailbox viewers' })
+  listMailboxViewer(@Query('id') mailboxId: string, @Query('mailboxId') altId?: string) { return this.svc.listMailboxViewers(mailboxId ?? altId ?? ''); }
+  @Post('mailbox/update/viewer') @ApiOperation({ summary: 'Update mailbox viewers' })
+  updateMailboxViewer(@Body() b: Record<string, unknown>) { return this.svc.updateMailboxViewer(b); }
+
+  @Get('mailboxExchange/list') @ApiOperation({ summary: 'List mailbox exchanges' })
+  listMailboxEx(@Query('mailboxId') mailboxId: string, @Query() q: Record<string, string>) { return this.svc.listMailboxExchanges(mailboxId, q); }
+  @Get('mailboxExchange/get') getMailboxEx(@Query('id') id: string) { return { id }; }
   @Post('mailboxExchange/send') sendMailbox(@Body() b: Record<string, unknown>) { return { sent: true }; }
+  @Post('mailboxExchange/update') @ApiOperation({ summary: 'Create or update mailbox exchange' })
+  upsertMailboxEx(@Body() b: Record<string, unknown>) { return this.svc.upsertMailboxExchange(b); }
+  @Delete('mailboxExchange/delete') @ApiOperation({ summary: 'Delete mailbox exchange' })
+  deleteMailboxEx(@Query('id') id: string) { return this.svc.deleteMailboxExchange(id); }
 
   // ── Treatment Time ────────────────────────────────────────────────────────
   @Get('treatmentTime/list') listTreatmentTimes(@TenantId() t: string, @Query() q: Record<string, string>) { return this.svc.listTreatmentTimes(t, q); }

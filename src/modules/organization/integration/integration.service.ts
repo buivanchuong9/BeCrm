@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../shared/database/prisma.service';
 import { RequestUser } from '../../../shared/guards/jwt.strategy';
+import { buildPagedResult, parsePage, parseLimit } from '../../../shared/kernel/pagination';
 type Dto = Record<string, unknown>;
 
 @Injectable()
@@ -46,7 +47,7 @@ export class IntegrationService {
       this.prisma.userLoginLog.findMany({ where: { tenantId, ...(q.userId ? { userId: q.userId as string } : {}) }, skip: (page - 1) * limit, take: limit, orderBy: { loggedAt: 'desc' } }),
       this.prisma.userLoginLog.count({ where: { tenantId } }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async getCustomerAnalytics(tenantId: string, type: string, q: Dto) {
@@ -63,7 +64,7 @@ export class IntegrationService {
       this.prisma.customer.findMany({ where: { tenantId, deletedAt: null }, skip: (page - 1) * limit, take: limit, select: { id: true, name: true, phone: true, createdAt: true } }),
       this.prisma.customer.count({ where: { tenantId, deletedAt: null } }),
     ]);
-    return { data, total };
+    return buildPagedResult(data, total, 1, total);
   }
 
   async listReports(tenantId: string) { return this.prisma.report.findMany({ where: { tenantId, deletedAt: null }, orderBy: { name: 'asc' } }); }
@@ -84,4 +85,124 @@ export class IntegrationService {
     return this.prisma.treatmentTime.create({ data: { tenantId: actor.tenantId, roomId: dto.roomId as string | undefined, iamDoctorId: dto.iamDoctorId as string | undefined, dayOfWeek: dto.dayOfWeek as number | undefined, startTime: dto.startTime as string | undefined, endTime: dto.endTime as string | undefined, capacity: (dto.capacity as number) ?? 1, createdBy: actor.id, updatedBy: actor.id } });
   }
   async deleteTreatmentTime(id: string, actor: RequestUser) { await this.prisma.treatmentTime.update({ where: { id }, data: { deletedAt: new Date(), deletedBy: actor.id } }); return { message: 'Deleted' }; }
+
+  // ── Mailbox (no Prisma model — tenant-scoped in-memory store) ─────────────
+  private readonly mailboxes = new Map<string, Array<Record<string, unknown> & { id: string }>>();
+  private readonly mailboxViewers = new Map<string, unknown[]>();
+  private readonly mailboxExchanges = new Map<string, Array<Record<string, unknown> & { id: string }>>();
+
+  private mailboxList(tenantId: string) {
+    if (!this.mailboxes.has(tenantId)) this.mailboxes.set(tenantId, []);
+    return this.mailboxes.get(tenantId)!;
+  }
+
+  async listMailboxes(tenantId: string, query: Record<string, string>) {
+    const page = parsePage(query.page);
+    const limit = parseLimit(query.limit);
+    const keyword = (query.keyword ?? '').toLowerCase();
+    let items = this.mailboxList(tenantId);
+    if (keyword) {
+      items = items.filter((m) => {
+        const title = String(m.title ?? '').toLowerCase();
+        const content = String(m.content ?? '').toLowerCase();
+        return title.includes(keyword) || content.includes(keyword);
+      });
+    }
+    const total = items.length;
+    const slice = items.slice((page - 1) * limit, page * limit);
+    return buildPagedResult(slice, total, page, limit);
+  }
+
+  async getMailbox(id: string) {
+    for (const list of this.mailboxes.values()) {
+      const found = list.find((m) => m.id === id);
+      if (found) return found;
+    }
+    return { id, title: '', content: '', departments: '', employees: '', attachments: '' };
+  }
+
+  async upsertMailbox(tenantId: string, dto: Dto, actor: RequestUser) {
+    const list = this.mailboxList(tenantId);
+    const id = (dto.id as string) ?? `mb-${Date.now()}`;
+    const payload = {
+      id,
+      tenantId,
+      title: (dto.title as string) ?? '',
+      content: (dto.content as string) ?? '',
+      departments: (dto.departments as string) ?? '',
+      employees: (dto.employees as string) ?? '',
+      attachments: (dto.attachments as string) ?? '',
+      updatedBy: actor.id,
+      updatedAt: new Date().toISOString(),
+    };
+    const idx = list.findIndex((m) => m.id === id);
+    if (idx >= 0) {
+      list[idx] = { ...list[idx], ...payload };
+      return list[idx];
+    }
+    const created = { ...payload, createdBy: actor.id, createdAt: new Date().toISOString() };
+    list.push(created);
+    return created;
+  }
+
+  async deleteMailbox(id: string) {
+    for (const [tenantId, list] of this.mailboxes.entries()) {
+      const next = list.filter((m) => m.id !== id);
+      if (next.length !== list.length) {
+        this.mailboxes.set(tenantId, next);
+        this.mailboxViewers.delete(id);
+        this.mailboxExchanges.delete(id);
+        return { message: 'Deleted', id };
+      }
+    }
+    return { message: 'Deleted', id };
+  }
+
+  listMailboxViewers(mailboxId: string) {
+    return this.mailboxViewers.get(mailboxId) ?? [];
+  }
+
+  updateMailboxViewer(dto: Dto) {
+    const mailboxId = String(dto.id ?? dto.mailboxId ?? '');
+    const employees = String(dto.employees ?? '');
+    const viewers = employees
+      ? employees.split(',').map((e) => e.trim()).filter(Boolean).map((employeeId) => ({ employeeId, mailboxId }))
+      : [];
+    this.mailboxViewers.set(mailboxId, viewers);
+    return { id: mailboxId, employees, viewers, updated: true };
+  }
+
+  listMailboxExchanges(mailboxId: string, query: Record<string, string>) {
+    const page = parsePage(query.page);
+    const limit = parseLimit(query.limit);
+    const items = (this.mailboxExchanges.get(mailboxId) ?? []).filter(
+      (e) => !query.mailboxId || String(e.mailboxId ?? mailboxId) === String(query.mailboxId ?? mailboxId),
+    );
+    const total = items.length;
+    const slice = items.slice((page - 1) * limit, page * limit);
+    return buildPagedResult(slice, total, page, limit);
+  }
+
+  async upsertMailboxExchange(dto: Dto) {
+    const mailboxId = String(dto.mailboxId ?? '');
+    const id = (dto.id as string) ?? `mbex-${Date.now()}`;
+    const list = this.mailboxExchanges.get(mailboxId) ?? [];
+    const payload = { ...dto, id, mailboxId, updatedAt: new Date().toISOString() };
+    const idx = list.findIndex((e) => e.id === id);
+    if (idx >= 0) list[idx] = { ...list[idx], ...payload };
+    else list.push(payload as Record<string, unknown> & { id: string });
+    this.mailboxExchanges.set(mailboxId, list);
+    return list.find((e) => e.id === id) ?? payload;
+  }
+
+  deleteMailboxExchange(id: string) {
+    for (const [mailboxId, list] of this.mailboxExchanges.entries()) {
+      const next = list.filter((e) => e.id !== id);
+      if (next.length !== list.length) {
+        this.mailboxExchanges.set(mailboxId, next);
+        return { message: 'Deleted', id };
+      }
+    }
+    return { message: 'Deleted', id };
+  }
 }

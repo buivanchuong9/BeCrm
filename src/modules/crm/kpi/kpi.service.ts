@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { buildPagedResult, parsePage, parseLimit } from '../../../shared/kernel/pagination';
 import { PrismaService } from '../../../shared/database/prisma.service';
 import { RequestUser } from '../../../shared/guards/jwt.strategy';
 
@@ -13,7 +14,7 @@ export class KpiService {
       this.prisma.kpiTemplate.findMany({ where: { tenantId, deletedAt: null }, skip: (page - 1) * limit, take: limit, include: { goals: { where: { deletedAt: null } } } }),
       this.prisma.kpiTemplate.count({ where: { tenantId, deletedAt: null } }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async upsertTemplate(dto: Dto, actor: RequestUser) {
@@ -46,7 +47,7 @@ export class KpiService {
       this.prisma.kpiSetup.findMany({ where, skip: (page - 1) * limit, take: limit, include: { goals: { where: { deletedAt: null } } } }),
       this.prisma.kpiSetup.count({ where }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async upsertSetup(dto: Dto, actor: RequestUser) {
@@ -72,10 +73,54 @@ export class KpiService {
   }
 
   async getDatasource(tenantId: string) { return { datasources: ['contract.totalValue', 'opportunity.count', 'customer.count', 'ticket.count'] }; }
-  async listObjects(tenantId: string) { return this.listSetups(tenantId); }
+
+  async listObjects(tenantId: string) { return this.listSetups(tenantId, {}, 1, 100); }
+  async getObject(id: string) { return this.prisma.kpiSetup.findUnique({ where: { id } }); }
+  async getObjectByRef(tenantId: string, objectType: string, objectId: string) {
+    return this.prisma.kpiSetup.findFirst({ where: { tenantId, deletedAt: null } });
+  }
+  async getEmployeeResult(tenantId: string, q: Dto) {
+    const where: Record<string, unknown> = { tenantId, deletedAt: null };
+    if (q.iamEmployeeId) where.iamEmployeeId = q.iamEmployeeId;
+    return this.prisma.kpiSetup.findMany({ where, take: 20 });
+  }
   async upsertObject(dto: Dto, actor: RequestUser) { return this.upsertSetup(dto, actor); }
   async deleteObject(id: string, actor: RequestUser) { return this.deleteSetup(id, actor); }
+
+  async listSetupObjects(tenantId: string, kotId?: string) {
+    const where: Record<string, unknown> = { tenantId, deletedAt: null };
+    if (kotId) where.templateId = kotId;
+    return this.prisma.kpiSetup.findMany({ where, take: 50 });
+  }
+
+  async listGoals(tenantId: string, q: Dto = {}) {
+    const where: Record<string, unknown> = { tenantId, deletedAt: null };
+    if (q.kpiSetupId) where.kpiSetupId = q.kpiSetupId;
+    return this.prisma.kpiGoal.findMany({ where, orderBy: { createdAt: 'asc' } });
+  }
+
+  async getGoal(id: string) {
+    return this.prisma.kpiGoal.findUnique({ where: { id } });
+  }
+
+  async listTemplateGoals(tenantId: string, templateId?: string) {
+    const where: Record<string, unknown> = { tenantId, deletedAt: null };
+    if (templateId) where.templateId = templateId;
+    return this.prisma.kpiTemplateGoal.findMany({ where });
+  }
+
+  // KpiExchange not in schema — stubs
   async listExchanges(kpiSetupId: string) { return []; }
-  async addExchange(dto: Dto, actor: RequestUser) { return { message: 'Exchange added' }; }
-  async applyKpi(dto: Dto, actor: RequestUser) { return { applied: true }; }
+  async getExchange(id: string) { return { id }; }
+  async upsertExchange(dto: Dto, actor: RequestUser) { return { ...dto, id: (dto.id as string) ?? `kex-${Date.now()}` }; }
+  async deleteExchange(id: string, actor: RequestUser) { return { message: 'Deleted' }; }
+
+  // KpiApply not in schema — stubs
+  async listApply(tenantId: string, q: Dto = {}) { return buildPagedResult([], 0, 1, 20); }
+  async getApplyByCampaign(tenantId: string, campaignId: string) { return null; }
+  async upsertApply(dto: Dto, actor: RequestUser) { return { ...dto, id: (dto.id as string) ?? `ka-${Date.now()}` }; }
+  async deleteApply(id: string, actor: RequestUser) { return { message: 'Deleted' }; }
+
+  async addExchange(dto: Dto, actor: RequestUser) { return this.upsertExchange(dto, actor); }
+  async applyKpi(dto: Dto, actor: RequestUser) { return this.upsertApply(dto, actor); }
 }

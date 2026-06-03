@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { buildPagedResult, parsePage, parseLimit } from '../../../shared/kernel/pagination';
 import { PrismaService } from '../../../shared/database/prisma.service';
 import { RequestUser } from '../../../shared/guards/jwt.strategy';
 type Dto = Record<string, unknown>;
@@ -13,7 +14,7 @@ export class SurveyService {
       this.prisma.cxmSurvey.findMany({ where: this.bw(tenantId), skip: (page - 1) * limit, take: limit, include: { questions: { where: { deletedAt: null }, include: { options: { where: { deletedAt: null } } } } } }),
       this.prisma.cxmSurvey.count({ where: this.bw(tenantId) }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async upsertSurvey(dto: Dto, actor: RequestUser) {

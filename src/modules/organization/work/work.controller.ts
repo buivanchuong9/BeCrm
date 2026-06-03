@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Delete, Body, Query } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Query, Put } from '@nestjs/common';
+import { Controller as C3 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { WorkService } from './work.service';
 import { CurrentUser } from '../../../shared/decorators/current-user.decorator';
@@ -308,6 +309,12 @@ export class WorkController {
   deleteWorkType(@Query('id') id: string, @CurrentUser() actor: RequestUser) {
     return this.workService.deleteWorkType(id, actor);
   }
+
+  @Get('workOrder/report')
+  @ApiOperation({ summary: 'Work order summary report' })
+  workOrderReport(@TenantId() tenantId: string, @Query() q: Record<string, string>) {
+    return this.workService.getWorkOrderReport(tenantId, q);
+  }
 }
 
 // ── BPM Work Order Export Controller (separate prefix) ───────────────────────
@@ -336,5 +343,48 @@ export class WorkBpmController {
   @ApiOperation({ summary: 'Export SLA report' })
   exportSLA(@TenantId() tenantId: string, @Query() query: Record<string, string>) {
     return this.workService.exportSLA(tenantId, query);
+  }
+}
+
+// FE calls /sale/workInprogress/* and /sale/workExchange/*
+@ApiTags('sale-work')
+@ApiBearerAuth('JWT')
+@C3('sale')
+export class WorkSaleController {
+  constructor(private workService: WorkService) {}
+
+  @Get('workInprogress/list')
+  listWorkInprogress(@Query('workOrderId') id: string, @Query('page') p?: string, @Query('limit') l?: string) {
+    return this.workService.listWorkInprogress(id, Number(p ?? 1), Number(l ?? 20));
+  }
+
+  @Get('workInprogress/get')
+  getWorkInprogress(@Query('id') id: string) {
+    return this.workService.getWorkInprogress(id);
+  }
+
+  @Post('workInprogress/update')
+  updateWorkInprogress(@Body() body: Record<string, unknown>, @CurrentUser() actor: RequestUser) {
+    return this.workService.updateWorkInprogress(body, actor);
+  }
+
+  @Get('workExchange/list')
+  listWorkExchanges(@Query('workOrderId') id: string, @Query('page') p?: string, @Query('limit') l?: string) {
+    return this.workService.listWorkExchanges(id, Number(p ?? 1), Number(l ?? 20));
+  }
+
+  @Get('workExchange/get')
+  getWorkExchange(@Query('id') id: string) {
+    return this.workService.getWorkExchange(id);
+  }
+
+  @Post('workExchange/update')
+  addWorkExchange(@Body() body: Record<string, unknown>, @CurrentUser() actor: RequestUser) {
+    return this.workService.addWorkExchange(body, actor);
+  }
+
+  @Delete('workExchange/delete')
+  deleteWorkExchange(@Query('id') id: string, @CurrentUser() actor: RequestUser) {
+    return this.workService.deleteWorkExchange(id, actor);
   }
 }

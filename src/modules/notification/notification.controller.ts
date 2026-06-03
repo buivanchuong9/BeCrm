@@ -45,6 +45,12 @@ export class NotificationController {
     return this.notificationService.markUnread(id);
   }
 
+  @Get('get')
+  @ApiOperation({ summary: 'Get notification detail' })
+  getById(@Query('id') id: string) {
+    return this.notificationService.getById(id);
+  }
+
   @Delete('delete')
   @ApiOperation({ summary: 'Delete notification' })
   delete(@Query('id') id: string, @CurrentUser() actor: RequestUser) {

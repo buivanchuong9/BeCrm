@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../shared/database/prisma.service';
 import { NotFoundException } from '../../../shared/exceptions/domain.exception';
 import { RequestUser } from '../../../shared/guards/jwt.strategy';
+import { buildPagedResult, parsePage, parseLimit } from '../../../shared/kernel/pagination';
 
 @Injectable()
 export class CustomerService {
@@ -14,25 +15,25 @@ export class CustomerService {
   // ── Customers ──────────────────────────────────────────────────────────────
 
   async list(tenantId: string, query?: {
-    name?: string; phone?: string; status?: number;
+    name?: string; phone?: string; status?: number | string;
     customerGroupId?: string; customerSourceId?: string;
     iamEmployeeId?: string; keyword?: string;
-    page?: number; limit?: number;
-    pageIndex?: number; pageSize?: number;
+    page?: number | string; limit?: number | string;
+    pageIndex?: number | string; pageSize?: number | string;
   }) {
-    const page = query?.pageIndex ?? query?.page ?? 1;
-    const limit = query?.pageSize ?? query?.limit ?? 20;
+    const page = parsePage(query?.pageIndex ?? query?.page);
+    const limit = parseLimit(query?.pageSize ?? query?.limit);
 
     const where: Record<string, unknown> = this.baseWhere(tenantId);
     const keyword = query?.keyword ?? query?.name;
     if (keyword) where.name = { contains: keyword, mode: 'insensitive' };
     if (query?.phone) where.phone = { contains: query.phone };
-    if (query?.status !== undefined) where.status = query.status;
+    if (query?.status !== undefined && query.status !== '') where.status = Number(query.status);
     if (query?.customerGroupId) where.customerGroupId = query.customerGroupId;
     if (query?.customerSourceId) where.customerSourceId = query.customerSourceId;
     if (query?.iamEmployeeId) where.iamEmployeeId = query.iamEmployeeId;
 
-    const [data, total] = await Promise.all([
+    const [rows, total] = await Promise.all([
       this.prisma.customer.findMany({
         where,
         skip: (page - 1) * limit,
@@ -41,22 +42,51 @@ export class CustomerService {
         include: {
           customerGroup: { select: { id: true, name: true } },
           customerSource: { select: { id: true, name: true } },
+          extraInfos: {
+            include: { attributeDef: { select: { fieldName: true } } },
+          },
         },
       }),
       this.prisma.customer.count({ where }),
     ]);
-    return { data, total, page, limit };
+
+    const items = rows.map((c) => {
+      const extra: Record<string, unknown> = {};
+      for (const ei of c.extraInfos ?? []) {
+        extra[ei.attributeDef.fieldName] = ei.value;
+      }
+      return {
+        ...c,
+        // FE-expected field aliases
+        customerCode: c.code,
+        birthday: c.dateOfBirth ? (c.dateOfBirth as Date).toISOString().slice(0, 10) : null,
+        createdTime: c.createdAt,
+        lstCustomerExtraInfo: c.extraInfos ?? [],
+        customerGroupId: c.customerGroupId,
+        customerGroupName: c.customerGroup?.name ?? null,
+        customerSourceId: c.customerSourceId,
+        customerSourceName: c.customerSource?.name ?? null,
+        // Employee reference (id only — name requires separate lookup)
+        employeeId: c.iamEmployeeId ?? null,
+        employeeName: null,
+        // Extra info fields flattened
+        medicalHistory: (extra['medicalHistory'] as string) ?? null,
+        currentDiagnosis: (extra['currentDiagnosis'] as string) ?? null,
+        skinType: (extra['skinType'] as string) ?? null,
+      };
+    });
+    return buildPagedResult(items, total, page, limit);
   }
 
   async listShared(tenantId: string, query?: {
-    name?: string; page?: number; limit?: number;
+    name?: string; page?: number | string; limit?: number | string;
   }) {
-    const page = query?.page ?? 1;
-    const limit = query?.limit ?? 20;
+    const page = parsePage(query?.page);
+    const limit = parseLimit(query?.limit);
     const where: Record<string, unknown> = this.baseWhere(tenantId);
     if (query?.name) where.name = { contains: query.name, mode: 'insensitive' };
 
-    const [data, total] = await Promise.all([
+    const [items, total] = await Promise.all([
       this.prisma.customer.findMany({
         where,
         skip: (page - 1) * limit,
@@ -66,7 +96,7 @@ export class CustomerService {
       }),
       this.prisma.customer.count({ where }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(items, total, page, limit);
   }
 
   async listByIds(tenantId: string, ids: string[]) {
@@ -85,11 +115,26 @@ export class CustomerService {
       include: {
         customerGroup: true,
         customerSource: true,
-        extraInfos: { include: { attributeDef: true } },
+        extraInfos: { include: { attributeDef: { select: { fieldName: true, name: true } } } },
       },
     });
     if (!customer) throw new NotFoundException('Customer', id);
-    return customer;
+    const extra: Record<string, unknown> = {};
+    for (const ei of customer.extraInfos ?? []) {
+      extra[ei.attributeDef.fieldName] = ei.value;
+    }
+    return {
+      ...customer,
+      customerCode: customer.code,
+      birthday: customer.dateOfBirth ? (customer.dateOfBirth as Date).toISOString().slice(0, 10) : null,
+      createdTime: customer.createdAt,
+      lstCustomerExtraInfo: customer.extraInfos ?? [],
+      employeeId: customer.iamEmployeeId ?? null,
+      employeeName: null,
+      medicalHistory: (extra['medicalHistory'] as string) ?? null,
+      currentDiagnosis: (extra['currentDiagnosis'] as string) ?? null,
+      skinType: (extra['skinType'] as string) ?? null,
+    };
   }
 
   async getPhone(id: string, tenantId: string) {
@@ -292,7 +337,7 @@ export class CustomerService {
       this.prisma.customer.findMany({ where, skip: (page - 1) * limit, take: limit, orderBy: { createdAt: 'desc' } }),
       this.prisma.customer.count({ where }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   // ── Customer Schedulers ────────────────────────────────────────────────────
@@ -306,11 +351,18 @@ export class CustomerService {
     if (query?.customerId) where.customerId = query.customerId;
     if (query?.status) where.status = query.status;
 
-    const [data, total] = await Promise.all([
+    const [rows, total] = await Promise.all([
       this.prisma.customerScheduler.findMany({ where, skip: (page - 1) * limit, take: limit, orderBy: { scheduledAt: 'asc' } }),
       this.prisma.customerScheduler.count({ where }),
     ]);
-    return { data, total, page, limit };
+    const data = rows.map((s) => ({
+      ...s,
+      appointmentDate: s.scheduledAt,
+      employeeId: s.iamEmployeeId,
+      serviceName: s.title,
+      statusName: s.status === 'pending' ? 'Chờ xác nhận' : s.status === 'completed' ? 'Hoàn thành' : s.status,
+    }));
+    return buildPagedResult(data, total, page, limit);
   }
 
   async getScheduler(id: string, tenantId: string) {
@@ -352,7 +404,7 @@ export class CustomerService {
   // ── Customer Exchanges ─────────────────────────────────────────────────────
 
   async listExchanges(tenantId: string, customerId: string, page = 1, limit = 20) {
-    const [data, total] = await Promise.all([
+    const [rows, total] = await Promise.all([
       this.prisma.customerExchange.findMany({
         where: { tenantId, customerId, deletedAt: null },
         skip: (page - 1) * limit,
@@ -361,7 +413,17 @@ export class CustomerService {
       }),
       this.prisma.customerExchange.count({ where: { tenantId, customerId, deletedAt: null } }),
     ]);
-    return { data, total, page, limit };
+    // Map to FE-expected field names (MSW_REMOVAL_BLOCKERS BLOCKER-008/019)
+    const data = rows.map((ex) => ({
+      ...ex,
+      createdTime: ex.createdAt,        // FE: moment(item.createdTime)
+      employeeId: ex.iamAuthorId,       // FE: item.employeeId
+      employeeUserId: ex.iamAuthorId,   // FE: item.employeeUserId === id comparison
+      employeeName: null,               // requires join, stub for now
+      employeeAvatar: null,
+      type: 1,                          // default exchange type
+    }));
+    return buildPagedResult(data, total, page, limit);
   }
 
   async addExchange(dto: {
@@ -423,7 +485,7 @@ export class CustomerService {
       this.prisma.telesaleCall.findMany({ where, skip: (page - 1) * limit, take: limit, orderBy: { calledAt: 'desc' } }),
       this.prisma.telesaleCall.count({ where }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async upsertTelesaleCall(dto: Record<string, unknown>, actor: RequestUser) {
@@ -510,7 +572,7 @@ export class CustomerService {
       }),
       this.prisma.opportunity.count({ where: { tenantId, customerId, deletedAt: null } }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   // ── Customer Groups ───────────────────────────────────────────────────────
@@ -621,5 +683,48 @@ export class CustomerService {
       where: { customerId },
       include: { attributeDef: true },
     });
+  }
+
+  async listCareAfterVisit(tenantId: string, customerId?: string, page = 1, limit = 20) {
+    const where: Record<string, unknown> = { tenantId, deletedAt: null };
+    if (customerId) where.customerId = customerId;
+    const [rows, total] = await Promise.all([
+      this.prisma.customerScheduler.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { scheduledAt: 'desc' },
+      }),
+      this.prisma.customerScheduler.count({ where }),
+    ]);
+    const data = rows.map((s) => ({
+      ...s,
+      date: s.scheduledAt,
+      employeeId: s.iamEmployeeId,
+      processName: s.title,
+    }));
+    return buildPagedResult(data, total, page, limit);
+  }
+
+  async getMedicalRecord(tenantId: string, customerId: string) {
+    const customer = await this.prisma.customer.findFirst({
+      where: { id: customerId, tenantId, deletedAt: null },
+      include: {
+        extraInfos: { include: { attributeDef: { select: { fieldName: true } } } },
+      },
+    });
+    if (!customer) return null;
+    const extra: Record<string, unknown> = {};
+    for (const ei of customer.extraInfos ?? []) {
+      extra[ei.attributeDef.fieldName] = ei.value;
+    }
+    return {
+      customerId: customer.id,
+      customerName: customer.name,
+      medicalHistory: (extra['medicalHistory'] as string) ?? '',
+      currentDiagnosis: (extra['currentDiagnosis'] as string) ?? '',
+      skinType: (extra['skinType'] as string) ?? '',
+      ...extra,
+    };
   }
 }

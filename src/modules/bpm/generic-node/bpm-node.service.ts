@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { buildPagedResult, parsePage, parseLimit } from '../../../shared/kernel/pagination';
 import { PrismaService } from '../../../shared/database/prisma.service';
 import { RequestUser } from '../../../shared/guards/jwt.strategy';
 
@@ -78,7 +79,7 @@ export class BpmNodeService {
       this.prisma.bpmNode.findMany({ where, skip: (page - 1) * limit, take: limit }),
       this.prisma.bpmNode.count({ where }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async getConfigNode(id: string) {
@@ -101,7 +102,7 @@ export class BpmNodeService {
       this.prisma.bpmEdge.findMany({ where, skip: (page - 1) * limit, take: limit }),
       this.prisma.bpmEdge.count({ where }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async listConfigLinkNodeChildren(tenantId: string, parentId?: string) {
@@ -162,7 +163,7 @@ export class BpmNodeService {
       }),
       this.prisma.bpmProcessTemplate.count({ where }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async getBusinessProcess(id: string) {
@@ -263,7 +264,7 @@ export class BpmNodeService {
       this.prisma.bpmProcessInstance.findMany({ where: { tenantId, deletedAt: null }, skip: (page - 1) * limit, take: limit, orderBy: { startedAt: 'desc' } }),
       this.prisma.bpmProcessInstance.count({ where: { tenantId, deletedAt: null } }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async listProcessedObjectLogs(instanceId: string) {

@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { buildPagedResult, parsePage, parseLimit } from '../../../shared/kernel/pagination';
 import { PrismaService } from '../../../shared/database/prisma.service';
 import { RequestUser } from '../../../shared/guards/jwt.strategy';
 type Dto = Record<string, unknown>;
@@ -12,7 +13,7 @@ export class DecisionTableService {
       this.prisma.decisionTable.findMany({ where: { tenantId, deletedAt: null }, skip: (page - 1) * limit, take: limit, include: { inputs: { where: { deletedAt: null } }, outputs: { where: { deletedAt: null } } } }),
       this.prisma.decisionTable.count({ where: { tenantId, deletedAt: null } }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async getById(id: string) { return this.prisma.decisionTable.findUnique({ where: { id }, include: { inputs: { where: { deletedAt: null } }, outputs: { where: { deletedAt: null } } } }); }

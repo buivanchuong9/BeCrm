@@ -144,6 +144,40 @@ export class AuthService {
     }
   }
 
+  async getAdminProfile(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        userRoles: {
+          where: { deletedAt: null },
+          include: { role: { select: { code: true } } },
+        },
+        employee: {
+          select: { id: true, departmentId: true, position: true },
+        },
+      },
+    });
+    if (!user) throw new NotFoundException('User not found');
+
+    const firstRole = user.userRoles[0]?.role?.code ?? 'user';
+    // Return nested under `user` key as expected by FE (docs.md response contract)
+    return {
+      user: {
+        id: user.id,
+        name: user.name,
+        phone: user.phone ?? '',
+        avatar: user.avatar ?? '',
+        gender: user.gender === 'female' ? 0 : 1,
+        role: firstRole,
+        username: user.username,
+        email: user.email ?? '',
+        employeeId: user.employee?.id ?? null,
+        departmentId: user.employee?.departmentId ?? null,
+        position: user.employee?.position ?? null,
+      },
+    };
+  }
+
   async changePassword(userId: string, currentPassword: string, newPassword: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');

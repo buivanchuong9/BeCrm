@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../shared/database/prisma.service';
 import { NotFoundException } from '../../../shared/exceptions/domain.exception';
 import { RequestUser } from '../../../shared/guards/jwt.strategy';
+import { buildPagedResult, parsePage, parseLimit } from '../../../shared/kernel/pagination';
 
 @Injectable()
 export class WorkService {
@@ -34,7 +35,7 @@ export class WorkService {
       }),
       this.prisma.workProject.count({ where }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async getProject(id: string, tenantId: string) {
@@ -105,7 +106,7 @@ export class WorkService {
     if (query?.keyword) where.title = { contains: query.keyword, mode: 'insensitive' };
     if (query?.priority !== undefined) where.priority = query.priority;
 
-    const [data, total] = await Promise.all([
+    const [rows, total] = await Promise.all([
       this.prisma.workOrder.findMany({
         where,
         skip: (page - 1) * limit,
@@ -118,7 +119,8 @@ export class WorkService {
       }),
       this.prisma.workOrder.count({ where }),
     ]);
-    return { data, total, page, limit };
+    const data = rows.map(this.mapWorkOrder.bind(this));
+    return buildPagedResult(data, total, page, limit);
   }
 
   async listWorkOrdersV2(tenantId: string, query?: Record<string, unknown>) {
@@ -147,6 +149,23 @@ export class WorkService {
     return groups.map((g) => ({ status: g.status, count: g._count.id }));
   }
 
+  // Map WorkOrder DB fields to FE-expected field names
+  private mapWorkOrder(w: Record<string, unknown>) {
+    return {
+      ...w,
+      name: (w['title'] as string) ?? '',        // FE: IWorkOrderResponseModel.name
+      startTime: w['startDate'],                  // FE: item.startTime
+      endTime: w['dueDate'],                      // FE: item.endTime
+      createdTime: w['createdAt'],                // FE: item.createdTime
+      workTypeName: (w['workType'] as Record<string, unknown>)?.['name'] ?? null,
+      projectName: (w['workProject'] as Record<string, unknown>)?.['name'] ?? null,
+      ola: null,                                  // FE: JSON.parse(result.ola)
+      docLink: '[]',                              // FE: JSON.parse(result.docLink)
+      reviews: '[]',                              // FE: JSON.parse(data.reviews || "[]")
+      extendedData: null,
+    };
+  }
+
   async getWorkOrder(id: string, tenantId: string) {
     const w = await this.prisma.workOrder.findFirst({
       where: { id, ...this.baseWhere(tenantId) },
@@ -158,7 +177,7 @@ export class WorkService {
       },
     });
     if (!w) throw new NotFoundException('WorkOrder', id);
-    return w;
+    return this.mapWorkOrder(w as unknown as Record<string, unknown>);
   }
 
   async upsertWorkOrder(dto: Record<string, unknown>, actor: RequestUser) {
@@ -301,7 +320,7 @@ export class WorkService {
       }),
       this.prisma.workOrder.count({ where: { tenantId, deletedAt: null, pausedAt: { not: null } } }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async addOtherWorkOrder(workOrderId: string, relatedId: string, actor: RequestUser) {
@@ -326,7 +345,7 @@ export class WorkService {
       this.prisma.workInprogress.findMany({ where: { workOrderId }, skip: (page - 1) * limit, take: limit, orderBy: { createdAt: 'desc' } }),
       this.prisma.workInprogress.count({ where: { workOrderId } }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async getWorkInprogress(id: string) {
@@ -349,7 +368,7 @@ export class WorkService {
   // ── Work Exchanges ─────────────────────────────────────────────────────────
 
   async listWorkExchanges(workOrderId: string, page = 1, limit = 20) {
-    const [data, total] = await Promise.all([
+    const [rows, total] = await Promise.all([
       this.prisma.workExchange.findMany({
         where: { workOrderId, deletedAt: null },
         skip: (page - 1) * limit,
@@ -358,7 +377,17 @@ export class WorkService {
       }),
       this.prisma.workExchange.count({ where: { workOrderId, deletedAt: null } }),
     ]);
-    return { data, total, page, limit };
+    // FE reads: createdTime, employeeId, employeeName, loginEmployeeId, worId
+    const data = rows.map((ex) => ({
+      ...ex,
+      createdTime: ex.createdAt,
+      employeeId: ex.iamAuthorId,
+      loginEmployeeId: ex.iamAuthorId,
+      employeeName: null,
+      employeeAvatar: null,
+      worId: workOrderId,
+    }));
+    return buildPagedResult(data, total, page, limit);
   }
 
   async getWorkExchange(id: string) {
@@ -456,5 +485,19 @@ export class WorkService {
 
   async exportSLA(tenantId: string, query: Record<string, string>) {
     return { message: 'SLA export ready', url: `/exports/sla-${Date.now()}.xlsx` };
+  }
+
+  async getWorkOrderReport(tenantId: string, query: Record<string, string>) {
+    const where: Record<string, unknown> = { tenantId, deletedAt: null };
+    if (query.status) where.status = query.status;
+    const [total, byStatus] = await Promise.all([
+      this.prisma.workOrder.count({ where: { tenantId, deletedAt: null } }),
+      this.prisma.workOrder.groupBy({
+        by: ['status'],
+        where: { tenantId, deletedAt: null },
+        _count: { id: true },
+      }),
+    ]);
+    return { total, byStatus: byStatus.map((g) => ({ status: g.status, count: g._count.id })) };
   }
 }

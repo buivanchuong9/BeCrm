@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { buildPagedResult, parsePage, parseLimit } from '../../../shared/kernel/pagination';
 import { PrismaService } from '../../../shared/database/prisma.service';
 import { NotFoundException, OptimisticLockException } from '../../../shared/exceptions/domain.exception';
 import { RequestUser } from '../../../shared/guards/jwt.strategy';
@@ -32,7 +33,7 @@ export class CampaignService {
       }),
       this.prisma.campaign.count({ where }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async getById(id: string, tenantId: string) {
@@ -272,5 +273,145 @@ export class CampaignService {
       data: { deletedAt: new Date(), deletedBy: actor.id },
     });
     return { message: 'Marketing source deleted' };
+  }
+
+  // ── Campaign Opportunity CRUD ─────────────────────────────────────────────
+
+  async listOpportunities(tenantId: string, q: Record<string, string>) {
+    const page = parsePage(q.page);
+    const limit = parseLimit(q.limit);
+    const where: Record<string, unknown> = { tenantId, deletedAt: null };
+    if (q.campaignId) where.campaignId = q.campaignId;
+    if (q.customerId) where.customerId = q.customerId;
+    if (q.iamSaleId) where.iamSaleId = q.iamSaleId;
+    if (q.iamOwnerId) where.iamOwnerId = q.iamOwnerId;
+    if (q.status) where.status = q.status;
+    const [items, total] = await Promise.all([
+      this.prisma.opportunity.findMany({
+        where, skip: (page - 1) * limit, take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: { campaign: { select: { id: true, name: true } }, approach: { select: { id: true, name: true } } },
+      }),
+      this.prisma.opportunity.count({ where }),
+    ]);
+    return buildPagedResult(items, total, page, limit);
+  }
+
+  async getOpportunity(id: string, tenantId: string) {
+    const opp = await this.prisma.opportunity.findFirst({
+      where: { id, tenantId, deletedAt: null },
+      include: { campaign: true, approach: true, processes: { where: { deletedAt: null } }, exchanges: { where: { deletedAt: null } } },
+    });
+    if (!opp) throw new NotFoundException('Opportunity', id);
+    return opp;
+  }
+
+  async upsertOpportunity(dto: Record<string, unknown>, actor: RequestUser) {
+    const id = dto.id as string | undefined;
+    if (id) return this.prisma.opportunity.update({ where: { id }, data: { ...(dto as object), id: undefined, updatedBy: actor.id, rowVersion: { increment: 1 } } });
+    return this.prisma.opportunity.create({
+      data: {
+        tenantId: actor.tenantId,
+        campaignId: dto.campaignId as string,
+        customerId: dto.customerId as string | undefined,
+        contactId: dto.contactId as string | undefined,
+        iamOwnerId: (dto.iamOwnerId as string) ?? actor.id,
+        iamSaleId: dto.iamSaleId as string | undefined,
+        expectedRevenue: Number(dto.expectedRevenue ?? 0),
+        status: (dto.status as string) ?? 'open',
+        percent: Number(dto.percent ?? 0),
+        note: dto.note as string | undefined,
+        createdBy: actor.id,
+        updatedBy: actor.id,
+      },
+    });
+  }
+
+  async deleteOpportunity(id: string, actor: RequestUser) {
+    await this.prisma.opportunity.update({ where: { id }, data: { deletedAt: new Date(), deletedBy: actor.id } });
+    return { message: 'Deleted' };
+  }
+
+  async addOpportunityProcess(dto: Record<string, unknown>, actor: RequestUser) {
+    return this.prisma.opportunityProcess.create({
+      data: {
+        tenantId: actor.tenantId,
+        opportunityId: dto.opportunityId as string,
+        campaignApproachId: dto.campaignApproachId as string | undefined,
+        note: dto.note as string | undefined,
+        percent: dto.percent ? Number(dto.percent) : undefined,
+        status: dto.status as string | undefined,
+        createdBy: actor.id,
+      },
+    });
+  }
+
+  async deleteOpportunityProcess(id: string) {
+    await this.prisma.opportunityProcess.update({ where: { id }, data: { deletedAt: new Date() } });
+    return { message: 'Deleted' };
+  }
+
+  async listOppExchanges(opportunityId: string, page = 1, limit = 20) {
+    const [rows, total] = await Promise.all([
+      this.prisma.opportunityExchange.findMany({ where: { opportunityId, deletedAt: null }, skip: (page - 1) * limit, take: limit, orderBy: { createdAt: 'desc' } }),
+      this.prisma.opportunityExchange.count({ where: { opportunityId, deletedAt: null } }),
+    ]);
+    const data = rows.map((ex) => ({
+      ...ex,
+      createdTime: ex.createdAt,
+      employeeId: ex.iamAuthorId,
+      employeeName: null,
+    }));
+    return buildPagedResult(data, total, page, limit);
+  }
+
+  async getOppExchange(id: string) {
+    return this.prisma.opportunityExchange.findUnique({ where: { id } });
+  }
+
+  async addOppExchange(dto: Record<string, unknown>, actor: RequestUser) {
+    return this.prisma.opportunityExchange.create({
+      data: {
+        tenantId: actor.tenantId,
+        opportunityId: dto.opportunityId as string,
+        iamAuthorId: actor.id,
+        content: dto.content as string | undefined,
+        contentDelta: dto.contentDelta as string | undefined,
+        mediaUrls: dto.mediaUrls as object | undefined,
+      },
+    });
+  }
+
+  async deleteOppExchange(id: string, actor: RequestUser) {
+    await this.prisma.opportunityExchange.update({ where: { id }, data: { deletedAt: new Date(), deletedBy: actor.id } });
+    return { message: 'Deleted' };
+  }
+
+  // ── Campaign Dashboard Stats ──────────────────────────────────────────────
+
+  async getCampaignStats(tenantId: string, q: Record<string, string>, type: string) {
+    const where: Record<string, unknown> = { tenantId, deletedAt: null };
+    if (q.campaignId) where.campaignId = q.campaignId;
+    const total = await this.prisma.opportunity.count({ where });
+    const byStatus = await this.prisma.opportunity.groupBy({ by: ['status'], where, _count: { id: true } });
+    return { type, total, byStatus: byStatus.map((g) => ({ status: g.status, count: g._count.id })), data: [] };
+  }
+
+  async getCampaignDashboard(tenantId: string, q: Record<string, string>) {
+    const where: Record<string, unknown> = { tenantId, deletedAt: null };
+    if (q.campaignId) where.campaignId = q.campaignId;
+    const [totalOpp, totalRevenue] = await Promise.all([
+      this.prisma.opportunity.count({ where }),
+      this.prisma.opportunity.aggregate({ where, _sum: { expectedRevenue: true } }),
+    ]);
+    return { totalOpportunity: totalOpp, totalExpectedRevenue: totalRevenue._sum.expectedRevenue ?? 0 };
+  }
+
+  async getSalePointConfig(tenantId: string, campaignId: string) {
+    return { tenantId, campaignId, config: null };
+  }
+
+  async updateSalePointConfig(dto: Record<string, unknown>, actor: RequestUser) {
+    return { ...dto, updatedBy: actor.id };
   }
 }

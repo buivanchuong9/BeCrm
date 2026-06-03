@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { buildPagedResult, parsePage, parseLimit } from '../../../shared/kernel/pagination';
 import { PrismaService } from '../../../shared/database/prisma.service';
 import { RequestUser } from '../../../shared/guards/jwt.strategy';
 
@@ -16,7 +17,7 @@ export class ScheduleService {
       this.prisma.scheduleCommon.findMany({ where, skip: (page - 1) * limit, take: limit, orderBy: { scheduledAt: 'asc' } }),
       this.prisma.scheduleCommon.count({ where }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async getSchedule(id: string) { return this.prisma.scheduleCommon.findUnique({ where: { id } }); }
@@ -43,7 +44,7 @@ export class ScheduleService {
       this.prisma.scheduleConsultant.findMany({ where, skip: (page - 1) * limit, take: limit, orderBy: { scheduledAt: 'asc' } }),
       this.prisma.scheduleConsultant.count({ where }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async upsertConsultantSchedule(dto: Dto, actor: RequestUser) {
@@ -77,7 +78,7 @@ export class ScheduleService {
       this.prisma.treatmentHistory.findMany({ where, skip: (page - 1) * limit, take: limit, orderBy: { treatmentDate: 'desc' } }),
       this.prisma.treatmentHistory.count({ where }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async upsertTreatmentHistory(dto: Dto, actor: RequestUser) {
@@ -89,5 +90,60 @@ export class ScheduleService {
   async deleteTreatmentHistory(id: string, actor: RequestUser) {
     await this.prisma.treatmentHistory.update({ where: { id }, data: { deletedAt: new Date(), deletedBy: actor.id } });
     return { message: 'Deleted' };
+  }
+
+  async getTreatmentHistory(id: string) {
+    return this.prisma.treatmentHistory.findUnique({ where: { id } });
+  }
+
+  async getRoom(id: string) {
+    return this.prisma.treatmentRoom.findUnique({ where: { id } });
+  }
+
+  async checkRoom(roomId: string, startTime: string, endTime: string) {
+    const count = await this.prisma.treatmentHistory.count({
+      where: { roomId, deletedAt: null },
+    });
+    return { available: true, roomId, count };
+  }
+
+  async getConsultantSchedule(id: string) {
+    return this.prisma.scheduleConsultant.findUnique({ where: { id } });
+  }
+
+  async listNextSchedule(tenantId: string, q: Record<string, string>) {
+    const where: Record<string, unknown> = { tenantId, deletedAt: null };
+    if (q.customerId) where.customerId = q.customerId;
+    if (q.iamEmployeeId) where.iamEmployeeId = q.iamEmployeeId;
+    const [data, total] = await Promise.all([
+      this.prisma.treatmentHistory.findMany({ where, take: 20, orderBy: { treatmentDate: 'asc' } }),
+      this.prisma.treatmentHistory.count({ where }),
+    ]);
+    return buildPagedResult(data, total, 1, 20);
+  }
+
+  async getByScheduler(schedulerId: string) {
+    return this.prisma.treatmentHistory.findFirst({ where: { roomId: schedulerId, deletedAt: null } });
+  }
+
+  async updateNext(dto: Record<string, unknown>, actor: RequestUser) {
+    const id = dto.id as string;
+    return this.prisma.treatmentHistory.update({ where: { id }, data: { ...(dto as object), id: undefined, updatedBy: actor.id } as any });
+  }
+
+  async updateCaringEmployee(dto: Record<string, unknown>, actor: RequestUser) {
+    const id = dto.id as string;
+    return this.prisma.treatmentHistory.update({
+      where: { id },
+      data: { iamDoctorId: dto.caringEmployeeId as string, updatedBy: actor.id },
+    });
+  }
+
+  async updateTreatmentTime(dto: Record<string, unknown>, actor: RequestUser) {
+    return this.upsertTreatmentHistory(dto, actor);
+  }
+
+  async deleteTreatmentTime(id: string, actor: RequestUser) {
+    return this.deleteTreatmentHistory(id, actor);
   }
 }

@@ -148,3 +148,23 @@ export class BpmUserTaskRuntimeController {
     return this.workOrderService.updatePause(id, actor);
   }
 }
+
+// MSW compat: FE calls bpmapi/workorder/list (all-lowercase)
+@ApiTags('bpm')
+@ApiBearerAuth('JWT')
+@C2('bpmapi/workorder')
+export class BpmWorkOrderLowercaseController {
+  constructor(private workOrderService: BpmWorkOrderService) {}
+
+  @Get('list')
+  @ApiOperation({ summary: 'List work orders (MSW compat lowercase path)' })
+  list(@TenantId() tenantId: string, @Query() query: Record<string, string>) {
+    return this.workOrderService.list(tenantId, {
+      instanceId: query.instanceId,
+      status: query.status,
+      iamAssigneeId: query.iamAssigneeId,
+      page: query.page ? Number(query.page) : undefined,
+      limit: query.limit ? Number(query.limit) : undefined,
+    });
+  }
+}

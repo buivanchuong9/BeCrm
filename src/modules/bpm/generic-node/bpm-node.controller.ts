@@ -217,6 +217,7 @@ export class BpmNodeController {
 
   // ── ProcessedObject ───────────────────────────────────────────────────────
   @Get('processedObject/list') listPO(@TenantId() t: string, @Query() q: Record<string, string>) { return this.svc.listProcessedObjects(t, q, Number(q.page ?? 1), Number(q.limit ?? 20)); }
+  @Get('processedobject/list') listPOAlias(@TenantId() t: string, @Query() q: Record<string, string>) { return this.svc.listProcessedObjects(t, q, Number(q.page ?? 1), Number(q.limit ?? 20)); }
   @Post('processedObject/update') upsertPO(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return { id: 'stub', ...b }; }
   @Delete('processedObject/delete') deletePO(@Query('id') id: string) { return { message: 'Deleted' }; }
   @Get('processedObject/get') getPO(@Query('id') id: string) { return { id }; }

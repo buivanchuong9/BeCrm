@@ -2,20 +2,21 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../shared/database/prisma.service';
 import { NotFoundException } from '../../../shared/exceptions/domain.exception';
 import { RequestUser } from '../../../shared/guards/jwt.strategy';
+import { buildPagedResult, parsePage, parseLimit } from '../../../shared/kernel/pagination';
 
 @Injectable()
 export class EmployeeService {
   constructor(private prisma: PrismaService) {}
 
-  async list(tenantId: string, query?: { name?: string; departmentId?: string; page?: number; limit?: number }) {
-    const page = query?.page ?? 1;
-    const limit = query?.limit ?? 20;
+  async list(tenantId: string, query?: { name?: string; departmentId?: string; page?: number | string; limit?: number | string }) {
+    const page = parsePage(query?.page);
+    const limit = parseLimit(query?.limit);
 
     const where: Record<string, unknown> = { tenantId, deletedAt: null };
     if (query?.name) where.name = { contains: query.name, mode: 'insensitive' };
     if (query?.departmentId) where.departmentId = query.departmentId;
 
-    const [data, total] = await Promise.all([
+    const [items, total] = await Promise.all([
       this.prisma.employee.findMany({
         where,
         skip: (page - 1) * limit,
@@ -25,26 +26,39 @@ export class EmployeeService {
       }),
       this.prisma.employee.count({ where }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(items, total, page, limit);
   }
 
   async getById(id: string, tenantId: string) {
     const emp = await this.prisma.employee.findFirst({
       where: { id, tenantId, deletedAt: null },
       include: {
-        department: true,
+        department: { select: { id: true, name: true } },
         user: { select: { id: true, username: true, email: true, isActive: true } },
       },
     });
     if (!emp) throw new NotFoundException('Employee', id);
-    return emp;
+    return {
+      ...emp,
+      departmentName: emp.department?.name ?? null,
+      branchId: emp.departmentId ?? null,
+      branchName: emp.department?.name ?? null,
+      lstOrgApp: [{ endDate: '2099-12-31T23:59:59Z', packageName: 'Gói Vĩnh Viễn' }],
+    };
   }
 
   async getInfo(tenantId: string, userId: string) {
-    return this.prisma.employee.findFirst({
+    const emp = await this.prisma.employee.findFirst({
       where: { userId, tenantId, deletedAt: null },
-      include: { department: true },
+      include: { department: { select: { id: true, name: true } } },
     });
+    if (!emp) return null;
+    return {
+      ...emp,
+      branchId: emp.departmentId ?? null,
+      branchName: emp.department?.name ?? null,
+      lstOrgApp: [{ endDate: '2099-12-31T23:59:59Z', packageName: 'Gói Vĩnh Viễn' }],
+    };
   }
 
   async upsert(
@@ -109,6 +123,7 @@ export class EmployeeService {
     const emp = await this.prisma.employee.findFirst({
       where: { id: employeeId, tenantId },
       include: {
+        department: { select: { id: true, name: true } },
         user: {
           include: {
             userRoles: {
@@ -120,8 +135,15 @@ export class EmployeeService {
       },
     });
     if (!emp?.user) return [];
-    const userRoles = emp.user.userRoles as Array<{ role: unknown }>;
-    return userRoles.map((ur) => ur.role);
+    type RoleWithMeta = { id: string; name: string; code: string };
+    const userRoles = emp.user.userRoles as Array<{ role: RoleWithMeta }>;
+    return userRoles.map((ur) => ({
+      ...ur.role,
+      // FE reads: item.title, item.departmentId, item.departmentName
+      title: ur.role.name,
+      departmentId: emp.departmentId ?? null,
+      departmentName: emp.department?.name ?? null,
+    }));
   }
 
   async init(tenantId: string, actor: RequestUser) {

@@ -3,6 +3,7 @@ import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../../shared/database/prisma.service';
 import { NotFoundException, ConflictException } from '../../../shared/exceptions/domain.exception';
 import { CreateUserDto, UpdateUserDto, ListUserDto, ResetPasswordDto, FcmDeviceDto } from './user.dto';
+import { buildPagedResult, parsePage, parseLimit } from '../../../shared/kernel/pagination';
 import { RequestUser } from '../../../shared/guards/jwt.strategy';
 
 @Injectable()
@@ -53,19 +54,18 @@ export class UserService {
   }
 
   async list(dto: ListUserDto, tenantId: string) {
-    const page = dto.page ?? 1;
-    const limit = dto.limit ?? 20;
-    const skip = (page - 1) * limit;
+    const page = parsePage(dto.page);
+    const limit = parseLimit(dto.limit);
 
     const where: Record<string, unknown> = { tenantId, deletedAt: null };
     if (dto.name) where.name = { contains: dto.name, mode: 'insensitive' };
     if (dto.phone) where.phone = { contains: dto.phone };
     if (dto.isActive !== undefined) where.isActive = dto.isActive === 'true';
 
-    const [data, total] = await Promise.all([
+    const [items, total] = await Promise.all([
       this.prisma.user.findMany({
         where,
-        skip,
+        skip: (page - 1) * limit,
         take: limit,
         orderBy: { createdAt: 'desc' },
         select: {
@@ -83,7 +83,7 @@ export class UserService {
       this.prisma.user.count({ where }),
     ]);
 
-    return { data, total, page, limit };
+    return buildPagedResult(items, total, page, limit);
   }
 
   async getById(userId: string, tenantId: string) {

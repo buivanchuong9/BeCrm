@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../shared/database/prisma.service';
 import { NotFoundException } from '../../../shared/exceptions/domain.exception';
 import { RequestUser } from '../../../shared/guards/jwt.strategy';
+import { buildPagedResult, parsePage, parseLimit } from '../../../shared/kernel/pagination';
 
 @Injectable()
 export class CatalogService {
@@ -23,15 +24,15 @@ export class CatalogService {
   // ── BeautyBranch ───────────────────────────────────────────────────────────
 
   async listBranches(tenantId: string, query?: {
-    parentId?: string; keyword?: string; page?: number; limit?: number;
+    parentId?: string; keyword?: string; page?: number | string; limit?: number | string;
   }) {
-    const page = query?.page ?? 1;
-    const limit = query?.limit ?? 50;
+    const page = parsePage(query?.page);
+    const limit = parseLimit(query?.limit ?? 50);
     const where: Record<string, unknown> = { tenantId, deletedAt: null };
     if (query?.parentId !== undefined) where.parentId = query.parentId || null;
     if (query?.keyword) where.name = { contains: query.keyword, mode: 'insensitive' };
 
-    const [data, total] = await Promise.all([
+    const [rows, total] = await Promise.all([
       this.prisma.beautyBranch.findMany({
         where,
         skip: (page - 1) * limit,
@@ -41,7 +42,12 @@ export class CatalogService {
       }),
       this.prisma.beautyBranch.count({ where }),
     ]);
-    return { data, total, page, limit };
+    // Add FE-expected alias fields
+    const items = rows.map((b) => ({
+      ...b,
+      headquarter: b.parentId === null ? 1 : 0,
+    }));
+    return buildPagedResult(items, total, page, limit);
   }
 
   async listBranchChildren(tenantId: string, parentId: string) {
@@ -110,8 +116,8 @@ export class CatalogService {
   // ── BeautySalon ────────────────────────────────────────────────────────────
 
   async listSalons(tenantId: string, query?: { keyword?: string; status?: string; page?: number; limit?: number }) {
-    const page = query?.page ?? 1;
-    const limit = query?.limit ?? 20;
+    const page = parsePage(query?.page);
+    const limit = parseLimit(query?.limit);
     const where: Record<string, unknown> = { tenantId, deletedAt: null };
     if (query?.keyword) where.name = { contains: query.keyword, mode: 'insensitive' };
     if (query?.status) where.status = query.status;
@@ -120,7 +126,7 @@ export class CatalogService {
       this.prisma.beautySalon.findMany({ where, skip: (page - 1) * limit, take: limit }),
       this.prisma.beautySalon.count({ where }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async approveSalon(id: string, actor: RequestUser) {
@@ -141,8 +147,8 @@ export class CatalogService {
   // ── Artifact / Common ──────────────────────────────────────────────────────
 
   async listArtifacts(tenantId: string, query?: { keyword?: string; page?: number; limit?: number }) {
-    const page = query?.page ?? 1;
-    const limit = query?.limit ?? 20;
+    const page = parsePage(query?.page);
+    const limit = parseLimit(query?.limit);
     const where: Record<string, unknown> = { tenantId, deletedAt: null };
     if (query?.keyword) where.name = { contains: query.keyword, mode: 'insensitive' };
 
@@ -150,7 +156,7 @@ export class CatalogService {
       this.prisma.artifact.findMany({ where, skip: (page - 1) * limit, take: limit }),
       this.prisma.artifact.count({ where }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async getArtifact(id: string) {
@@ -192,8 +198,8 @@ export class CatalogService {
   // ── BrandName ──────────────────────────────────────────────────────────────
 
   async listBrandNames(tenantId: string, query?: { keyword?: string; page?: number; limit?: number }) {
-    const page = query?.page ?? 1;
-    const limit = query?.limit ?? 20;
+    const page = parsePage(query?.page);
+    const limit = parseLimit(query?.limit);
     const where: Record<string, unknown> = { tenantId, deletedAt: null };
     if (query?.keyword) where.name = { contains: query.keyword, mode: 'insensitive' };
 
@@ -201,7 +207,7 @@ export class CatalogService {
       this.prisma.brandName.findMany({ where, skip: (page - 1) * limit, take: limit }),
       this.prisma.brandName.count({ where }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async upsertBrandName(dto: Record<string, unknown>, actor: RequestUser) {
@@ -242,7 +248,7 @@ export class CatalogService {
       }),
       this.prisma.brandNameWhitelist.count({ where: { tenantId, brandNameId, deletedAt: null } }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async upsertWhitelist(dto: Record<string, unknown>, actor: RequestUser) {

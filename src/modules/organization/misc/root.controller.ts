@@ -192,4 +192,17 @@ export class RootController {
   @Post('renewalContract/initBusinessProcess') renewalContractInit(@Body() b: Record<string, unknown>) { return { initiated: true }; }
   @Get('contract-insurance/get/jssdk') getContractInsuranceJssdk(@Query() q: Record<string, string>) { return {}; }
   @Get('supportObject/reset') resetTransferVotes(@Query() q: Record<string, string>) { return { reset: true }; }
+
+  // ── BeautySalon domain lookup ─────────────────────────────────────────────
+  // FE calls: ${APP_AUTHENTICATOR_URL}/api/beautySalon/get_bydomain (capital S)
+  @Get('api/beautySalon/get_bydomain')
+  getBeautySalonByDomain(@Query('domain') domain: string, @TenantId() t: string) {
+    return this.svc.getBeautySalonByDomain(domain ?? '', t);
+  }
+
+  // lowercase alias (docs.md compat)
+  @Get('api/beautysalon/get_bydomain')
+  getBeautySalonByDomainLower(@Query('domain') domain: string, @TenantId() t: string) {
+    return this.svc.getBeautySalonByDomain(domain ?? '', t);
+  }
 }

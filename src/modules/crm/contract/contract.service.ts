@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../shared/database/prisma.service';
 import { NotFoundException } from '../../../shared/exceptions/domain.exception';
 import { RequestUser } from '../../../shared/guards/jwt.strategy';
+import { buildPagedResult, parsePage, parseLimit } from '../../../shared/kernel/pagination';
 
 type Dto = Record<string, unknown>;
 
@@ -25,7 +26,7 @@ export class ContractService {
       this.prisma.contract.findMany({ where, skip: (page - 1) * limit, take: limit, orderBy: { createdAt: 'desc' }, include: { pipeline: { select: { id: true, name: true } }, stage: { select: { id: true, name: true, colorHex: true } } } }),
       this.prisma.contract.count({ where }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async getById(id: string, tenantId: string) {
@@ -133,7 +134,7 @@ export class ContractService {
       this.prisma.contractActivity.findMany({ where: { contractId, tenantId, deletedAt: null }, skip: (page - 1) * limit, take: limit, orderBy: { createdAt: 'desc' } }),
       this.prisma.contractActivity.count({ where: { contractId, tenantId, deletedAt: null } }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async upsertActivity(dto: Dto, actor: RequestUser) {
@@ -152,7 +153,7 @@ export class ContractService {
       this.prisma.contractAppendix.findMany({ where: { contractId, deletedAt: null }, skip: (page - 1) * limit, take: limit }),
       this.prisma.contractAppendix.count({ where: { contractId, deletedAt: null } }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async getAppendix(id: string) { return this.prisma.contractAppendix.findUnique({ where: { id } }); }
@@ -175,7 +176,7 @@ export class ContractService {
       this.prisma.contractPayment.findMany({ where: { contractId, deletedAt: null }, skip: (page - 1) * limit, take: limit }),
       this.prisma.contractPayment.count({ where: { contractId, deletedAt: null } }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async upsertPayment(dto: Dto, actor: RequestUser) {
@@ -196,7 +197,7 @@ export class ContractService {
       this.prisma.contractExchange.findMany({ where: { contractId, deletedAt: null }, skip: (page - 1) * limit, take: limit, orderBy: { createdAt: 'desc' } }),
       this.prisma.contractExchange.count({ where: { contractId, deletedAt: null } }),
     ]);
-    return { data, total, page, limit };
+    return buildPagedResult(data, total, page, limit);
   }
 
   async addExchange(dto: Dto, actor: RequestUser) {

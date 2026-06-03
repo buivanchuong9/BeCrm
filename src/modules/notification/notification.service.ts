@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { PrismaService } from '../../shared/database/prisma.service';
 import { RequestUser } from '../../shared/guards/jwt.strategy';
+import { buildPagedResult, parsePage, parseLimit } from '../../shared/kernel/pagination';
 
 @Injectable()
 export class NotificationService {
@@ -9,13 +10,32 @@ export class NotificationService {
 
   constructor(private prisma: PrismaService) {}
 
-  async list(userId: string, tenantId: string, query?: { isRead?: boolean; page?: number; limit?: number }) {
-    const page = query?.page ?? 1;
-    const limit = query?.limit ?? 20;
+  private mapNotificationRow(n: {
+    data: unknown;
+    isRead: boolean;
+    createdAt: Date;
+    refType: string | null;
+    [key: string]: unknown;
+  }) {
+    const data = (n.data as Record<string, unknown>) ?? {};
+    return {
+      ...n,
+      unread: n.isRead ? 0 : 1,
+      is_read: n.isRead,
+      timeReceived: n.createdAt,
+      type: n.refType ?? 'system',
+      workId: data['workId'] ?? null,
+      projectName: data['projectName'] ?? null,
+    };
+  }
+
+  async list(userId: string, tenantId: string, query?: { isRead?: boolean; page?: number | string; limit?: number | string }) {
+    const page = parsePage(query?.page);
+    const limit = parseLimit(query?.limit);
     const where: Record<string, unknown> = { userId, tenantId, deletedAt: null };
     if (query?.isRead !== undefined) where.isRead = query.isRead;
 
-    const [data, total] = await Promise.all([
+    const [rows, total] = await Promise.all([
       this.prisma.notificationHistory.findMany({
         where,
         skip: (page - 1) * limit,
@@ -24,14 +44,16 @@ export class NotificationService {
       }),
       this.prisma.notificationHistory.count({ where }),
     ]);
-    return { data, total, page, limit };
+
+    const items = rows.map((n) => this.mapNotificationRow(n));
+    return buildPagedResult(items, total, page, limit);
   }
 
   async countUnread(userId: string, tenantId: string) {
-    const count = await this.prisma.notificationHistory.count({
+    // FE: setCountUnread(response.result) — expects plain number, NOT {count: n}
+    return this.prisma.notificationHistory.count({
       where: { userId, tenantId, isRead: false, deletedAt: null },
     });
-    return { count };
   }
 
   async markRead(id: string, actor: RequestUser) {
@@ -54,6 +76,11 @@ export class NotificationService {
       where: { id },
       data: { isRead: false, readAt: null },
     });
+  }
+
+  async getById(id: string) {
+    const row = await this.prisma.notificationHistory.findUnique({ where: { id } });
+    return row ? this.mapNotificationRow(row) : null;
   }
 
   async delete(id: string, actor: RequestUser) {

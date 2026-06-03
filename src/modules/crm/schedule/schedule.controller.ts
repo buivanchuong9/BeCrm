@@ -14,6 +14,9 @@ export class ScheduleController {
   @Get('schedule/list') @ApiOperation({ summary: 'List schedules' })
   list(@TenantId() t: string, @Query() q: Record<string, string>) { return this.svc.listSchedules(t, q, Number(q.page ?? 1), Number(q.limit ?? 20)); }
 
+  @Get('schedule/list/by_customer') @ApiOperation({ summary: 'List schedules by customer' })
+  listByCustomer(@TenantId() t: string, @Query() q: Record<string, string>) { return this.svc.listSchedules(t, q, Number(q.page ?? 1), Number(q.limit ?? 20)); }
+
   @Get('schedule/get') @ApiOperation({ summary: 'Get schedule' })
   get(@Query('id') id: string) { return this.svc.getSchedule(id); }
 
@@ -26,39 +29,39 @@ export class ScheduleController {
   @Post('schedule/cancel') @ApiOperation({ summary: 'Cancel schedule' })
   cancel(@Body('id') id: string, @CurrentUser() a: RequestUser) { return this.svc.cancelSchedule(id, a); }
 
-  @Get('scheduleConsultant/list') @ApiOperation({ summary: 'List consultant schedules' })
-  listConsultant(@TenantId() t: string, @Query() q: Record<string, string>) { return this.svc.listConsultantSchedules(t, q, Number(q.page ?? 1), Number(q.limit ?? 20)); }
+  // ── scheduleConsultant ────────────────────────────────────────────────────
+  @Get('scheduleConsultant/list') listConsultant(@TenantId() t: string, @Query() q: Record<string, string>) { return this.svc.listConsultantSchedules(t, q, Number(q.page ?? 1), Number(q.limit ?? 20)); }
+  @Get('scheduleConsultant/get') getConsultant(@Query('id') id: string) { return this.svc.getConsultantSchedule(id); }
+  @Post('scheduleConsultant/update') upsertConsultant(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.upsertConsultantSchedule(b, a); }
+  @Delete('scheduleConsultant/delete') deleteConsultant(@Query('id') id: string, @CurrentUser() a: RequestUser) { return this.svc.deleteConsultantSchedule(id, a); }
+  @Post('scheduleConsultant/updateKafka') updateConsultantKafka(@Body() b: Record<string, unknown>) { return { triggered: true, ...b }; }
 
-  @Post('scheduleConsultant/update') @ApiOperation({ summary: 'Upsert consultant schedule' })
-  upsertConsultant(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.upsertConsultantSchedule(b, a); }
+  // ── treatmentRoom ─────────────────────────────────────────────────────────
+  @Get('treatmentRoom/list') listRooms(@TenantId() t: string) { return this.svc.listRooms(t); }
+  @Get('treatmentRoom/get') getRoom(@Query('id') id: string) { return this.svc.getRoom(id); }
+  @Get('treatmentRoom/check') checkRoom(@Query('roomId') roomId: string, @Query('startTime') s: string, @Query('endTime') e: string) { return this.svc.checkRoom(roomId, s, e); }
+  @Post('treatmentRoom/update') upsertRoom(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.upsertRoom(b, a); }
+  @Delete('treatmentRoom/delete') deleteRoom(@Query('id') id: string, @CurrentUser() a: RequestUser) { return this.svc.deleteRoom(id, a); }
 
-  @Delete('scheduleConsultant/delete') @ApiOperation({ summary: 'Delete consultant schedule' })
-  deleteConsultant(@Query('id') id: string, @CurrentUser() a: RequestUser) { return this.svc.deleteConsultantSchedule(id, a); }
+  // ── treatmentHistory ──────────────────────────────────────────────────────
+  @Get('treatmentHistory/list') listTreatments(@TenantId() t: string, @Query() q: Record<string, string>) { return this.svc.listTreatmentHistories(t, q, Number(q.page ?? 1), Number(q.limit ?? 20)); }
+  @Get('treatmentHistory/list_all') listAllTreatments(@TenantId() t: string, @Query() q: Record<string, string>) { return this.svc.listTreatmentHistories(t, q, Number(q.page ?? 1), Number(q.limit ?? 20)); }
+  @Get('treatmentHistory/list_by_customer') listTreatmentsByCustomer(@TenantId() t: string, @Query() q: Record<string, string>) { return this.svc.listTreatmentHistories(t, q, Number(q.page ?? 1), Number(q.limit ?? 20)); }
+  @Get('treatmentHistory/get') getTreatment(@Query('id') id: string) { return this.svc.getTreatmentHistory(id); }
+  @Post('treatmentHistory/update') upsertTreatment(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.upsertTreatmentHistory(b, a); }
+  @Delete('treatmentHistory/delete') deleteTreatment(@Query('id') id: string, @CurrentUser() a: RequestUser) { return this.svc.deleteTreatmentHistory(id, a); }
 
-  @Get('treatmentRoom/list') @ApiOperation({ summary: 'List treatment rooms' })
-  listRooms(@TenantId() t: string) { return this.svc.listRooms(t); }
+  // ── scheduleTreatment ─────────────────────────────────────────────────────
+  @Get('scheduleTreatment/list') listScheduleTreatment(@TenantId() t: string, @Query() q: Record<string, string>) { return this.svc.listTreatmentHistories(t, q, Number(q.page ?? 1), Number(q.limit ?? 20)); }
+  @Get('scheduleTreatment/get') getScheduleTreatment(@Query('id') id: string) { return this.svc.getTreatmentHistory(id); }
+  @Post('scheduleTreatment/update') upsertScheduleTreatment(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.upsertTreatmentHistory(b, a); }
+  @Delete('scheduleTreatment/delete') deleteScheduleTreatment(@Query('id') id: string, @CurrentUser() a: RequestUser) { return this.svc.deleteTreatmentHistory(id, a); }
+  @Post('scheduleTreatment/updateKafka') updateScheduleTreatmentKafka(@Body() b: Record<string, unknown>) { return { triggered: true }; }
 
-  @Post('treatmentRoom/update') @ApiOperation({ summary: 'Upsert treatment room' })
-  upsertRoom(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.upsertRoom(b, a); }
-
-  @Delete('treatmentRoom/delete') @ApiOperation({ summary: 'Delete treatment room' })
-  deleteRoom(@Query('id') id: string, @CurrentUser() a: RequestUser) { return this.svc.deleteRoom(id, a); }
-
-  @Get('treatmentHistory/list') @ApiOperation({ summary: 'List treatment histories' })
-  listTreatments(@TenantId() t: string, @Query() q: Record<string, string>) { return this.svc.listTreatmentHistories(t, q, Number(q.page ?? 1), Number(q.limit ?? 20)); }
-
-  @Post('treatmentHistory/update') @ApiOperation({ summary: 'Upsert treatment history' })
-  upsertTreatment(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.upsertTreatmentHistory(b, a); }
-
-  @Delete('treatmentHistory/delete') @ApiOperation({ summary: 'Delete treatment history' })
-  deleteTreatment(@Query('id') id: string, @CurrentUser() a: RequestUser) { return this.svc.deleteTreatmentHistory(id, a); }
-
-  @Get('scheduleTreatment/list') @ApiOperation({ summary: 'List treatment schedules' })
-  listScheduleTreatment(@TenantId() t: string, @Query() q: Record<string, string>) { return this.svc.listTreatmentHistories(t, q, Number(q.page ?? 1), Number(q.limit ?? 20)); }
-
-  @Post('scheduleTreatment/update') @ApiOperation({ summary: 'Upsert treatment schedule' })
-  upsertScheduleTreatment(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.upsertTreatmentHistory(b, a); }
-
-  @Delete('scheduleTreatment/delete') @ApiOperation({ summary: 'Delete treatment schedule' })
-  deleteScheduleTreatment(@Query('id') id: string, @CurrentUser() a: RequestUser) { return this.svc.deleteTreatmentHistory(id, a); }
+  // ── treatmentTime ─────────────────────────────────────────────────────────
+  @Get('treatmentTime/list_schedule_next') listNextSchedule(@TenantId() t: string, @Query() q: Record<string, string>) { return this.svc.listNextSchedule(t, q); }
+  @Get('treatmentTime/get_byscheduler') getByScheduler(@Query('schedulerId') sid: string) { return this.svc.getByScheduler(sid); }
+  @Post('treatmentTime/update_next') updateNext(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.updateNext(b, a); }
+  @Post('treatmentTime/update_caring_employee') updateCaringEmployee(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.updateCaringEmployee(b, a); }
+  // NOTE: treatmentTime/update, /delete, /get, /list are owned by IntegrationController (avoid duplicate routes)
 }
