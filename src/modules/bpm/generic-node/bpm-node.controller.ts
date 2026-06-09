@@ -1,5 +1,6 @@
-import { Controller, Get, Post, Delete, Body, Query, Param } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { Controller, Get, Post, Delete, Body, Query, Param, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiConsumes } from '@nestjs/swagger';
 import { BpmNodeService } from './bpm-node.service';
 import { CurrentUser } from '../../../shared/decorators/current-user.decorator';
 import { TenantId } from '../../../shared/decorators/tenant.decorator';
@@ -174,6 +175,7 @@ export class BpmNodeController {
   // ── BpmConfigNode ─────────────────────────────────────────────────────────
   @Get('bpmConfigNode/list') listCN(@TenantId() t: string, @Query('templateId') tid?: string, @Query('page') p?: string, @Query('limit') l?: string) { return this.svc.listConfigNodes(t, tid, Number(p ?? 1), Number(l ?? 50)); }
   @Get('bpmConfigNode/get') getCN(@Query('id') id: string) { return this.svc.getConfigNode(id); }
+  @Get('bpmconfignode/get') getCNAlias(@Query('id') id: string) { return this.svc.getConfigNode(id); }
   @Post('bpmConfigNode/update') upsertCN(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.upsertConfigNode(b, a); }
   @Delete('bpmConfigNode/delete') deleteCN(@Query('id') id: string, @CurrentUser() a: RequestUser) { return this.svc.deleteConfigNode(id, a); }
   @Post('bpmConfigNode/clone') cloneCN(@Body('id') id: string, @CurrentUser() a: RequestUser) { return this.svc.cloneNode('configNode', id, a); }
@@ -204,39 +206,42 @@ export class BpmNodeController {
   @Post('businessProcess/importExcel') importBPExcel(@Body() b: Record<string, unknown>) { return this.svc.importExcel(b); }
 
   // ── StateMapping ──────────────────────────────────────────────────────────
-  @Get('stateMapping/list') listSM(@TenantId() t: string) { return this.svc.listStateMappings(t); }
+  @Get('stateMapping/list') listSM(@TenantId() t: string, @Query() q: Record<string, string>) { return this.svc.listStateMappings(t, q); }
+  @Get('statemapping/list') listSMAlias(@TenantId() t: string, @Query() q: Record<string, string>) { return this.svc.listStateMappings(t, q); }
   @Post('stateMapping/update') upsertSM(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.upsertStateMapping(b, a); }
+  @Post('statemapping/update') upsertSMAlias(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.upsertStateMapping(b, a); }
   @Delete('stateMapping/delete') deleteSM(@Query('id') id: string) { return this.svc.deleteStateMapping(id); }
 
   // ── VariableDeclare ───────────────────────────────────────────────────────
-  @Get('variableDeclare/list') listVars(@TenantId() t: string) { return this.svc.listVariables(t); }
+  @Get('variableDeclare/list') listVars(@TenantId() t: string, @Query() q: Record<string, string>) { return this.svc.listVariables(t, q); }
   @Post('variableDeclare/update') upsertVar(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.upsertVariable(b, a); }
-  @Delete('variableDeclare/delete') deleteVar(@Query('id') id: string) { return this.svc.deleteVariable(id); }
-  @Get('variableDeclare/get') getVar(@Query('id') id: string) { return { id }; }
+  @Delete('variableDeclare/delete') deleteVar(@Query('id') id: string, @CurrentUser() a: RequestUser) { return this.svc.deleteVariable(id, a); }
+  @Get('variableDeclare/get') getVar(@Query('id') id: string) { return this.svc.getVariable(id); }
   @Get('variableInstance/list') listVarInst(@Query('instanceId') id: string) { return this.svc.listVariableInstances(id); }
 
   // ── ProcessedObject ───────────────────────────────────────────────────────
   @Get('processedObject/list') listPO(@TenantId() t: string, @Query() q: Record<string, string>) { return this.svc.listProcessedObjects(t, q, Number(q.page ?? 1), Number(q.limit ?? 20)); }
   @Get('processedobject/list') listPOAlias(@TenantId() t: string, @Query() q: Record<string, string>) { return this.svc.listProcessedObjects(t, q, Number(q.page ?? 1), Number(q.limit ?? 20)); }
-  @Post('processedObject/update') upsertPO(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return { id: 'stub', ...b }; }
-  @Delete('processedObject/delete') deletePO(@Query('id') id: string) { return { message: 'Deleted' }; }
-  @Get('processedObject/get') getPO(@Query('id') id: string) { return { id }; }
-  @Post('processedObject/reset') resetPO(@Body('id') id: string) { return { reset: true }; }
+  @Post('processedObject/update') upsertPO(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.upsertProcessedObject(b, a); }
+  @Delete('processedObject/delete') deletePO(@Query('id') id: string, @CurrentUser() a: RequestUser) { return this.svc.deleteProcessedObject(id, a); }
+  @Get('processedObject/get') getPO(@Query('id') id: string) { return this.svc.getProcessedObject(id); }
+  @Post('processedObject/reset') resetPO(@Body('id') id: string, @CurrentUser() a: RequestUser) { return this.svc.resetProcessedObject(id, a); }
   @Get('processedObjectLog/list') listPOLog(@Query('instanceId') instanceId: string) { return this.svc.listProcessedObjectLogs(instanceId); }
+  @Get('processedobjectlog/findbycriteria') findPOLogByCriteria(@TenantId() t: string, @Query() q: Record<string, string>) { return this.svc.findByCriteria(t, q); }
 
   // ── Workflow ──────────────────────────────────────────────────────────────
   @Get('workflow/list') listWF(@TenantId() t: string) { return this.svc.listWorkflows(t); }
   @Post('workflow/update') upsertWF(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.upsertBusinessProcess(b, a); }
   @Delete('workflow/delete') deleteWF(@Query('id') id: string, @CurrentUser() a: RequestUser) { return this.svc.deleteBusinessProcess(id, a); }
-  @Get('workflowStatus/list') listWFStatus(@TenantId() t: string) { return this.svc.listWorkflowStatuses(t); }
-  @Post('workflowStatus/update') upsertWFStatus(@Body() b: Record<string, unknown>) { return { id: 'stub', ...b }; }
-  @Delete('workflowStatus/delete') deleteWFStatus(@Query('id') id: string) { return { message: 'Deleted' }; }
+  @Get('workflowStatus/list') listWFStatus(@TenantId() t: string, @Query() q: Record<string, string>) { return this.svc.listWorkflowStatuses(t, q); }
+  @Post('workflowStatus/update') upsertWFStatus(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.upsertWorkflowStatus(b, a); }
+  @Delete('workflowStatus/delete') deleteWFStatus(@Query('id') id: string, @CurrentUser() a: RequestUser) { return this.svc.deleteWorkflowStatus(id, a); }
 
   // ── OLA / SLA ─────────────────────────────────────────────────────────────
   @Get('ola/export') exportOLA(@TenantId() t: string) { return this.svc.exportOLA(t); }
   @Get('sla/export') exportSLA(@TenantId() t: string) { return this.svc.exportSLA(t); }
-  @Get('ola/list') listOLA(@TenantId() t: string) { return this.svc.listServiceLevels(t); }
-  @Get('sla/list') listSLA(@TenantId() t: string) { return this.svc.listServiceLevels(t); }
+  @Get('ola/list') listOLA(@TenantId() t: string) { return this.svc.listServiceLevels(t, 'OLA'); }
+  @Get('sla/list') listSLA(@TenantId() t: string) { return this.svc.listServiceLevels(t, 'SLA'); }
 
   // ── ProcessInstance ───────────────────────────────────────────────────────
   @Get('processInstance/list') listPI(@TenantId() t: string) { return this.svc.listProcessInstances(t); }
@@ -244,19 +249,20 @@ export class BpmNodeController {
   // ── ServiceLevel ──────────────────────────────────────────────────────────
   @Get('serviceLevel/list') listSL(@TenantId() t: string) { return this.svc.listServiceLevels(t); }
   @Post('serviceLevel/update') upsertSL(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.upsertServiceLevel(b, a); }
-  @Delete('serviceLevel/delete') deleteSL(@Query('id') id: string) { return { message: 'Deleted' }; }
-  @Get('serviceLevel/get') getSL(@Query('id') id: string) { return { id }; }
-  @Get('serviceLevelHistory/list') listSLH(@TenantId() t: string) { return this.svc.listServiceLevelHistories(t); }
-  @Post('serviceLevelHistory/update') upsertSLH(@Body() b: Record<string, unknown>) { return { id: 'stub', ...b }; }
+  @Delete('serviceLevel/delete') deleteSL(@Query('id') id: string, @CurrentUser() a: RequestUser) { return this.svc.deleteServiceLevel(id, a); }
+  @Get('serviceLevel/get') getSL(@Query('id') id: string) { return this.svc.getServiceLevel(id); }
+  @Get('serviceLevelHistory/list') listSLH(@TenantId() t: string, @Query() q: Record<string, string>) { return this.svc.listServiceLevelHistories(t, q); }
+  @Post('serviceLevelHistory/update') upsertSLH(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.upsertServiceLevelHistory(b, a); }
 
   // ── BpmObject / Trigger / AssignmentRule / SegmentFilter ─────────────────
   @Get('bpmObject/list') listBO(@TenantId() t: string) { return this.svc.listBpmObjects(t); }
   @Post('bpmObject/update') upsertBO(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.upsertBpmObject(b, a); }
   @Delete('bpmObject/delete') deleteBO(@Query('id') id: string) { return this.svc.deleteBpmObject(id); }
-  @Get('bpmObject/get') getBO(@Query('id') id: string) { return { id }; }
+  @Get('bpmObject/get') getBO(@Query('id') id: string) { return this.svc.getBpmObject(id); }
 
-  @Get('bpmTrigger/list') listBT(@TenantId() t: string) { return this.svc.listBpmTriggers(t); }
+  @Get('bpmTrigger/list') listBT(@TenantId() t: string, @Query() q: Record<string, string>) { return this.svc.listBpmTriggers(t, q); }
   @Post('bpmTrigger/update') upsertBT(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.upsertBpmTrigger(b, a); }
+  @Post('bpmTrigger/activate') activateBT(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.activateBpmTrigger(b, a); }
   @Delete('bpmTrigger/delete') deleteBT(@Query('id') id: string) { return this.svc.deleteBpmTrigger(id); }
 
   @Get('bpmAssignmentRule/list') listBAR(@TenantId() t: string) { return this.svc.listBpmAssignmentRules(t); }
@@ -265,33 +271,45 @@ export class BpmNodeController {
   @Get('bpmSegmentFilter/list') listBSF(@TenantId() t: string) { return this.svc.listBpmSegmentFilters(t); }
   @Post('bpmSegmentFilter/update') upsertBSF(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.upsertBpmSegmentFilter(b, a); }
   @Delete('bpmSegmentFilter/delete') deleteBSF(@Query('id') id: string) { return this.svc.deleteBpmSegmentFilter(id); }
-  @Get('bpmSegmentFilter/get') getBSF(@Query('id') id: string) { return { id }; }
+  @Get('bpmSegmentFilter/get') getBSF(@Query('id') id: string) { return this.svc.getBpmSegmentFilter(id); }
 
   // ── FindByCriteria / Rest ─────────────────────────────────────────────────
   @Post('findByCriteria/search') findByCriteria(@TenantId() t: string, @Body() b: Record<string, unknown>) { return this.svc.findByCriteria(t, b); }
   @Post('rest/call') restCall(@Body() b: Record<string, unknown>) { return this.svc.restCall(b); }
 
+  // ── Process permission alias (docs.md expects bpmapi prefix) ─────────────
+  @Post('process-permission/update') upsertProcessPerm(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.upsertProcessPermission(b, a); }
+
   // ── BpmArtifactData / BpmFormData / BpmFormPopup ──────────────────────────
-  @Get('bpmArtifactData/list') listBAD(@TenantId() t: string) { return []; }
-  @Post('bpmArtifactData/update') upsertBAD(@Body() b: Record<string, unknown>) { return b; }
-  @Delete('bpmArtifactData/delete') deleteBAD(@Query('id') id: string) { return { message: 'Deleted' }; }
-  @Get('bpmFormData/list') listBFD(@TenantId() t: string) { return []; }
-  @Post('bpmFormData/update') upsertBFD(@Body() b: Record<string, unknown>) { return b; }
-  @Get('bpmFormPopup/list') listBFP(@TenantId() t: string) { return []; }
-  @Post('bpmFormPopup/update') upsertBFP(@Body() b: Record<string, unknown>) { return b; }
-  @Delete('bpmFormPopup/delete') deleteBFP(@Query('id') id: string) { return { message: 'Deleted' }; }
-  @Get('bpmFormPopup/get') getBFP(@Query('id') id: string) { return { id }; }
+  @Get('bpmArtifactData/list') listBAD(@TenantId() t: string, @Query() q: Record<string, string>) { return this.svc.listBpmArtifactData(t, q); }
+  @Post('bpmArtifactData/update') upsertBAD(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.upsertBpmArtifactData(b, a); }
+  @Delete('bpmArtifactData/delete') deleteBAD(@Query('id') id: string, @CurrentUser() a: RequestUser) { return this.svc.deleteBpmArtifactData(id, a); }
+  @Get('bpmFormData/list') listBFD(@TenantId() t: string, @Query() q: Record<string, string>) { return this.svc.listBpmFormData(t, q); }
+  @Get('bpmformdata/getbynodeid') getBFDByNodeId(@TenantId() t: string, @Query('nodeId') nodeId: string, @Query('potId') potId?: string) { return this.svc.getFormDataByNodeId(nodeId, potId, t); }
+  @Post('bpmFormData/update') upsertBFD(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.upsertBpmFormData(b, a); }
+  @Get('bpmFormPopup/list') listBFP(@TenantId() t: string, @Query() q: Record<string, string>) { return this.svc.listBpmFormPopups(t, q); }
+  @Post('bpmFormPopup/update') upsertBFP(@Body() b: Record<string, unknown>, @CurrentUser() a: RequestUser) { return this.svc.upsertBpmFormPopup(b, a); }
+  @Delete('bpmFormPopup/delete') deleteBFP(@Query('id') id: string, @CurrentUser() a: RequestUser) { return this.svc.deleteBpmFormPopup(id, a); }
+  @Get('bpmFormPopup/get') getBFP(@Query('id') id: string) { return this.svc.getBpmFormPopup(id); }
 
   // ── Upload ────────────────────────────────────────────────────────────────
-  @Post('upload/file') uploadFile(@Body() b: Record<string, unknown>) { return { url: `/uploads/file-${Date.now()}` }; }
-  
-  @Post('documents/upload')
-  uploadDocument(@Body() b: Record<string, unknown>) { 
-    // Alias for the standard BPM spec
-    return { url: `/uploads/document-${Date.now()}` }; 
+  @Post('upload/file')
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadFile(@UploadedFile() file: Express.Multer.File, @CurrentUser() a: RequestUser) {
+    const row = await this.svc.saveFileUpload(file, a);
+    return { id: row.id, url: row.fileUrl, filename: row.fileName, size: row.fileSize };
   }
 
-  @Delete('upload/delete') deleteUpload(@Query('id') id: string) { return { message: 'Deleted' }; }
+  @Post('documents/upload')
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadDocument(@UploadedFile() file: Express.Multer.File, @CurrentUser() a: RequestUser) {
+    const row = await this.svc.saveFileUpload(file, a, 'document');
+    return { id: row.id, url: row.fileUrl, filename: row.fileName, size: row.fileSize };
+  }
+
+  @Delete('upload/delete') deleteUpload(@Query('id') id: string, @CurrentUser() a: RequestUser) { return this.svc.deleteFileUpload(id, a); }
 
   // ── BpmParticipantProcesslog ──────────────────────────────────────────────
   @Get('bpmParticipantProcesslog/list') listBPPL(@TenantId() t: string, @Query() q: Record<string, string>) { return this.svc.listProcessedObjects(t, q); }

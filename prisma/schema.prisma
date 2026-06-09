@@ -1956,10 +1956,19 @@ model BpmProcessTemplate {
   deletedBy   String?   @map("deleted_by") @db.Uuid
   rowVersion  Int       @default(1) @map("row_version")
 
-  nodes      BpmNode[]
-  edges      BpmEdge[]
-  instances  BpmProcessInstance[]
-  slaConfigs BpmSlaConfig[]
+  nodes               BpmNode[]
+  edges               BpmEdge[]
+  instances           BpmProcessInstance[]
+  slaConfigs          BpmSlaConfig[]
+  variableDeclares    BpmVariableDeclare[]
+  workflowStatuses    BpmWorkflowStatus[]
+  serviceLevels       BpmServiceLevel[]
+  bpmObjects          BpmObject[]
+  bpmTriggers         BpmTrigger[]
+  assignmentRules     BpmAssignmentRule[]
+  segmentFilters      BpmSegmentFilter[]
+  formPopups          BpmFormPopup[]
+  processPermissions  BpmProcessPermission[]
 
   @@unique([tenantId, code])
   @@map("bpm_process_templates")
@@ -2028,11 +2037,15 @@ model BpmProcessInstance {
   updatedBy    String    @map("updated_by") @db.Uuid
   deletedAt    DateTime? @map("deleted_at") @db.Timestamptz
 
-  template   BpmProcessTemplate @relation(fields: [templateId], references: [id])
-  tokens     BpmTaskToken[]
-  workOrders BpmWorkOrder[]
-  history    BpmInstanceHistory[]
-  gridData   BpmGridData[]
+  template              BpmProcessTemplate      @relation(fields: [templateId], references: [id])
+  tokens                BpmTaskToken[]
+  workOrders            BpmWorkOrder[]
+  history               BpmInstanceHistory[]
+  gridData              BpmGridData[]
+  processedObject       BpmProcessedObject?
+  variableInstances     BpmVariableInstance[]
+  formDataEntries       BpmFormData[]
+  serviceLevelHistories BpmServiceLevelHistory[]
 
   @@index([tenantId, status])
   @@index([tenantId, businessKey])
@@ -2380,6 +2393,391 @@ model BpmSlaConfig {
 
   @@unique([templateId, nodeKey, slaType])
   @@map("bpm_sla_configs")
+  @@schema("bpm")
+}
+
+// ── BPM Auxiliary Config & Runtime Models ────────────────────────────────────
+
+model BpmStateMapping {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  stateCode String    @map("state_code") @db.VarChar(50)
+  stateName String    @map("state_name") @db.VarChar(255)
+  color     String?   @db.VarChar(20)
+  sortOrder Int       @default(0) @map("sort_order")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy String    @map("created_by") @db.Uuid
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy String    @map("updated_by") @db.Uuid
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy String?   @map("deleted_by") @db.Uuid
+
+  @@unique([tenantId, stateCode])
+  @@index([tenantId])
+  @@map("bpm_state_mappings")
+  @@schema("bpm")
+}
+
+model BpmVariableDeclare {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  templateId   String    @map("template_id") @db.Uuid
+  name         String    @db.VarChar(255)
+  code         String    @db.VarChar(100)
+  dataType     String    @default("String") @map("data_type") @db.VarChar(50)
+  defaultValue String?   @map("default_value")
+  description  String?
+  config       Json?
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy    String    @map("created_by") @db.Uuid
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy    String    @map("updated_by") @db.Uuid
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy    String?   @map("deleted_by") @db.Uuid
+
+  template  BpmProcessTemplate    @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  instances BpmVariableInstance[]
+
+  @@unique([templateId, code])
+  @@index([tenantId])
+  @@map("bpm_variable_declares")
+  @@schema("bpm")
+}
+
+model BpmVariableInstance {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  instanceId String    @map("instance_id") @db.Uuid
+  declareId  String?   @map("declare_id") @db.Uuid
+  code       String    @db.VarChar(100)
+  name       String?   @db.VarChar(255)
+  value      Json?
+  nodeKey    String?   @map("node_key") @db.VarChar(100)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz
+
+  instance BpmProcessInstance  @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  declare  BpmVariableDeclare? @relation(fields: [declareId], references: [id], onDelete: SetNull)
+
+  @@index([instanceId])
+  @@index([tenantId, code])
+  @@map("bpm_variable_instances")
+  @@schema("bpm")
+}
+
+model BpmWorkflowStatus {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  templateId String    @map("template_id") @db.Uuid
+  stepName   String    @map("step_name") @db.VarChar(255)
+  stepNumber Int       @map("step_number")
+  stateCode  String    @map("state_code") @db.VarChar(50)
+  stateName  String    @map("state_name") @db.VarChar(255)
+  config     Json?
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy  String    @map("created_by") @db.Uuid
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy  String    @map("updated_by") @db.Uuid
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy  String?   @map("deleted_by") @db.Uuid
+
+  template BpmProcessTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, templateId])
+  @@map("bpm_workflow_statuses")
+  @@schema("bpm")
+}
+
+model BpmProcessPermission {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  name        String    @db.VarChar(255)
+  uri         String    @db.VarChar(500)
+  processCode String?   @map("process_code") @db.VarChar(100)
+  processName String?   @map("process_name") @db.VarChar(255)
+  templateId  String?   @map("template_id") @db.Uuid
+  config      Json?
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+
+  template BpmProcessTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@map("bpm_process_permissions")
+  @@schema("bpm")
+}
+
+model BpmServiceLevel {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId         String    @map("tenant_id") @db.Uuid
+  templateId       String?   @map("template_id") @db.Uuid
+  nodeKey          String?   @map("node_key") @db.VarChar(100)
+  name             String?   @db.VarChar(255)
+  code             String?   @db.VarChar(100)
+  slaType          String    @default("SLA") @map("sla_type") @db.VarChar(10)
+  duration         Int       @default(0)
+  durationUnit     String    @default("hours") @map("duration_unit") @db.VarChar(20)
+  status           Int       @default(1)
+  escalationAction Json?     @map("escalation_action")
+  config           Json?
+  isActive         Boolean   @default(true) @map("is_active")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy        String    @map("created_by") @db.Uuid
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy        String    @map("updated_by") @db.Uuid
+  deletedAt        DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy        String?   @map("deleted_by") @db.Uuid
+
+  template BpmProcessTemplate?      @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  history  BpmServiceLevelHistory[]
+
+  @@index([tenantId, slaType])
+  @@map("bpm_service_levels")
+  @@schema("bpm")
+}
+
+model BpmServiceLevelHistory {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  serviceLevelId String?   @map("service_level_id") @db.Uuid
+  instanceId     String?   @map("instance_id") @db.Uuid
+  potId          String?   @map("pot_id") @db.VarChar(100)
+  nodeKey        String?   @map("node_key") @db.VarChar(100)
+  status         Int       @default(0)
+  startedAt      DateTime  @default(now()) @map("started_at") @db.Timestamptz
+  dueAt          DateTime? @map("due_at") @db.Timestamptz
+  completedAt    DateTime? @map("completed_at") @db.Timestamptz
+  breachedAt     DateTime? @map("breached_at") @db.Timestamptz
+  metadata       Json?
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz
+
+  serviceLevel BpmServiceLevel?    @relation(fields: [serviceLevelId], references: [id], onDelete: SetNull)
+  instance     BpmProcessInstance? @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, instanceId])
+  @@map("bpm_service_level_histories")
+  @@schema("bpm")
+}
+
+model BpmObject {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  templateId String?   @map("template_id") @db.Uuid
+  name       String    @db.VarChar(255)
+  code       String?   @db.VarChar(100)
+  objectType String?   @map("object_type") @db.VarChar(50)
+  status     Int       @default(1)
+  config     Json?
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy  String    @map("created_by") @db.Uuid
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy  String    @map("updated_by") @db.Uuid
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy  String?   @map("deleted_by") @db.Uuid
+
+  template BpmProcessTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@map("bpm_objects")
+  @@schema("bpm")
+}
+
+model BpmTrigger {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  templateId  String?   @map("template_id") @db.Uuid
+  name        String    @db.VarChar(255)
+  code        String?   @db.VarChar(100)
+  triggerType String?   @map("trigger_type") @db.VarChar(50)
+  eventName   String?   @map("event_name") @db.VarChar(100)
+  status      Int       @default(0)
+  activated   Boolean   @default(false)
+  condition   Json?
+  action      Json?
+  config      Json?
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy   String    @map("created_by") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String    @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+
+  template BpmProcessTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@map("bpm_triggers")
+  @@schema("bpm")
+}
+
+model BpmAssignmentRule {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  templateId   String?   @map("template_id") @db.Uuid
+  nodeKey      String?   @map("node_key") @db.VarChar(100)
+  name         String    @db.VarChar(255)
+  ruleType     String?   @map("rule_type") @db.VarChar(50)
+  assigneeType String?   @map("assignee_type") @db.VarChar(50)
+  assigneeRef  String?   @map("assignee_ref") @db.VarChar(100)
+  priority     Int       @default(0)
+  condition    Json?
+  config       Json?
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy    String    @map("created_by") @db.Uuid
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy    String    @map("updated_by") @db.Uuid
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy    String?   @map("deleted_by") @db.Uuid
+
+  template BpmProcessTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, templateId])
+  @@map("bpm_assignment_rules")
+  @@schema("bpm")
+}
+
+model BpmSegmentFilter {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  templateId String?   @map("template_id") @db.Uuid
+  name       String    @db.VarChar(255)
+  code       String?   @db.VarChar(100)
+  filterType String?   @map("filter_type") @db.VarChar(50)
+  expression Json?
+  config     Json?
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy  String    @map("created_by") @db.Uuid
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy  String    @map("updated_by") @db.Uuid
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy  String?   @map("deleted_by") @db.Uuid
+
+  template BpmProcessTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@map("bpm_segment_filters")
+  @@schema("bpm")
+}
+
+model BpmArtifactData {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  name      String    @db.VarChar(255)
+  code      String    @db.VarChar(100)
+  status    Int       @default(1)
+  type      String    @default("grid") @db.VarChar(30)
+  config    Json?
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy String    @map("created_by") @db.Uuid
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy String    @map("updated_by") @db.Uuid
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy String?   @map("deleted_by") @db.Uuid
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("bpm_artifact_data")
+  @@schema("bpm")
+}
+
+model BpmFormData {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  nodeKey    String    @map("node_key") @db.VarChar(100)
+  potId      String?   @map("pot_id") @db.VarChar(100)
+  instanceId String?   @map("instance_id") @db.Uuid
+  templateId String?   @map("template_id") @db.Uuid
+  data       Json      @default("{}")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz
+
+  instance BpmProcessInstance? @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, nodeKey, potId])
+  @@index([instanceId])
+  @@map("bpm_form_data")
+  @@schema("bpm")
+}
+
+model BpmFormPopup {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  templateId String?   @map("template_id") @db.Uuid
+  nodeKey    String?   @map("node_key") @db.VarChar(100)
+  bpmFormId  String?   @map("bpm_form_id") @db.Uuid
+  title      String?   @db.VarChar(255)
+  name       String    @db.VarChar(255)
+  code       String?   @db.VarChar(100)
+  config     Json?
+  isActive   Boolean   @default(true) @map("is_active")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdBy  String    @map("created_by") @db.Uuid
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy  String    @map("updated_by") @db.Uuid
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy  String?   @map("deleted_by") @db.Uuid
+
+  template BpmProcessTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, templateId])
+  @@map("bpm_form_popups")
+  @@schema("bpm")
+}
+
+model BpmProcessedObject {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  instanceId      String    @unique @map("instance_id") @db.Uuid
+  name            String?   @db.VarChar(500)
+  code            String?   @db.VarChar(100)
+  potId           String?   @map("pot_id") @db.VarChar(100)
+  customerName    String?   @map("customer_name") @db.VarChar(255)
+  patientName     String?   @map("patient_name") @db.VarChar(255)
+  mainDiagnosis   String?   @map("main_diagnosis") @db.VarChar(500)
+  priority        String?   @db.VarChar(20)
+  iamEmployeeId   String?   @map("iam_employee_id") @db.Uuid
+  employeeName    String?   @map("employee_name") @db.VarChar(255)
+  status          Int       @default(0)
+  sheetId         Int?      @map("sheet_id")
+  startTime       DateTime? @map("start_time") @db.Timestamptz
+  endTime         DateTime? @map("end_time") @db.Timestamptz
+  metadata        Json?
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz
+
+  instance BpmProcessInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, potId])
+  @@map("bpm_processed_objects")
+  @@schema("bpm")
+}
+
+model BpmFileUpload {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  fileName    String    @map("file_name") @db.VarChar(500)
+  fileUrl     String    @map("file_url") @db.VarChar(1000)
+  storagePath String?   @map("storage_path") @db.VarChar(1000)
+  fileSize    Int?      @map("file_size")
+  mimeType    String?   @map("mime_type") @db.VarChar(100)
+  refType     String?   @map("ref_type") @db.VarChar(50)
+  refId       String?   @map("ref_id") @db.Uuid
+  uploadedBy  String    @map("uploaded_by") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedBy   String?   @map("deleted_by") @db.Uuid
+
+  @@index([tenantId, refType, refId])
+  @@map("bpm_file_uploads")
   @@schema("bpm")
 }
 
