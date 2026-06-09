@@ -5,6 +5,7 @@ WORKDIR /app
 RUN apk add --no-cache openssl
 
 COPY package*.json ./
+COPY prisma ./prisma
 RUN npm ci
 
 FROM node:18-alpine AS builder
