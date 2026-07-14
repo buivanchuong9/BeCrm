@@ -44,10 +44,30 @@ Covered in detail as decision D-002 in `docs/BACKEND_DECISION_LOG.md`. Summarize
 
 ---
 
-## DEV-005 — Jest e2e process required `--forceExit`
+## DEV-005 — Jest e2e process required `--forceExit` (RESOLVED — see F-001)
 
 **What was expected:** `npm run test:e2e` exits cleanly on its own once all tests finish.
 
-**What was actually true:** The first e2e run hung indefinitely after all 5 tests passed (verified via a second, `--forceExit` run showing identical pass output) — an open-handle teardown issue, almost certainly the BullMQ/ioredis connections registered by `OutboxModule`/`RedisModule` not being closed by `app.close()`.
+**What was actually true:** The first e2e run hung indefinitely after all 5 tests passed — an open-handle teardown issue.
 
-**Resolution:** Added `--forceExit` to the `test:integration`, `test:e2e`, and `test:security` npm scripts as an immediate unblock. **This is a known workaround, not a fix** — the underlying open-handle leak should be traced (likely needs an explicit `OnModuleDestroy` on `RedisModule`'s provider and/or closing the BullMQ `Queue` instance registered by `OutboxModule`) before T22 (hardening/operations) sign-off, since `--forceExit` can mask a real resource leak in long-running worker processes, not just test runs.
+**Root cause found (2026-07-14):** `src/infrastructure/redis/redis.module.ts`'s `REDIS_CLIENT` provider was a bare `useFactory: () => new Redis(...)` with no lifecycle hook. The raw ioredis connection (plus its reconnect timers) was never closed on `app.close()`, keeping the Node process alive. Confirmed via `grep -rn "REDIS_CLIENT" src` that the client had zero consumers yet — it was purely inert, open infrastructure.
+
+**Fix:** Wrapped the ioredis instance in an injectable `RedisClientHolder implements OnModuleDestroy` that calls `client.quit()` on module teardown, and provide `REDIS_CLIENT` via a factory reading `holder.client`. Verified with `npx jest --selectProjects e2e --detectOpenHandles` (no `--forceExit`) — zero open-handle warnings, process exits naturally. `--forceExit` removed from `test:integration`, `test:e2e`, `test:security` in `package.json`.
+
+**Reference:** decision — this file, item F-001 in the session's foundation-gap fix list; `src/infrastructure/redis/redis.module.ts`.
+
+---
+
+## DEV-006 — Node 22 quality-gate execution via nvm (RESOLVED — see F-006)
+
+**What was expected:** Quality gates run under Node.js 22 LTS per the spec's stack requirement, without changing `package.json`'s `engines` field to accommodate whatever Node happens to be active locally.
+
+**What was actually true:** This machine's default/active Node was v24.14.1 (see decision D-009/D-014); `npm install` under Node 24 emitted `EBADENGINE` warnings and, more importantly, native modules (`argon2`) built against the Node 24 ABI would not portably match a Node 22 deployment target.
+
+**Resolution:** `nvm` was already installed on this machine (`command -v nvm` resolved). Installed Node 22 via `nvm install 22` (resolved to v22.23.1, the latest 22.x LTS point release), added a `.nvmrc` pinning `22` to the repo root, and re-ran `npm install` after `nvm use 22` — the native-module `EBADENGINE` warning disappeared entirely. All quality-gate commands from this point forward were run as:
+```
+export NVM_DIR="$HOME/.nvm" && [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" && nvm use 22
+```
+prepended to each command (or `nvm use` once per shell session). `node --version` confirmed `v22.23.1` for every subsequent `typecheck`/`lint`/`build`/`test*`/`prisma migrate`/`db:seed` run in this session.
+
+**Reference:** `.nvmrc`, decision D-014 (renumbered from D-009 in the decision log).

@@ -6,8 +6,10 @@ import { UserRole, UserStatus } from '@prisma/client';
 import { Roles } from '../../common/authorization/roles.decorator';
 import { NotFoundAppError } from '../../common/errors/app-error';
 import { toOffsetPage } from '../../common/pagination/pagination.util';
+import { ApiOkEnvelope, ApiOkListEnvelope } from '../../common/http/api-envelope.decorator';
 import { UsersRepository } from './users.repository';
 import { toUserResponse } from './user-response.mapper';
+import { UserResponseDto } from './dto/responses/user-response.dto';
 
 class ListUsersQuery {
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) page = 1;
@@ -27,6 +29,7 @@ class ListUsersQuery {
 export class UsersController {
   constructor(private readonly users: UsersRepository) {}
 
+  @ApiOkListEnvelope(UserResponseDto)
   @Get()
   async list(@Query() query: ListUsersQuery) {
     const { rows, total } = await this.users.list(query);
@@ -39,6 +42,7 @@ export class UsersController {
     return { data: page.data, meta: page.meta };
   }
 
+  @ApiOkEnvelope(UserResponseDto)
   @Get(':userId')
   async detail(@Param('userId', ParseUUIDPipe) userId: string) {
     const user = await this.users.findByIdWithMemberships(userId);

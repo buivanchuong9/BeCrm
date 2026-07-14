@@ -166,7 +166,11 @@ model UserMembership {
   clinicLocation ClinicLocation? @relation(fields: [clinicLocationId], references: [id], onDelete: Restrict)
   department     Department?     @relation(fields: [departmentId], references: [id], onDelete: SetNull)
 
-  @@unique([userId, organizationId, clinicLocationId, role], name: "uniq_membership_scope_role")
+  // Uniqueness is enforced by two handwritten partial unique indexes (migration
+  // 20260714094500_membership_partial_unique_indexes), not a Prisma @@unique:
+  // Postgres treats NULL as distinct per row in a plain unique index, so a
+  // single (user, org, clinic, role) constraint cannot dedupe org-wide
+  // memberships (clinicLocationId = NULL) — see decision D-006/F-004.
   @@index([organizationId, role])
   @@index([userId])
   @@map("user_memberships")

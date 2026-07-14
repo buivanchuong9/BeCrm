@@ -4,7 +4,9 @@ import { Type } from 'class-transformer';
 import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
 import { AuthenticatedPrincipal } from '../../common/auth/auth.types';
+import { ApiOkListEnvelope } from '../../common/http/api-envelope.decorator';
 import { OrganizationsService } from './organizations.service';
+import { OrganizationResponseDto } from './dto/organization-response.dto';
 
 class ListOrganizationsQuery {
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) page = 1;
@@ -17,6 +19,7 @@ class ListOrganizationsQuery {
 export class OrganizationsController {
   constructor(private readonly organizationsService: OrganizationsService) {}
 
+  @ApiOkListEnvelope(OrganizationResponseDto)
   @Get()
   async list(
     @CurrentUser() principal: AuthenticatedPrincipal,

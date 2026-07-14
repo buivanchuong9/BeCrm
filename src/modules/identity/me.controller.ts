@@ -2,10 +2,13 @@ import { Body, Controller, Get, Put, Patch } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
 import { AuthenticatedPrincipal } from '../../common/auth/auth.types';
+import { ApiOkEnvelope } from '../../common/http/api-envelope.decorator';
 import { UsersRepository } from './users.repository';
 import { UserPreferencesRepository } from './user-preferences.repository';
 import { NotFoundAppError } from '../../common/errors/app-error';
 import { toCurrentUserResponse } from './user-response.mapper';
+import { CurrentUserResponseDto } from './dto/responses/current-user-response.dto';
+import { UserPreferenceResponseDto } from './dto/responses/user-preference-response.dto';
 import { UpdateCurrentUserRequest } from './dto/update-current-user.dto';
 import { UpsertUserPreferenceRequest } from './dto/upsert-preferences.dto';
 
@@ -17,6 +20,7 @@ export class MeController {
     private readonly preferences: UserPreferencesRepository,
   ) {}
 
+  @ApiOkEnvelope(CurrentUserResponseDto)
   @Get()
   async getProfile(@CurrentUser() principal: AuthenticatedPrincipal) {
     const user = await this.users.findByIdWithMemberships(principal.userId);
@@ -26,6 +30,7 @@ export class MeController {
     return { data: toCurrentUserResponse(user, this.users.toMembershipScopes(user)) };
   }
 
+  @ApiOkEnvelope(CurrentUserResponseDto)
   @Patch()
   async updateProfile(
     @CurrentUser() principal: AuthenticatedPrincipal,
@@ -39,12 +44,14 @@ export class MeController {
     return { data: toCurrentUserResponse(updated, this.users.toMembershipScopes(updated)) };
   }
 
+  @ApiOkEnvelope(UserPreferenceResponseDto)
   @Get('preferences')
   async getPreferences(@CurrentUser() principal: AuthenticatedPrincipal) {
     const preference = await this.preferences.findOrDefault(principal.userId);
     return { data: this.toPreferenceResponse(preference) };
   }
 
+  @ApiOkEnvelope(UserPreferenceResponseDto)
   @Put('preferences')
   async putPreferences(
     @CurrentUser() principal: AuthenticatedPrincipal,

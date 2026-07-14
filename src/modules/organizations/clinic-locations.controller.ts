@@ -1,7 +1,9 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { IsIn, IsOptional, IsString, IsUUID } from 'class-validator';
+import { ApiOkListEnvelope } from '../../common/http/api-envelope.decorator';
 import { OrganizationsService } from './organizations.service';
+import { ClinicLocationResponseDto } from './dto/organization-response.dto';
 
 class ListClinicLocationsQuery {
   @IsOptional() @IsUUID() organizationId?: string;
@@ -16,6 +18,7 @@ class ListClinicLocationsQuery {
 export class ClinicLocationsController {
   constructor(private readonly organizationsService: OrganizationsService) {}
 
+  @ApiOkListEnvelope(ClinicLocationResponseDto)
   @Get()
   async list(@Query() query: ListClinicLocationsQuery) {
     return { data: await this.organizationsService.listClinicLocations(query) };

@@ -1,13 +1,15 @@
 import { Body, Controller, Delete, HttpCode, HttpStatus, Post, Req, Res } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiNoContentResponse, ApiTags } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { Request, Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { Public } from '../../common/auth/public.decorator';
 import { UnauthorizedAppError } from '../../common/errors/app-error';
+import { ApiCreatedEnvelope, ApiOkEnvelope } from '../../common/http/api-envelope.decorator';
 import { AppConfiguration } from '../../config/configuration';
 import { AuthService, LoginResult } from './auth.service';
 import { CreateSessionRequest, EndAllSessionsRequest } from './dto/create-session.dto';
+import { SessionResponseDto } from './dto/responses/current-user-response.dto';
 import { PasswordService } from './password.service';
 import { UsersRepository } from './users.repository';
 import { toCurrentUserResponse } from './user-response.mapper';
@@ -30,6 +32,7 @@ export class AuthController {
 
   @Public()
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiCreatedEnvelope(SessionResponseDto)
   @Post('sessions')
   @HttpCode(HttpStatus.CREATED)
   async createSession(
@@ -48,6 +51,7 @@ export class AuthController {
 
   @Public()
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @ApiOkEnvelope(SessionResponseDto)
   @Post('session-refreshes')
   @HttpCode(HttpStatus.OK)
   async createSessionRefresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
@@ -65,6 +69,7 @@ export class AuthController {
   }
 
   @Public()
+  @ApiNoContentResponse()
   @Delete('sessions/current')
   @HttpCode(HttpStatus.NO_CONTENT)
   async endCurrentSession(
@@ -79,6 +84,7 @@ export class AuthController {
   }
 
   @Public()
+  @ApiNoContentResponse()
   @Delete('sessions')
   @HttpCode(HttpStatus.NO_CONTENT)
   async endAllSessions(

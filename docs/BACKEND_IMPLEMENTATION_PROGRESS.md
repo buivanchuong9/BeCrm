@@ -151,6 +151,39 @@ npm run openapi:generate → 12 paths generated, all matching docs/api.md litera
 
 ---
 
+## Foundation gap fixes (F-001 through F-006) — 2026-07-14
+
+Requested before starting T04, to close known gaps from the T00–T03/realignment stages rather than carry them forward. All six done.
+
+| ID | Fix | Files | Verified by |
+|---|---|---|---|
+| F-001 | Redis open-handle leak | `src/infrastructure/redis/redis.module.ts` — wrapped the raw ioredis client in an `OnModuleDestroy` holder that calls `.quit()` | `npx jest --selectProjects e2e --detectOpenHandles` → 0 warnings, natural exit. `--forceExit` removed from `test:integration`/`test:e2e`/`test:security` in `package.json`. |
+| F-002 | Audit immutability integration tests | `test/integration/audit-immutability.spec.ts` (new) | 6 tests: insert allowed; UPDATE rejected (Prisma + raw SQL); DELETE rejected (Prisma + raw SQL); redaction contract documented; request ID/actor context preserved. |
+| F-003 | Idempotency integration tests | `test/integration/idempotency.spec.ts` (new) | 8 tests: replay, `IDEMPOTENCY_KEY_REUSED`, failed≠completed, retry-after-fail proceeds, concurrent duplicates → 1 row, principal scoping, target scoping. |
+| F-004 | `user_memberships` NULL-clinic uniqueness | `prisma/schema.prisma` (dropped the `@@unique`), migration `20260714101425_membership_partial_unique_indexes` (two partial unique indexes), `test/integration/membership-uniqueness.spec.ts` (new) | 4 tests against real Postgres: duplicate clinic-scoped rejected, duplicate org-wide rejected, org-wide+clinic-scoped coexist, re-grant after revoke succeeds. |
+| F-005 | OpenAPI response DTOs for T03 | `src/common/http/api-envelope.decorator.ts` (new — `ApiOkEnvelope`/`ApiCreatedEnvelope`/`ApiOkListEnvelope`), response DTO classes under `src/modules/identity/dto/responses/` and `src/modules/organizations/dto/`, applied to every T03 controller method | `docs/openapi.json` regenerated — every T03 response now has an explicit `$ref`'d schema (verified via `components.schemas` containing `SessionResponseDto`, `CurrentUserResponseDto`, `UserResponseDto`, `OrganizationResponseDto`, `ClinicLocationResponseDto`, `DepartmentResponseDto`, `UserPreferenceResponseDto`, etc.) instead of inferred/untyped shapes. |
+| F-006 | Node 22 for quality gates | `.nvmrc` (new, pins `22`) | `nvm install 22` (resolved v22.23.1) + `nvm use 22` + fresh `npm install` (no more `EBADENGINE`/native-module-ABI warning). Every command in this stage and onward run under Node 22 — see `docs/BACKEND_DEVIATIONS.md` DEV-006 for the exact shell incantation used. `package.json` `engines` field unchanged (`>=22 <23`), not relaxed to accommodate the local Node 24 default. |
+
+**Actual test results after all six fixes (2026-07-14, re-verified against a freshly-recreated empty test database, Node v22.23.1):**
+```
+npm run typecheck        → 0 errors
+npm run lint              → 0 errors
+npm run build              → exit 0
+npm run test                → 2 suites, 10 tests passed
+npm run test:integration    → 3 suites, 17 tests passed (no --forceExit)
+npm run test:e2e            → 2 suites, 10 tests passed (no --forceExit)
+npm run test:security       → 0 suites, 0 tests, exit 0 (--passWithNoTests; no spec files yet)
+npx prisma migrate deploy (empty DB) → 5 migrations applied cleanly
+npm run db:seed (run twice) → 19 users / 19 memberships, unchanged on 2nd run
+npm run openapi:generate    → 12 paths, all response schemas explicitly typed
+```
+
+**Not done (explicitly out of scope for this pass):** `test:security` project has no spec files yet — it will gain content as each module's authorization boundaries are built (starting with T04's patient/consent policies). Jest exits 1 on an empty project by default ("No tests found"), so `--passWithNoTests` was added to the `test:security` script to keep it CI-safe until the first spec file lands; this flag must be removed once real security tests exist, so an accidentally-empty security suite fails loudly again.
+
+**Next task:** T04 — patients, care teams, consents, preferences.
+
+---
+
 ## T04–T22
 
 **Status:** Not started. Blocked only by sequencing (each depends on the prior stage per spec section 43's table), not by any open product decision beyond the safe defaults already recorded in section 47 and `docs/BACKEND_DECISION_LOG.md`.

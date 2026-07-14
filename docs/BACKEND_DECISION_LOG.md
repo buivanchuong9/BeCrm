@@ -133,3 +133,15 @@ Every UNKNOWN or ambiguous requirement resolved during implementation, in order 
 **Why:** Spec section 40 / stack list mandates "Node.js 22 LTS." Deployment images (`Dockerfile FROM node:22-slim`) correctly pin 22; only this developer's local shell has a newer Node installed. Recorded here so it isn't mistaken for a silent scope change.
 
 **Reference:** Spec "Primary implementation stack" (section 19), `Dockerfile`.
+### D-015 — Membership uniqueness enforced by two partial unique indexes, not a Prisma `@@unique`
+
+**Decision:** Dropped the Prisma-declared `@@unique([userId, organizationId, clinicLocationId, role])` on `user_memberships` (which never actually prevented org-wide-membership duplicates — see D-006) and replaced it with two handwritten partial unique indexes in migration `20260714101425_membership_partial_unique_indexes`: `uniq_membership_clinic_scoped` (`WHERE status='active' AND clinic_location_id IS NOT NULL`) and `uniq_membership_org_wide` (`WHERE status='active' AND clinic_location_id IS NULL`).
+
+**Why:** Postgres unique constraints/indexes treat NULL as distinct per row, so no single plain unique index can correctly dedupe both "this user has role X at clinic Y" and "this user has role X org-wide" cases simultaneously. Prisma's `@@unique` syntax has no `WHERE` clause support, so the fix had to be a handwritten SQL migration (consistent with spec section 21's explicit allowance: "handwritten SQL migrations where needed for ... partial indexes"). Both indexes are scoped to `status='active'` so a revoked membership never blocks re-granting the same role later.
+
+**Verified by:** `test/integration/membership-uniqueness.spec.ts` (4 tests against real Postgres) — duplicate clinic-scoped rejected, duplicate org-wide rejected, org-wide + clinic-scoped for the same role coexist correctly, and re-granting after revocation succeeds.
+
+**Reference:** F-004 in the foundation-gap fix list; supersedes the workaround noted in D-006.
+
+---
+
