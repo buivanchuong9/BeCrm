@@ -46,3 +46,24 @@ New database migrations: `20260714092615_add_user_phone_avatar_preferences` (add
 **Frontend fields intentionally NOT carried over:** `User.department`/`User.specialty` (frontend, free-text strings on `User`) become `UserMembership.departmentId` (FK) — a normalized relationship replaces a denormalized string, per spec's "technical debt to avoid: free-text departments/specialties" (section 46). `User.online` (frontend presence flag) has no backend equivalent yet — presence/online status is not addressed until a realtime module exists (T07 SSE at the earliest); omitted rather than faked.
 
 **Breaking-change note:** none — this is the first API surface; nothing to break yet.
+
+## T04 — Patients, care teams, consents (2026-07-14)
+
+**New endpoints:**
+
+| Method | Path | Request | Response (`data`) | Notes |
+|---|---|---|---|---|
+| GET | `/api/v1/patients` | `page,limit,search,clinicId,primaryDoctorId,sortBy,sortOrder` | `PatientResponse[]` | Patient role forced to own record; staff roles org-scoped; `clinicId` accepted but currently inert (D-021) |
+| GET | `/api/v1/patients/{patientId}` | — | `PatientDetailResponse` | 404 for both not-found and not-visible (IDOR-safe); audited |
+| PATCH | `/api/v1/patients/{patientId}` | `UpdatePatientRequest` | `PatientResponse` | Field-level policy — 403 (not silent drop) on a disallowed field |
+| GET | `/api/v1/patients/{patientId}/consents` | `page,limit,type` | `ConsentResponse[]` | Self or medical_administrator (read-only) |
+| POST | `/api/v1/patients/{patientId}/consent-grants` | `CreateConsentGrantRequest{type,policyVersion,grantedAt?}` | `ConsentResponse` | Self only; `Idempotency-Key` required; **200** not 201 (D-018) |
+| POST | `/api/v1/patients/{patientId}/consent-withdrawals` | `CreateConsentWithdrawalRequest{type,reason?,version}` | `ConsentResponse` | Self only; `Idempotency-Key` required; optimistic version check |
+
+**New error codes triggerable for the first time:** `OPTIMISTIC_LOCK_FAILED` (stale `version` on patient update or consent withdrawal), `IDEMPOTENCY_KEY_REQUIRED`/`IDEMPOTENCY_KEY_REUSED` (now actually reachable via consent-grants/withdrawals — the first T03 idempotency-required endpoints).
+
+**New canonical entities exposed:** `Patient`, `Consent`. `PatientCareTeamMember` is internal-only (no endpoint — see D-019).
+
+**Frontend fields intentionally NOT carried over verbatim:** `Patient.profile.gender` (frontend Vietnamese string `'Nam'`) → normalized to canonical `'male'|'female'|'other'|'unknown'`. `Patient.profile.dob` (frontend `DD/MM/YYYY` string, e.g. `'15/03/1995'`) → canonical `LocalDate` (`YYYY-MM-DD`). No `Consent.policyVersion` existed on the frontend at all — new required field for legal/compliance version tracking (spec section 36).
+
+**Breaking-change note:** none — additive endpoints only.

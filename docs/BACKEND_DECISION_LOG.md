@@ -145,3 +145,73 @@ Every UNKNOWN or ambiguous requirement resolved during implementation, in order 
 
 ---
 
+### D-016 — `GET /patients` doubles as the patient's own-record lookup
+
+**Decision:** `docs/api.md` documents `GET /patients` as "Authorized staff only" and gives patients no dedicated `/patients/me`-style endpoint, yet `GET /patients/{patientId}` explicitly allows "self" access and the frontend's entire Patient module exists only to let the seeded patient view their own profile. Resolved by extending `GET /patients`'s scope resolution: a caller holding only the `patient` role (no staff role) is force-scoped to their own single row, mirroring the exact pattern `docs/api.md` already documents for `GET /appointments` ("Patient list is forced to self; staff scoped").
+
+**Why:** This is not a new endpoint — it reuses the literal, already-documented path with role-conditional scoping, consistent with the one analogous pattern the contract does spell out elsewhere. Inventing a new `/patients/me` path was avoided per the explicit instruction not to add endpoints beyond `docs/api.md`.
+
+**Reference:** `src/modules/patients/policies/patient-policies.ts` (`resolvePatientListScope`), `docs/api.md` section 25 (`GET /appointments` row).
+
+---
+
+### D-017 — No field-level redaction on `PatientResponse` for receptionist/admin viewers
+
+**Decision:** Every role authorized to view a patient (self, primary doctor, active care-team member, medical_administrator, receptionist) currently receives the identical `PatientResponse` shape — no field is nulled out per-role.
+
+**Why:** The parent task instructions ask for "field-level policies" and to ensure "receptionist and customer-care responses omit clinical information," but `docs/api.md`'s `PatientResponse` has exactly one field that is even borderline clinical (`bloodType`), and it is declared **non-nullable** in the contract (`'A+' | 'A-' | ... | 'unknown'`, no `| null`) — redacting it to `null` would violate the documented DTO shape. Every other field (name/dob/gender/phone/email/address) is administrative/contact data, which spec section 29 explicitly says reception *should* see ("reception sees contact/appointment/check-in"). `customer_care_employee` is not granted `CanViewPatient` access at all (see D-019's authorization table), which is the actual mechanism satisfying "customer-care cannot access clinical notes" — full exclusion, not partial redaction. Genuine clinical redaction has a real home once T08 (encounters)/T11 (diagnoses) introduce fields that are actually clinical.
+
+**Reference:** `docs/api.md` section 26 `PatientResponse`; spec section 29 field-serializer note; T04 task's field-level-policy requirement.
+
+---
+
+### D-018 — Consent grant/withdrawal return `200`, not `201`
+
+**Decision:** `POST /patients/{id}/consent-grants` and `.../consent-withdrawals` both return HTTP 200, set via explicit `@HttpCode(HttpStatus.OK)` (Nest's POST default would otherwise be 201).
+
+**Why:** `docs/api.md` section 26's general HTTP rule is "create returns 201 ... reads/updates/commands return 200," and a consent-grant is a command on the existing `(patient, type)` consent aggregate (upsert semantics — the DB row for that type either already exists or is created transparently) rather than fresh, always-novel resource creation. This matches every other noun-subresource command in the spec (`/cancellations`, `/signatures`, `/completions`, etc.), none of which return 201.
+
+**Reference:** `docs/api.md` section 26 HTTP rules; `src/modules/patients/consents.controller.ts`.
+
+---
+
+### D-019 — `patient_care_team` has no dedicated CRUD endpoint
+
+**Decision:** The `patient_care_team` table and its authorization role (feeding `CanViewPatient`'s "active care-team" check) are implemented exactly per spec section 21/29, but there is no `GET/POST /patients/{id}/care-team`-style endpoint. The only write path is automatic: `PATCH /patients/{id}` with a `primaryDoctorId` change atomically closes any existing `relationship='primary_doctor'` row and opens a new one, inside the same transaction as the Patient field update.
+
+**Why:** Full-text search of `docs/api.md`'s complete endpoint catalog (section 25) confirms zero care-team-specific paths exist — "care-team" appears only as a database table (section 21) and an authorization-policy input (sections 11, 29). Broader care-team membership (secondary assigned doctors/nurses beyond the primary) will be populated by T06 (appointments)/T08 (encounters) once those modules exist to generate real assignment events; T04 only needs the primary-doctor case to exist.
+
+**Reference:** `docs/api.md` sections 11, 21, 25, 29; `src/modules/patients/patients.repository.ts` (`replacePrimaryDoctorCareTeamRow`).
+
+---
+
+### D-020 — `Patient.primaryDoctorId` references `users.id`, not a future `practitioner_profiles.id`
+
+**Decision:** `patients.primary_doctor_id` is a foreign key straight to `users.id`, not to the `practitioner_profiles`/"Doctor" concept `docs/api.md`'s naming table (section 24) describes as the eventual backing table for the public `doctors` collection.
+
+**Why:** T05 (practitioners/schedules), which would introduce `practitioner_profiles`, has not shipped yet and T04's only dependency is T03 (identity) — they're parallel branches in the task graph, not sequential. Since every "doctor" is fundamentally a `User` with a `doctor` role membership, and `practitioner_profiles` is expected to be a 1:1 extension of `users` (not a replacement identity), pointing at `users.id` now is forward-compatible: T05 can add `practitioner_profiles.user_id` without requiring any change to `patients.primary_doctor_id` or the `PatientResponse.primaryDoctor` projection.
+
+**Reference:** `docs/api.md` section 24 naming table; spec section 21 database design (T05 row).
+
+---
+
+### D-021 — `GET /patients`'s `clinicId` filter is accepted but currently inert
+
+**Decision:** The `ListPatientsQuery.clinicId` parameter (documented in `docs/api.md` section 25's `GET /patients` row) is validated as a UUID and accepted, but has no effect on the query — `Patient` has no clinic-location relation in the current schema.
+
+**Why:** Spec section 21's own `patients` row lists only `org_id`, not a clinic column — patients are organization-scoped, not clinic-scoped, in this data model (matching the frontend, which never showed a patient tied to more than one clinic). A real clinic filter will become meaningful once T06 (appointments) gives patients an actual relationship to specific clinic locations to filter through. Silently dropping the query param from the DTO would break contract validation for FE code that sends it per the documented shape; accepting-but-ignoring preserves forward compatibility.
+
+**Reference:** `docs/api.md` section 25; spec section 21 `patients` row; `src/modules/patients/patients.controller.ts`.
+
+---
+
+### D-022 — Consent type catalog restricted to the 3 frontend-confirmed values via DB CHECK constraint
+
+**Decision:** `consents.type`/`consent_events.type` are free-text columns but constrained by a `CHECK (type IN ('data_processing','research_data_sharing','telemedicine'))` — not an open string, and not a Prisma enum either (to avoid an enum-identifier-vs-API-literal translation layer, same reasoning as blood type).
+
+**Why:** These are exactly the three literals confirmed in the frontend (`SettingsPage.tsx`'s `CONSENT_LABEL` map and `seed.ts`'s three `Consent` fixtures) — `docs/api.md`'s `ConsentResponse.type` is typed as a bare `string` with no enum, but consent types are a legal/compliance surface (spec section 36) where silently accepting arbitrary client-supplied strings would be unsafe. Extending the catalog is a reviewed migration, not a runtime config value.
+
+**Reference:** Explore-agent frontend evidence (`SettingsPage.tsx` `CONSENT_LABEL`, `seed.ts` consent fixtures); spec section 36 (legal/compliance review items).
+
+---
+

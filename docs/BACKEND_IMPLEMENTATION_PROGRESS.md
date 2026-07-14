@@ -184,6 +184,59 @@ npm run openapi:generate    → 12 paths, all response schemas explicitly typed
 
 ---
 
-## T04–T22
+## T04 — Patients, care teams, consents, and preferences
 
-**Status:** Not started. Blocked only by sequencing (each depends on the prior stage per spec section 43's table), not by any open product decision beyond the safe defaults already recorded in section 47 and `docs/BACKEND_DECISION_LOG.md`.
+**Status:** Done (2026-07-14)
+**Dependencies:** T03 (satisfied)
+
+**Files created:** `src/modules/patients/{patients,consents}.{controller,service,repository}.ts`, `src/modules/patients/patient-response.mapper.ts`, `src/modules/patients/policies/patient-policies.ts` (+ spec), `src/modules/patients/dto/{update-patient,create-consent-grant,create-consent-withdrawal}.dto.ts`, `src/modules/patients/dto/responses/{patient-response,consent-response}.dto.ts`, `src/modules/patients/patients.module.ts`, `src/common/http/reference-response.dto.ts` (shared `ReferenceResponse` DTO, first used here but reusable by every future module), `prisma/migrations/20260714144627_patients_care_team_consents/`, `test/integration/patients-consents.spec.ts`, `test/e2e/patients-consents.e2e-spec.ts`.
+
+**Database migration:** `20260714144627_patients_care_team_consents` — `patients`, `patient_care_team`, `consents`, `consent_events` tables; handwritten additions: `blood_type` CHECK constraint (9 allowed values, no enum-translation layer), `consents`/`consent_events` `type` CHECK constraint (3 frontend-confirmed values), `patient_care_team` interval CHECK (`ends_at > starts_at`), and a new generic `prevent_append_only_mutation()` trigger function (append-only enforcement for `consent_events`, mirroring `audit_events`'s pattern but table-name-aware in its error message).
+
+**Endpoints implemented (all exact `docs/api.md` section 25 paths):**
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/api/v1/patients` | Patient role → forced to own record (D-016); staff roles → org-scoped list; unauthorized roles → 403 |
+| GET | `/api/v1/patients/{patientId}` | `PatientDetailResponse`; DB-scoped visibility query, 404 on both not-found and not-visible (IDOR-safe) |
+| PATCH | `/api/v1/patients/{patientId}` | Field-level policy: self/receptionist → contact fields only; medical_administrator → all fields including `primaryDoctorId` |
+| GET | `/api/v1/patients/{patientId}/consents` | Self or medical_administrator (read-only, org-scoped) |
+| POST | `/api/v1/patients/{patientId}/consent-grants` | Self only; Idempotency-Key required; 200 (D-018) |
+| POST | `/api/v1/patients/{patientId}/consent-withdrawals` | Self only; Idempotency-Key required; optimistic version check; 200 |
+
+**Authorization policies implemented:** `resolvePatientListScope`, `assertUpdateFieldsAllowed` (throws — never silently drops — on a disallowed field), `assertCanChangeConsent`, `canViewConsentReadOnly`, plus `PatientsRepository.findVisibleById`'s DB-scoped `OR` query (self / primary doctor / active care-team member / org-wide admin-or-receptionist), all in `src/modules/patients/policies/patient-policies.ts`.
+
+**Tests added:**
+- Unit (16 tests, `patient-policies.spec.ts`): list-scope resolution per role, field-update authorization per role/field, consent change/view authorization.
+- Integration (9 tests, `patients-consents.spec.ts`, real Postgres): unique code per org, blood-type CHECK, optimistic version conflict, care-team interval CHECK, one-current-row-per-type, consent-type CHECK, `consent_events` append-only (Prisma + raw SQL), withdrawal preserves grant history, transaction rollback leaves no partial state.
+- E2E (15 tests, `patients-consents.e2e-spec.ts`, 7 actors across 2 organizations): all 14 scenarios from the task's required list, plus a genuine-403 case (receptionist can view but not change consent) and a DTO-whitelist mass-assignment rejection test.
+
+**Actual test results (2026-07-14, re-verified against a freshly-recreated empty test database, Node v22.23.1):**
+```
+npm run typecheck          → 0 errors
+npm run lint                → 0 errors
+npm run build                → exit 0
+npm run test                  → 3 suites, 26 tests passed
+npm run test:integration      → 4 suites, 26 tests passed (no --forceExit)
+npm run test:e2e              → 3 suites, 25 tests passed (no --forceExit)
+npx prisma migrate deploy (empty DB) → 6 migrations applied cleanly
+npm run db:seed (run twice)   → 1 patient / 3 consents / 1 care-team row, unchanged on 2nd run
+npm run openapi:generate      → 17 paths, all matching docs/api.md exactly
+```
+
+**Two real bugs found and fixed during test-writing (not just spec-compliance judgment calls):**
+1. `PatientsService.update`'s field-authorization check used `Object.keys(dto)`, which — under `target: ES2022`'s native class-field semantics — returns every field the DTO class *declares*, not just the ones the client actually sent (undeclared fields become own properties initialized to `undefined`). Fixed by checking each field against `undefined` explicitly. Caught by the e2e "patient can update their own contact fields" test unexpectedly returning 403.
+2. Consent grant/withdrawal defaulted to NestJS's implicit 201 for POST; fixed to explicit 200 per the "commands return 200" HTTP rule (D-018).
+
+**Seed data added:** one `Patient` row (`PT-1029`, matching frontend `seed.ts` with gender normalized `Nam`→`male` and the real-looking `@gmail.com` contact email replaced with the fictional `@example.test` one already used for the account), linked to the existing `bs.nguyenthian@example.test` doctor as `primaryDoctorId`, one `primary_doctor` care-team row, and the frontend's three consent fixtures (`data_processing`/`research_data_sharing` granted, `telemedicine` withdrawn).
+
+**Decisions requiring interpretation (full detail in `docs/BACKEND_DECISION_LOG.md`):** D-016 (list-as-self-lookup), D-017 (no field redaction — contract's `bloodType` is non-nullable), D-018 (200 not 201), D-019 (care-team has no dedicated endpoint), D-020 (`primaryDoctorId` → `users.id` pending T05), D-021 (`clinicId` filter accepted but inert), D-022 (consent-type CHECK constraint catalog).
+
+**OpenAPI status:** `docs/openapi.json` regenerated, 17 paths total, all matching `docs/api.md`'s literal endpoint catalog exactly (verified path-by-path).
+
+**Next dependency-safe task:** T05 — clinics, practitioners, schedules, and availability (depends on T03, now satisfied; parallel to T04, now also satisfied).
+
+---
+
+## T05–T18
+
+**Status:** Not started. This is a large-scope continuation task; T04 and its prerequisite foundation fixes (F-001–F-006) represent substantial completed work for this session, but T05 through T18 (clinics/practitioners, appointments, check-in/queue, encounters, files, AI intake, clinical decisions, workflows ×2, medical records, care plans, notifications, progress/reports, integration ops) remain to be built in dependency order, each following the same pattern established here: read the exact `docs/api.md` section, inspect frontend evidence, migrate, implement policies/commands/queries, add unit/integration/e2e tests, regenerate OpenAPI, update these tracking docs, run all quality gates, then proceed to the next stage.

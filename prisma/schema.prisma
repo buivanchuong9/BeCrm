@@ -65,6 +65,7 @@ model Organization {
   clinicLocations ClinicLocation[]
   departments     Department[]
   memberships     UserMembership[]
+  patients        Patient[]
 
   @@map("organizations")
 }
@@ -128,6 +129,9 @@ model User {
   memberships     UserMembership[]
   refreshSessions RefreshSession[]
   preference      UserPreference?
+  patientProfile  Patient?                @relation("PatientOwner")
+  primaryDoctorOf Patient[]               @relation("PatientPrimaryDoctor")
+  careTeamOf      PatientCareTeamMember[]
 
   @@map("users")
 }
@@ -283,4 +287,108 @@ model AuditEvent {
   @@index([actorId, occurredAt])
   @@index([resourceType, resourceId])
   @@map("audit_events")
+}
+
+// ---------------------------------------------------------------------------
+// Patients, care team, and consent (T04)
+// ---------------------------------------------------------------------------
+
+enum PatientGender {
+  male
+  female
+  other
+  unknown
+}
+
+model Patient {
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String        @map("organization_id") @db.Uuid
+  code            String
+  userId          String?       @unique @map("user_id") @db.Uuid
+  name            String
+  dob             DateTime      @db.Date
+  gender          PatientGender @default(unknown)
+  phone           String
+  email           String?
+  address         String?
+  // Checked text, not a Prisma enum, so the raw '+'/'-' values ('A+','O-',...)
+  // from docs/api.md's BloodType union are stored/returned verbatim with no
+  // enum-identifier translation layer. Constrained by a CHECK in the SQL
+  // migration, not just application validation.
+  bloodType       String        @default("unknown") @map("blood_type")
+  primaryDoctorId String?       @map("primary_doctor_id") @db.Uuid
+  version         Int           @default(1)
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization  Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  user          User?                   @relation("PatientOwner", fields: [userId], references: [id], onDelete: SetNull)
+  primaryDoctor User?                   @relation("PatientPrimaryDoctor", fields: [primaryDoctorId], references: [id], onDelete: SetNull)
+  consents      Consent[]
+  careTeam      PatientCareTeamMember[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId])
+  @@index([primaryDoctorId])
+  @@map("patients")
+}
+
+model PatientCareTeamMember {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patientId    String    @map("patient_id") @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  // 'primary_doctor' | 'assigned_doctor' | 'assigned_nurse' | ... — open text
+  // rather than an enum since the confirmed relationship vocabulary will grow
+  // as T06 (appointments) and T08 (encounters) start populating this table.
+  relationship String
+  startsAt     DateTime  @default(now()) @map("starts_at") @db.Timestamptz
+  endsAt       DateTime? @map("ends_at") @db.Timestamptz
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([patientId])
+  @@index([userId])
+  @@map("patient_care_team")
+}
+
+// "current" projection: exactly one row per (patient, type). Historical
+// grant/withdraw events live in ConsentEvent (append-only, see migration
+// 20260714144627_patients_care_team_consents for the immutability trigger).
+model Consent {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patientId     String    @map("patient_id") @db.Uuid
+  type          String
+  policyVersion String    @map("policy_version")
+  granted       Boolean
+  grantedAt     DateTime? @map("granted_at") @db.Timestamptz
+  withdrawnAt   DateTime? @map("withdrawn_at") @db.Timestamptz
+  version       Int       @default(1)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  patient Patient        @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  events  ConsentEvent[]
+
+  @@unique([patientId, type])
+  @@index([patientId])
+  @@map("consents")
+}
+
+model ConsentEvent {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  consentId     String   @map("consent_id") @db.Uuid
+  patientId     String   @map("patient_id") @db.Uuid
+  type          String
+  action        String
+  policyVersion String   @map("policy_version")
+  actorId       String?  @map("actor_id") @db.Uuid
+  reason        String?
+  occurredAt    DateTime @default(now()) @map("occurred_at") @db.Timestamptz
+
+  consent Consent @relation(fields: [consentId], references: [id], onDelete: Restrict)
+
+  @@index([patientId, occurredAt])
+  @@map("consent_events")
 }

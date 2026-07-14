@@ -22,6 +22,7 @@ import { RolesGuard } from './common/authorization/roles.guard';
 
 import { IdentityModule } from './modules/identity/identity.module';
 import { OrganizationsModule } from './modules/organizations/organizations.module';
+import { PatientsModule } from './modules/patients/patients.module';
 import { HealthModule } from './modules/health/health.module';
 
 @Module({
@@ -73,6 +74,7 @@ import { HealthModule } from './modules/health/health.module';
 
     IdentityModule,
     OrganizationsModule,
+    PatientsModule,
     HealthModule,
   ],
   providers: [

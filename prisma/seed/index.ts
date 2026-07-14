@@ -211,6 +211,8 @@ async function main() {
     },
   ];
 
+  const userIdByEmail = new Map<string, string>();
+
   for (const def of users) {
     const user = await prisma.user.upsert({
       where: { email: def.email },
@@ -223,6 +225,7 @@ async function main() {
         emailVerifiedAt: new Date(),
       },
     });
+    userIdByEmail.set(def.email, user.id);
 
     const departmentId = def.departmentCode ? (departments.get(def.departmentCode)?.id ?? null) : null;
     const clinicLocationId = def.clinicScoped ? clinic.id : null;
@@ -251,6 +254,80 @@ async function main() {
         },
       });
     }
+  }
+
+  // T04: one seeded patient, correcting the frontend's single seed patient
+  // (seed.ts PT-1029 "Nguyễn Văn A") — gender normalized from the frontend's
+  // Vietnamese 'Nam' literal to the API's 'male'/'female'/'other'/'unknown'
+  // enum, and the frontend's real-looking @gmail.com contact email replaced
+  // with the same fictional @example.test address used for the account login.
+  const patientUserId = userIdByEmail.get('nguyenvana@example.test');
+  const primaryDoctorId = userIdByEmail.get('bs.nguyenthian@example.test');
+  if (!patientUserId || !primaryDoctorId) {
+    throw new Error('Expected seeded patient/doctor users to exist before creating the Patient row.');
+  }
+
+  const patient = await prisma.patient.upsert({
+    where: { organizationId_code: { organizationId: organization.id, code: 'PT-1029' } },
+    update: {
+      userId: patientUserId,
+      name: 'Nguyễn Văn A',
+      dob: new Date('1995-03-15T00:00:00.000Z'),
+      gender: 'male',
+      phone: '0912 345 678',
+      email: 'nguyenvana@example.test',
+      address: 'Q. Bình Thạnh, TP.HCM',
+      bloodType: 'O+',
+      primaryDoctorId,
+    },
+    create: {
+      organizationId: organization.id,
+      code: 'PT-1029',
+      userId: patientUserId,
+      name: 'Nguyễn Văn A',
+      dob: new Date('1995-03-15T00:00:00.000Z'),
+      gender: 'male',
+      phone: '0912 345 678',
+      email: 'nguyenvana@example.test',
+      address: 'Q. Bình Thạnh, TP.HCM',
+      bloodType: 'O+',
+      primaryDoctorId,
+    },
+  });
+
+  const existingPrimaryCareTeam = await prisma.patientCareTeamMember.findFirst({
+    where: { patientId: patient.id, relationship: 'primary_doctor', endsAt: null },
+  });
+  if (!existingPrimaryCareTeam) {
+    await prisma.patientCareTeamMember.create({
+      data: { patientId: patient.id, userId: primaryDoctorId, relationship: 'primary_doctor' },
+    });
+  }
+
+  // Matches seed.ts's three consent fixtures (CONSENT-1/2/3): two granted,
+  // one withdrawn — proving the append-only grant/withdraw history round-trips.
+  const consentDefs: Array<{
+    type: 'data_processing' | 'research_data_sharing' | 'telemedicine';
+    granted: boolean;
+  }> = [
+    { type: 'data_processing', granted: true },
+    { type: 'research_data_sharing', granted: true },
+    { type: 'telemedicine', granted: false },
+  ];
+  for (const def of consentDefs) {
+    const now = new Date();
+    await prisma.consent.upsert({
+      where: { patientId_type: { patientId: patient.id, type: def.type } },
+      update: {},
+      create: {
+        patientId: patient.id,
+        type: def.type,
+        policyVersion: '1.0',
+        granted: def.granted,
+        grantedAt: def.granted ? now : null,
+        withdrawnAt: def.granted ? null : now,
+      },
+    });
   }
 
   // eslint-disable-next-line no-console

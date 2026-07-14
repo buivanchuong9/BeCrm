@@ -480,6 +480,301 @@
         ]
       }
     },
+    "/api/v1/patients": {
+      "get": {
+        "operationId": "PatientsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/PatientResponseDto"
+                          }
+                        },
+                        "meta": {
+                          "type": "object"
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "patients"
+        ]
+      }
+    },
+    "/api/v1/patients/{patientId}": {
+      "get": {
+        "operationId": "PatientsController_detail",
+        "parameters": [
+          {
+            "name": "patientId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/PatientDetailResponseDto"
+                        },
+                        "meta": {
+                          "type": "object"
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "patients"
+        ]
+      },
+      "patch": {
+        "operationId": "PatientsController_update",
+        "parameters": [
+          {
+            "name": "patientId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePatientRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/PatientResponseDto"
+                        },
+                        "meta": {
+                          "type": "object"
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "patients"
+        ]
+      }
+    },
+    "/api/v1/patients/{patientId}/consents": {
+      "get": {
+        "operationId": "ConsentsController_list",
+        "parameters": [
+          {
+            "name": "patientId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/ConsentResponseDto"
+                          }
+                        },
+                        "meta": {
+                          "type": "object"
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "consents"
+        ]
+      }
+    },
+    "/api/v1/patients/{patientId}/consent-grants": {
+      "post": {
+        "operationId": "ConsentsController_grant",
+        "parameters": [
+          {
+            "name": "patientId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateConsentGrantRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/ConsentResponseDto"
+                        },
+                        "meta": {
+                          "type": "object"
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "consents"
+        ]
+      }
+    },
+    "/api/v1/patients/{patientId}/consent-withdrawals": {
+      "post": {
+        "operationId": "ConsentsController_withdraw",
+        "parameters": [
+          {
+            "name": "patientId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateConsentWithdrawalRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/ConsentResponseDto"
+                        },
+                        "meta": {
+                          "type": "object"
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "consents"
+        ]
+      }
+    },
     "/health/live": {
       "get": {
         "operationId": "HealthController_live",
@@ -1046,6 +1341,413 @@
           "code",
           "name",
           "status"
+        ]
+      },
+      "ReferenceResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "PatientResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "object",
+            "format": "uuid",
+            "nullable": true
+          },
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "dob": {
+            "type": "string",
+            "format": "date"
+          },
+          "gender": {
+            "type": "string",
+            "enum": [
+              "male",
+              "female",
+              "other",
+              "unknown"
+            ]
+          },
+          "phone": {
+            "type": "string"
+          },
+          "email": {
+            "type": "object",
+            "nullable": true
+          },
+          "address": {
+            "type": "object",
+            "nullable": true
+          },
+          "bloodType": {
+            "type": "string",
+            "enum": [
+              "A+",
+              "A-",
+              "B+",
+              "B-",
+              "AB+",
+              "AB-",
+              "O+",
+              "O-",
+              "unknown"
+            ]
+          },
+          "primaryDoctor": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ReferenceResponseDto"
+              }
+            ]
+          },
+          "version": {
+            "type": "number"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "userId",
+          "organizationId",
+          "name",
+          "dob",
+          "gender",
+          "phone",
+          "email",
+          "address",
+          "bloodType",
+          "primaryDoctor",
+          "version",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "ConsentSummaryItemDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "granted": {
+            "type": "boolean"
+          },
+          "policyVersion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "granted",
+          "policyVersion"
+        ]
+      },
+      "PatientDetailResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "object",
+            "format": "uuid",
+            "nullable": true
+          },
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "dob": {
+            "type": "string",
+            "format": "date"
+          },
+          "gender": {
+            "type": "string",
+            "enum": [
+              "male",
+              "female",
+              "other",
+              "unknown"
+            ]
+          },
+          "phone": {
+            "type": "string"
+          },
+          "email": {
+            "type": "object",
+            "nullable": true
+          },
+          "address": {
+            "type": "object",
+            "nullable": true
+          },
+          "bloodType": {
+            "type": "string",
+            "enum": [
+              "A+",
+              "A-",
+              "B+",
+              "B-",
+              "AB+",
+              "AB-",
+              "O+",
+              "O-",
+              "unknown"
+            ]
+          },
+          "primaryDoctor": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ReferenceResponseDto"
+              }
+            ]
+          },
+          "version": {
+            "type": "number"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "activeAppointmentCount": {
+            "type": "number"
+          },
+          "activeEncounterId": {
+            "type": "object",
+            "format": "uuid",
+            "nullable": true
+          },
+          "activeCarePlanId": {
+            "type": "object",
+            "format": "uuid",
+            "nullable": true
+          },
+          "consentSummary": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConsentSummaryItemDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "userId",
+          "organizationId",
+          "name",
+          "dob",
+          "gender",
+          "phone",
+          "email",
+          "address",
+          "bloodType",
+          "primaryDoctor",
+          "version",
+          "createdAt",
+          "updatedAt",
+          "activeAppointmentCount",
+          "activeEncounterId",
+          "activeCarePlanId",
+          "consentSummary"
+        ]
+      },
+      "UpdatePatientRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "dob": {
+            "type": "string",
+            "format": "date",
+            "example": "1995-03-15"
+          },
+          "gender": {
+            "type": "string",
+            "enum": [
+              "male",
+              "female",
+              "other",
+              "unknown"
+            ]
+          },
+          "phone": {
+            "type": "string"
+          },
+          "email": {
+            "type": "object",
+            "nullable": true
+          },
+          "address": {
+            "type": "object",
+            "nullable": true
+          },
+          "bloodType": {
+            "type": "string",
+            "enum": [
+              "A+",
+              "A-",
+              "B+",
+              "B-",
+              "AB+",
+              "AB-",
+              "O+",
+              "O-",
+              "unknown"
+            ]
+          },
+          "primaryDoctorId": {
+            "type": "object",
+            "format": "uuid",
+            "nullable": true
+          },
+          "version": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "version"
+        ]
+      },
+      "ConsentResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "patientId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "type": {
+            "type": "string"
+          },
+          "policyVersion": {
+            "type": "string"
+          },
+          "granted": {
+            "type": "boolean"
+          },
+          "grantedAt": {
+            "type": "object",
+            "format": "date-time",
+            "nullable": true
+          },
+          "withdrawnAt": {
+            "type": "object",
+            "format": "date-time",
+            "nullable": true
+          },
+          "version": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "patientId",
+          "type",
+          "policyVersion",
+          "granted",
+          "grantedAt",
+          "withdrawnAt",
+          "version"
+        ]
+      },
+      "CreateConsentGrantRequest": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "data_processing",
+              "research_data_sharing",
+              "telemedicine"
+            ]
+          },
+          "policyVersion": {
+            "type": "string"
+          },
+          "grantedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "type",
+          "policyVersion"
+        ]
+      },
+      "CreateConsentWithdrawalRequest": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "data_processing",
+              "research_data_sharing",
+              "telemedicine"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "version": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "type",
+          "version"
         ]
       }
     }
