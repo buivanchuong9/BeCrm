@@ -1,0 +1,282 @@
+// DermaHealth backend — Prisma schema (T01/T02/T03 foundation).
+// GiST exclusion constraints, citext, partial indexes and the append-only
+// audit trigger are added via handwritten SQL in prisma/migrations — Prisma's
+// declarative schema cannot express them.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [citext]
+}
+
+// ---------------------------------------------------------------------------
+// Identity / organization scope (T03)
+// ---------------------------------------------------------------------------
+
+enum UserRole {
+  super_administrator
+  patient
+  doctor
+  nurse
+  receptionist
+  lab_technician
+  imaging_technician
+  pharmacist
+  care_coordinator
+  customer_care_employee
+  medical_administrator
+  system_administrator
+  clinical_process_designer
+}
+
+enum UserStatus {
+  pending_activation
+  active
+  suspended
+  deactivated
+}
+
+enum MembershipStatus {
+  active
+  revoked
+}
+
+enum ClinicLocationStatus {
+  active
+  inactive
+}
+
+model Organization {
+  id          String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code        String                @unique
+  name        String
+  timezone    String                @default("Asia/Ho_Chi_Minh")
+  addressJson Json?                 @map("address_json")
+  status      ClinicLocationStatus  @default(active)
+  version     Int                   @default(1)
+  createdAt   DateTime              @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime              @updatedAt @map("updated_at") @db.Timestamptz
+
+  clinicLocations ClinicLocation[]
+  departments     Department[]
+  memberships     UserMembership[]
+
+  @@map("organizations")
+}
+
+model ClinicLocation {
+  id             String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String                @map("organization_id") @db.Uuid
+  code           String
+  name           String
+  timezone       String                @default("Asia/Ho_Chi_Minh")
+  addressJson    Json?                 @map("address_json")
+  status         ClinicLocationStatus  @default(active)
+  createdAt      DateTime              @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime              @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  departments  Department[]
+  memberships  UserMembership[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId])
+  @@map("clinic_locations")
+}
+
+model Department {
+  id               String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId   String                @map("organization_id") @db.Uuid
+  clinicLocationId String?               @map("clinic_location_id") @db.Uuid
+  code             String
+  name             String
+  status           ClinicLocationStatus  @default(active)
+  createdAt        DateTime              @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime              @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  clinicLocation ClinicLocation?  @relation(fields: [clinicLocationId], references: [id], onDelete: Restrict)
+  memberships    UserMembership[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId])
+  @@map("departments")
+}
+
+model User {
+  id               String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email            String     @unique @db.Citext
+  passwordHash     String?    @map("password_hash")
+  displayName      String     @map("display_name")
+  phone            String?
+  avatarFileId     String?    @map("avatar_file_id") @db.Uuid
+  status           UserStatus @default(pending_activation)
+  mfaEnabled       Boolean    @default(false) @map("mfa_enabled")
+  mfaSecretEnc     String?    @map("mfa_secret_enc")
+  emailVerifiedAt  DateTime?  @map("email_verified_at") @db.Timestamptz
+  failedLoginCount Int        @default(0) @map("failed_login_count")
+  lockedUntil      DateTime?  @map("locked_until") @db.Timestamptz
+  version          Int        @default(1)
+  createdAt        DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime   @updatedAt @map("updated_at") @db.Timestamptz
+
+  memberships     UserMembership[]
+  refreshSessions RefreshSession[]
+  preference      UserPreference?
+
+  @@map("users")
+}
+
+model UserPreference {
+  userId               String   @id @map("user_id") @db.Uuid
+  locale               String   @default("vi-VN")
+  timezone             String   @default("Asia/Ho_Chi_Minh")
+  dateFormat           String   @default("DD/MM/YYYY") @map("date_format")
+  theme                String   @default("system")
+  notificationChannels Json     @default("{\"inApp\":true,\"email\":true,\"sms\":false,\"push\":false}") @map("notification_channels")
+  deviceSettings       Json     @default("{\"biometricLogin\":false,\"mobileNotifications\":true}") @map("device_settings")
+  version              Int      @default(1)
+  updatedAt            DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_preferences")
+}
+
+model UserMembership {
+  id               String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String            @map("user_id") @db.Uuid
+  organizationId   String            @map("organization_id") @db.Uuid
+  clinicLocationId String?           @map("clinic_location_id") @db.Uuid
+  departmentId     String?           @map("department_id") @db.Uuid
+  role             UserRole
+  status           MembershipStatus  @default(active)
+  startsAt         DateTime          @default(now()) @map("starts_at") @db.Timestamptz
+  endsAt           DateTime?         @map("ends_at") @db.Timestamptz
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz
+
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  clinicLocation ClinicLocation? @relation(fields: [clinicLocationId], references: [id], onDelete: Restrict)
+  department     Department?     @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, organizationId, clinicLocationId, role], name: "uniq_membership_scope_role")
+  @@index([organizationId, role])
+  @@index([userId])
+  @@map("user_memberships")
+}
+
+model RefreshSession {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+  familyId       String    @map("family_id") @db.Uuid
+  tokenHash      String    @unique @map("token_hash")
+  deviceLabel    String?   @map("device_label")
+  ip             String?
+  userAgent      String?   @map("user_agent")
+  issuedAt       DateTime  @default(now()) @map("issued_at") @db.Timestamptz
+  expiresAt      DateTime  @map("expires_at") @db.Timestamptz
+  revokedAt      DateTime? @map("revoked_at") @db.Timestamptz
+  revokedReason  String?   @map("revoked_reason")
+  replacedById   String?   @map("replaced_by_id") @db.Uuid
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+  @@map("refresh_sessions")
+}
+
+// ---------------------------------------------------------------------------
+// Platform foundation (T02): audit, transactional outbox, idempotency
+// ---------------------------------------------------------------------------
+
+enum IdempotencyStatus {
+  in_progress
+  completed
+  failed
+}
+
+model IdempotencyRecord {
+  id                 String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  // Nullable principal (anonymous kiosk/public callers) is stored as the fixed
+  // NIL UUID sentinel, never SQL NULL — Postgres treats NULL as distinct per row
+  // in unique constraints, which would silently defeat idempotency dedup.
+  principalId        String            @map("principal_id") @db.Uuid
+  principalScope     String            @map("principal_scope")
+  route              String
+  target             String            @default("")
+  idempotencyKey     String            @map("idempotency_key")
+  requestFingerprint String            @map("request_fingerprint")
+  status             IdempotencyStatus @default(in_progress)
+  responseStatus     Int?              @map("response_status")
+  responseBody       Json?             @map("response_body")
+  expiresAt          DateTime          @map("expires_at") @db.Timestamptz
+  createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime          @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@unique([principalScope, principalId, route, target, idempotencyKey], name: "uniq_idempotency_scope")
+  @@index([expiresAt])
+  @@map("idempotency_records")
+}
+
+enum OutboxStatus {
+  pending
+  dispatched
+  failed
+}
+
+model OutboxEvent {
+  id            String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  aggregateType String       @map("aggregate_type")
+  aggregateId   String       @map("aggregate_id") @db.Uuid
+  eventType     String       @map("event_type")
+  payload       Json
+  deliveryKey   String       @map("delivery_key")
+  status        OutboxStatus @default(pending)
+  attempts      Int          @default(0)
+  availableAt   DateTime     @default(now()) @map("available_at") @db.Timestamptz
+  lastError     String?      @map("last_error")
+  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  dispatchedAt  DateTime?    @map("dispatched_at") @db.Timestamptz
+
+  @@unique([deliveryKey])
+  @@index([status, availableAt])
+  @@map("outbox_events")
+}
+
+model AuditEvent {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  occurredAt       DateTime @default(now()) @map("occurred_at") @db.Timestamptz
+  actorId          String?  @map("actor_id") @db.Uuid
+  actorRoleSnap    String?  @map("actor_role_snapshot")
+  actorNameSnap    String?  @map("actor_name_snapshot")
+  action           String
+  resourceType     String   @map("resource_type")
+  resourceId       String?  @map("resource_id") @db.Uuid
+  patientId        String?  @map("patient_id") @db.Uuid
+  organizationId   String?  @map("organization_id") @db.Uuid
+  clinicLocationId String?  @map("clinic_location_id") @db.Uuid
+  requestId        String?  @map("request_id") @db.Uuid
+  ip               String?
+  userAgent        String?  @map("user_agent")
+  result           String
+  reason           String?
+  changedFields    Json?    @map("changed_fields")
+  beforeRedacted   Json?    @map("before_redacted")
+  afterRedacted    Json?    @map("after_redacted")
+  breakGlass       Boolean  @default(false) @map("break_glass")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([organizationId, occurredAt])
+  @@index([patientId, occurredAt])
+  @@index([actorId, occurredAt])
+  @@index([resourceType, resourceId])
+  @@map("audit_events")
+}

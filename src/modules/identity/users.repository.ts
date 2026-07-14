@@ -1,0 +1,125 @@
+import { Injectable } from '@nestjs/common';
+import { Prisma, User } from '@prisma/client';
+import { PrismaService } from '../../infrastructure/database/prisma.service';
+import { MembershipScope } from '../../common/auth/auth.types';
+import { ConflictAppError, NotFoundAppError } from '../../common/errors/app-error';
+
+export type UserWithMemberships = User & {
+  memberships: Array<{
+    organizationId: string;
+    clinicLocationId: string | null;
+    departmentId: string | null;
+    role: MembershipScope['role'];
+  }>;
+};
+
+const activeMembershipsInclude = {
+  memberships: {
+    where: { status: 'active' as const },
+    orderBy: { createdAt: 'asc' as const },
+    select: { organizationId: true, clinicLocationId: true, departmentId: true, role: true },
+  },
+} satisfies Prisma.UserInclude;
+
+/** Pure persistence: no authorization decisions, no password verification. */
+@Injectable()
+export class UsersRepository {
+  constructor(private readonly prisma: PrismaService) {}
+
+  findByEmailWithMemberships(email: string): Promise<UserWithMemberships | null> {
+    return this.prisma.user.findUnique({
+      where: { email },
+      include: activeMembershipsInclude,
+    });
+  }
+
+  findByIdWithMemberships(id: string): Promise<UserWithMemberships | null> {
+    return this.prisma.user.findUnique({
+      where: { id },
+      include: activeMembershipsInclude,
+    });
+  }
+
+  async registerFailedLogin(id: string, lockThreshold: number, lockMinutes: number): Promise<void> {
+    const user = await this.prisma.user.update({
+      where: { id },
+      data: { failedLoginCount: { increment: 1 } },
+    });
+    if (user.failedLoginCount >= lockThreshold) {
+      await this.prisma.user.update({
+        where: { id },
+        data: { lockedUntil: new Date(Date.now() + lockMinutes * 60_000) },
+      });
+    }
+  }
+
+  resetFailedLogin(id: string): Promise<User> {
+    return this.prisma.user.update({
+      where: { id },
+      data: { failedLoginCount: 0, lockedUntil: null },
+    });
+  }
+
+  async updateProfile(
+    id: string,
+    version: number,
+    data: { displayName?: string; phone?: string; avatarFileId?: string },
+  ): Promise<UserWithMemberships> {
+    const result = await this.prisma.user.updateMany({
+      where: { id, version },
+      data: { ...data, version: { increment: 1 } },
+    });
+    if (result.count === 0) {
+      throw new ConflictAppError(
+        'OPTIMISTIC_LOCK_FAILED',
+        'The account was modified by another request.',
+      );
+    }
+    const updated = await this.findByIdWithMemberships(id);
+    if (!updated) {
+      throw new NotFoundAppError('User not found.');
+    }
+    return updated;
+  }
+
+  async list(params: {
+    page: number;
+    limit: number;
+    search?: string;
+    role?: MembershipScope['role'];
+    status?: User['status'];
+  }): Promise<{ rows: UserWithMemberships[]; total: number }> {
+    const where: Prisma.UserWhereInput = {
+      ...(params.search
+        ? {
+            OR: [
+              { displayName: { contains: params.search, mode: 'insensitive' } },
+              { email: { contains: params.search, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+      ...(params.status ? { status: params.status } : {}),
+      ...(params.role ? { memberships: { some: { role: params.role, status: 'active' } } } : {}),
+    };
+    const [rows, total] = await this.prisma.$transaction([
+      this.prisma.user.findMany({
+        where,
+        include: activeMembershipsInclude,
+        orderBy: { createdAt: 'asc' },
+        skip: (params.page - 1) * params.limit,
+        take: params.limit,
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+    return { rows, total };
+  }
+
+  toMembershipScopes(user: UserWithMemberships): MembershipScope[] {
+    return user.memberships.map((m) => ({
+      organizationId: m.organizationId,
+      clinicLocationId: m.clinicLocationId,
+      departmentId: m.departmentId,
+      role: m.role,
+    }));
+  }
+}
