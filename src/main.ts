@@ -15,16 +15,17 @@ async function bootstrap() {
 
   const config = app.get(ConfigService<AppConfiguration, true>);
 
+  const swaggerVersion = '2.0.0';
   const swaggerConfig = new DocumentBuilder()
     .setTitle('DermaHealth Backend API')
     .setDescription('Clinic workflow backend: identity, scheduling, clinical, workflow, EMR, CRM.')
-    .setVersion('2.0.0')
+    .setVersion(swaggerVersion)
     .addBearerAuth()
     .addCookieAuth('refresh_token')
     .build();
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api/docs', app, document);
-  SwaggerModule.setup('api/docs-v2', app, document);
+  SwaggerModule.setup(`api/docs/${swaggerVersion}`, app, document);
 
   const port = config.get('port', { infer: true });
   await app.listen(port);
