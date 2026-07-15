@@ -1,33 +1,13 @@
 # Deployment
 
-There are two supported deployment flows for this backend.
+This backend is deployed manually with Docker.
 
-## 1. GitHub Actions on push to `main`
-
-The tracked workflow at `.github/workflows/deploy.yml` runs on every push to `main` and can also be started manually.
-
-Required secrets:
-
-- `DEPLOY_HOST`
-- `DEPLOY_USER`
-- `DEPLOY_SSH_KEY`
-- `DEPLOY_PORT`
-- `DEPLOY_PATH`
-
-That workflow SSHes into the server, updates the checked-out repository, rebuilds the production containers, and runs Prisma migrations.
-
-## 2. Server-side `git pull`
-
-If you want deployment to happen when the server itself runs `git pull origin main`, configure the checked-out repository on the server to use the tracked hooks directory once:
+On the server, update the code, then rebuild the production containers and run migrations:
 
 ```sh
-./scripts/install-deploy-hook.sh
-git pull
+git pull origin main
+docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.prod.yml run --rm api npm run db:migrate
 ```
 
-After that, a successful `git pull` will trigger `.githooks/post-merge`, which runs `scripts/deploy-prod.sh`.
-
-The script does the same production steps as the GitHub Actions workflow:
-
-- `docker compose -f docker-compose.prod.yml up -d --build`
-- `docker compose -f docker-compose.prod.yml run --rm api npm run db:migrate`
+If you want the same commands in one place, use `scripts/deploy-prod.sh` directly.
