@@ -1,0 +1,82 @@
+# Production deployment target for the DermaHealth backend. Distinct from
+# docker-compose.yml (local dev: bind-mounted source, --watch, dev seed).
+#
+# Usage on the Ubuntu host:
+#   cp .env.example .env.production   # fill in real secrets, NODE_ENV=production
+#   docker compose -f docker-compose.prod.yml up -d --build
+#   docker compose -f docker-compose.prod.yml run --rm api npm run db:migrate
+#
+# Seeding is intentionally NOT run here — prisma/seed/index.ts refuses to run
+# when NODE_ENV=production (spec requirement; dev credentials must never be
+# seeded into a production database).
+#
+# MinIO/Mailpit are dev-only stand-ins and are deliberately not included here
+# — point S3_*/SMTP_* in .env.production at real object storage and a real
+# mail provider instead (see .env.example).
+
+name: dermahealth
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.production}
+      POSTGRES_DB: ${POSTGRES_DB:-dermahealth}
+    volumes:
+      - dermahealth_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-app} -d ${POSTGRES_DB:-dermahealth}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    # No host port published — reachable only from other containers on this
+    # network. Use `docker compose -f docker-compose.prod.yml exec postgres psql ...`
+    # for ad-hoc access instead of exposing 5432 publicly.
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - dermahealth_redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: dermahealth-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env.production
+    ports:
+      # 127.0.0.1-only: nginx on the same host is the public entry point and
+      # terminates TLS (see nginx/dermahealth.host.conf.example) — the app
+      # port itself is never exposed to the internet directly.
+      - '127.0.0.1:43000:3000'
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "require('http').get('http://localhost:3000/health/live', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  dermahealth_postgres_data:
+  dermahealth_redis_data:

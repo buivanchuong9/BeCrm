@@ -2,11 +2,11 @@ node_modules/
 dist/
 coverage/
 .env
-.env.*.local
+.env.*
+!.env.example
 *.log
 .DS_Store
 /prisma/*.db
 /tmp/
 .devkeys/
 .claude/
-.env.test

@@ -1,0 +1,85 @@
+# Nginx running as its own container on the same Docker network as the
+# DermaHealth API (alternative to dermahealth.host.conf.example, where nginx
+# runs directly on the Ubuntu host). Use this variant only if you add an
+# nginx service to docker-compose.prod.yml on the same network as `api` —
+# it is not wired in by default.
+#
+# Proxies to the `api` Compose service by its internal DNS name (Docker
+# Compose's default network gives every service a hostname equal to its
+# service name) and internal container port 3000 — NOT the host-published
+# 43000, which only matters for the host-nginx variant.
+#
+# DermaHealth API surface (see src/bootstrap.ts / src/main.ts): global prefix
+# /api (versioned /api/v1/...), Swagger UI at /api/docs, health checks
+# unprefixed at /health/live and /health/ready. There is no /authenticator,
+# /adminapi, /bpmapi, /notification, or /sale route — this backend is a single
+# NestJS modular monolith, not the legacy multi-service CareFollow backend.
+
+upstream dermahealth_be {
+    server api:3000;
+    keepalive 32;
+}
+
+server {
+    listen 80;
+    server_name dermahealth.fitdnu.id.vn;
+
+    server_tokens off;
+    client_max_body_size 25m;
+
+    gzip on;
+    gzip_comp_level 5;
+    gzip_min_length 256;
+    gzip_types
+        application/javascript
+        application/json
+        application/rss+xml
+        application/vnd.ms-fontobject
+        application/x-font-ttf
+        application/xml
+        font/opentype
+        image/svg+xml
+        text/css
+        text/plain
+        text/xml;
+
+    # Everything this backend serves lives under /api/... (REST + Swagger UI
+    # at /api/docs) or the unprefixed /health/{live,ready} checks.
+    location ~ ^/(api|health)(/|$) {
+        proxy_pass http://dermahealth_be;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Connection "";
+        proxy_read_timeout 60s;
+        proxy_send_timeout 60s;
+    }
+
+    location = /docs {
+        return 301 /api/docs;
+    }
+
+    # Optional: serve the DermaHealth frontend SPA from this same nginx once
+    # ../User has a production build and T19+ frontend integration has
+    # shipped. Uncomment and mount the build output into this container at
+    # /usr/share/nginx/html when that's ready — do not enable this against an
+    # empty/missing directory, it will just serve nginx's default 404s.
+    # root /usr/share/nginx/html;
+    # index index.html;
+    # location ~* \.(?:css|js|mjs|ico|gif|jpe?g|png|webp|svg|woff2?|ttf|eot)$ {
+    #     expires 30d;
+    #     add_header Cache-Control "public, immutable";
+    #     try_files $uri =404;
+    # }
+    # location / {
+    #     try_files $uri $uri/ /index.html;
+    # }
+
+    # Until the frontend is wired in above, anything outside /api and /health
+    # legitimately 404s rather than silently falling through to nothing.
+    location / {
+        return 404;
+    }
+}

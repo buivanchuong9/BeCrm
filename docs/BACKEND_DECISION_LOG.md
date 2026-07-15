@@ -215,3 +215,15 @@ Every UNKNOWN or ambiguous requirement resolved during implementation, in order 
 
 ---
 
+### D-023 — Production nginx configs rewritten to match this backend's actual routes
+
+**Decision:** The user supplied two nginx config drafts for deploying to `dermahealth.fitdnu.id.vn` (a host-nginx variant and a docker-compose-network variant), both written against an unrelated backend's route structure (`upstream carefollow_be`/`carefollow-be` container name; location blocks for `/authenticator`, `/adminapi`, `/bpmapi`, `/notification`, `/sale`). Confirmed with the user (via `AskUserQuestion`) that these were meant for *this* DermaHealth backend but needed fixing, not that a different backend was intended. Rewrote both as `nginx/dermahealth.host.conf.example` and `nginx/dermahealth.compose.conf.example`, routing only `/api/...` (REST + Swagger UI at `/api/docs`) and unprefixed `/health/{live,ready}` — this backend's actual surface per `src/bootstrap.ts`/`src/main.ts`. Added `docker-compose.prod.yml` (separate from the dev `docker-compose.yml`) so the host-nginx variant's assumed `127.0.0.1:43000 -> 3000` mapping actually exists somewhere; MinIO/Mailpit (dev-only stand-ins) are intentionally excluded from it.
+
+**Why:** Proxying to nonexistent routes would have made the deployed API completely unreachable through nginx (every request either 404s inside the app past the global `/api` prefix mismatch, or hits nginx's fallback `/` block). Fixing the location blocks to match reality was necessary for the stated goal ("deploy BE so the docs are reachable") to actually work.
+
+**Also fixed while here:** `.gitignore` did not actually cover `.env.production` or other `.env.*` variants (only `.env` exactly and `.env.*.local` — a real gap, since a real secrets file matching that exact pattern could have been committed). Broadened to `.env.*` with an explicit `!.env.example` negation.
+
+**Reference:** `nginx/dermahealth.host.conf.example`, `nginx/dermahealth.compose.conf.example`, `docker-compose.prod.yml`, `.gitignore`.
+
+---
+
