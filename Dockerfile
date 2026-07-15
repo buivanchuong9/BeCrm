@@ -13,7 +13,10 @@ RUN npm run build
 
 FROM base AS runtime
 ENV NODE_ENV=production
-COPY --from=deps /app/node_modules ./node_modules
+# The build stage runs `prisma generate`, which writes the schema-specific
+# client (including enums such as UserRole) into node_modules. Copy that
+# generated client into the runtime image instead of the pre-generation deps.
+COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/prisma ./prisma
 COPY package.json ./
