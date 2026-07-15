@@ -1,0 +1,11 @@
+#!/usr/bin/env sh
+
+set -eu
+
+ROOT_DIR=$(git rev-parse --show-toplevel)
+
+if [ -x "$ROOT_DIR/scripts/deploy-prod.sh" ]; then
+  "$ROOT_DIR/scripts/deploy-prod.sh"
+else
+  sh "$ROOT_DIR/scripts/deploy-prod.sh"
+fi
