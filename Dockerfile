@@ -10,6 +10,7 @@ FROM deps AS build
 COPY . .
 RUN npx prisma generate
 RUN npm run build
+RUN test -f dist/main.js
 
 FROM base AS runtime
 ENV NODE_ENV=production

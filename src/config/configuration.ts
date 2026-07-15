@@ -1,5 +1,15 @@
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import { EnvConfig } from './env.validation';
-import packageJson from '../../package.json';
+
+function packageVersion(): string {
+  // Avoid a static JSON import outside src/: it changes TypeScript's inferred
+  // rootDir and moves the production entrypoint from dist/main.js to
+  // dist/src/main.js. The runtime image always copies package.json to /app.
+  const path = join(__dirname, '../../package.json');
+  const parsed = JSON.parse(readFileSync(path, 'utf8')) as { version: string };
+  return parsed.version;
+}
 
 export function buildConfiguration(env: EnvConfig) {
   return {
@@ -7,7 +17,7 @@ export function buildConfiguration(env: EnvConfig) {
     isProduction: env.NODE_ENV === 'production',
     port: env.PORT,
     apiBasePath: env.API_BASE_PATH,
-    documentation: { version: env.OPENAPI_VERSION ?? packageJson.version },
+    documentation: { version: env.OPENAPI_VERSION ?? packageVersion() },
     frontendOrigins: env.FRONTEND_ORIGINS.split(',').map((origin) => origin.trim()),
     appPublicUrl: env.APP_PUBLIC_URL,
     database: { url: env.DATABASE_URL },
