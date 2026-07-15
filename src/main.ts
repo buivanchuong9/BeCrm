@@ -24,6 +24,7 @@ async function bootstrap() {
     .build();
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api/docs', app, document);
+  SwaggerModule.setup('api/docs-v2', app, document);
 
   const port = config.get('port', { infer: true });
   await app.listen(port);
