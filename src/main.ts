@@ -18,7 +18,7 @@ async function bootstrap() {
   const swaggerConfig = new DocumentBuilder()
     .setTitle('DermaHealth Backend API')
     .setDescription('Clinic workflow backend: identity, scheduling, clinical, workflow, EMR, CRM.')
-    .setVersion('1.0')
+    .setVersion('2.0.0')
     .addBearerAuth()
     .addCookieAuth('refresh_token')
     .build();

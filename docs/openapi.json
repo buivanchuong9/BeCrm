@@ -801,7 +801,7 @@
   "info": {
     "title": "DermaHealth Backend API",
     "description": "Clinic workflow backend: identity, scheduling, clinical, workflow, EMR, CRM.",
-    "version": "1.0",
+    "version": "2.0.0",
     "contact": {}
   },
   "tags": [],
