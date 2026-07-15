@@ -1,4 +1,5 @@
 import { EnvConfig } from './env.validation';
+import packageJson from '../../package.json';
 
 export function buildConfiguration(env: EnvConfig) {
   return {
@@ -6,6 +7,7 @@ export function buildConfiguration(env: EnvConfig) {
     isProduction: env.NODE_ENV === 'production',
     port: env.PORT,
     apiBasePath: env.API_BASE_PATH,
+    documentation: { version: env.OPENAPI_VERSION ?? packageJson.version },
     frontendOrigins: env.FRONTEND_ORIGINS.split(',').map((origin) => origin.trim()),
     appPublicUrl: env.APP_PUBLIC_URL,
     database: { url: env.DATABASE_URL },
