@@ -7,13 +7,14 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Put,
   Query,
   Req,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsBoolean, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
 import { AuthenticatedPrincipal } from '../../common/auth/auth.types';
 import { RequireIdempotencyKey } from '../../common/idempotency/idempotency-key.decorator';
@@ -27,6 +28,12 @@ class ListConsentsQuery {
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) page = 1;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit = 20;
   @IsOptional() @IsString() type?: string;
+}
+
+class SetConsentRequest {
+  @IsBoolean() granted!: boolean;
+  @IsOptional() @IsString() policyVersion?: string;
+  @IsOptional() @IsString() reason?: string;
 }
 
 @ApiTags('consents')
@@ -76,6 +83,21 @@ export class ConsentsController {
     @Req() req: Request,
   ) {
     return this.consentsService.withdraw(principal, patientId, dto, {
+      requestId: req.requestId,
+      ip: req.ip,
+      userAgent: req.header('user-agent'),
+    });
+  }
+
+  @Put('consents/:type')
+  async setConsent(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Param('patientId', ParseUUIDPipe) patientId: string,
+    @Param('type') type: string,
+    @Body() dto: SetConsentRequest,
+    @Req() req: Request,
+  ) {
+    return this.consentsService.set(principal, patientId, type, dto, {
       requestId: req.requestId,
       ip: req.ip,
       userAgent: req.header('user-agent'),

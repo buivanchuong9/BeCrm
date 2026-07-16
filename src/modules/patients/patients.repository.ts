@@ -58,6 +58,24 @@ export class PatientsRepository {
     return this.prisma.patient.findUnique({ where: { userId }, include: withPrimaryDoctor });
   }
 
+  /** Registration-time patient row creation (docs: self-registration). Code
+   * generation is a cosmetic display value, not a security/uniqueness
+   * invariant beyond the `(organizationId, code)` DB constraint — a retry on
+   * collision is acceptable and handled by the caller via the unique
+   * constraint's ConflictAppError, same tradeoff already accepted for queue
+   * ticket numbers. */
+  async nextPatientCode(tx: Prisma.TransactionClient, organizationId: string): Promise<string> {
+    const count = await tx.patient.count({ where: { organizationId } });
+    return `PT-${String(1000 + count + 1)}`;
+  }
+
+  create(
+    tx: Prisma.TransactionClient,
+    data: Prisma.PatientUncheckedCreateInput,
+  ): Promise<PatientWithDoctor> {
+    return tx.patient.create({ data, include: withPrimaryDoctor });
+  }
+
   async listSelf(userId: string): Promise<PatientWithDoctor[]> {
     const patient = await this.findByUserId(userId);
     return patient ? [patient] : [];

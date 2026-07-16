@@ -172,4 +172,32 @@ export class ConsentsService {
 
     return { data: toConsentResponse(consent) };
   }
+
+  async set(
+    principal: AuthenticatedPrincipal,
+    patientId: string,
+    type: string,
+    dto: { granted: boolean; policyVersion?: string; reason?: string },
+    context: RequestContext,
+  ) {
+    const current = await this.consents.findCurrent(patientId, type as ConsentType);
+    if (dto.granted) {
+      return this.grant(
+        principal,
+        patientId,
+        {
+          type: type as ConsentType,
+          policyVersion: dto.policyVersion ?? current?.policyVersion ?? 'current',
+        },
+        context,
+      );
+    }
+    if (!current) throw new NotFoundAppError('Consent not found.');
+    return this.withdraw(
+      principal,
+      patientId,
+      { type: type as ConsentType, reason: dto.reason, version: current.version },
+      context,
+    );
+  }
 }

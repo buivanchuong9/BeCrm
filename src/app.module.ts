@@ -23,7 +23,17 @@ import { RolesGuard } from './common/authorization/roles.guard';
 import { IdentityModule } from './modules/identity/identity.module';
 import { OrganizationsModule } from './modules/organizations/organizations.module';
 import { PatientsModule } from './modules/patients/patients.module';
+import { EncountersModule } from './modules/encounters/encounters.module';
+import { AppointmentsModule } from './modules/appointments/appointments.module';
+import { QueueModule } from './modules/queue/queue.module';
+import { AiAssessmentModule } from './modules/ai-assessment/ai-assessment.module';
+import { DoctorDecisionModule } from './modules/doctor-decision/doctor-decision.module';
+import { ClinicalOrdersModule } from './modules/clinical-orders/clinical-orders.module';
 import { HealthModule } from './modules/health/health.module';
+import { PractitionersModule } from './modules/practitioners/practitioners.module';
+import { WorkflowModule } from './modules/workflow/workflow.module';
+import { MedicalRecordsModule } from './modules/medical-records/medical-records.module';
+import { OperationsModule } from './modules/operations/operations.module';
 
 @Module({
   imports: [
@@ -75,6 +85,16 @@ import { HealthModule } from './modules/health/health.module';
     IdentityModule,
     OrganizationsModule,
     PatientsModule,
+    PractitionersModule,
+    EncountersModule,
+    AppointmentsModule,
+    QueueModule,
+    AiAssessmentModule,
+    DoctorDecisionModule,
+    ClinicalOrdersModule,
+    WorkflowModule,
+    MedicalRecordsModule,
+    OperationsModule,
     HealthModule,
   ],
   providers: [

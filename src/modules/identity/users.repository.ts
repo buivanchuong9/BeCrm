@@ -40,6 +40,37 @@ export class UsersRepository {
     });
   }
 
+  /** Registration-time creation (User + its initial membership), both inside
+   * the caller's transaction. `status: 'active'` immediately — this repo has
+   * no email-delivery infrastructure to gate on a verification step yet
+   * (docs' UNKNOWN-5/AUTH-03 territory), documented as a Phase-1
+   * simplification rather than a silent security gap. */
+  async createWithMembership(
+    tx: Prisma.TransactionClient,
+    data: {
+      email: string;
+      passwordHash: string;
+      displayName: string;
+      phone?: string;
+      organizationId: string;
+      role: MembershipScope['role'];
+    },
+  ): Promise<User> {
+    const user = await tx.user.create({
+      data: {
+        email: data.email.toLowerCase(),
+        passwordHash: data.passwordHash,
+        displayName: data.displayName,
+        phone: data.phone ?? null,
+        status: 'active',
+      },
+    });
+    await tx.userMembership.create({
+      data: { userId: user.id, organizationId: data.organizationId, role: data.role },
+    });
+    return user;
+  }
+
   async registerFailedLogin(id: string, lockThreshold: number, lockMinutes: number): Promise<void> {
     const user = await this.prisma.user.update({
       where: { id },

@@ -1,8 +1,8 @@
 import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { Request } from 'express';
-import { Observable, from, of } from 'rxjs';
-import { switchMap, tap, catchError } from 'rxjs/operators';
+import { Request, Response } from 'express';
+import { Observable, from, of, throwError } from 'rxjs';
+import { switchMap, catchError, map } from 'rxjs/operators';
 import { AppError } from '../errors/app-error';
 import { AuthenticatedPrincipal } from '../auth/auth.types';
 import { IdempotencyService } from './idempotency.service';
@@ -36,6 +36,10 @@ export class IdempotencyInterceptor implements NestInterceptor {
 
     const principalId = request.user?.userId ?? null;
     const route = `${request.method} ${request.route?.path ?? request.path}`;
+    const target = Object.values(request.params ?? {}).find(
+      (value): value is string => typeof value === 'string' && value.length > 0,
+    );
+    const response = context.switchToHttp().getResponse<Response>();
 
     return from(
       this.idempotencyService.begin(
@@ -43,7 +47,7 @@ export class IdempotencyInterceptor implements NestInterceptor {
           principalId,
           principalScope: principalId ? 'user' : 'anonymous',
           route,
-          target: typeof request.params?.id === 'string' ? request.params.id : undefined,
+          target,
           idempotencyKey: key,
           requestBody: request.body,
         },
@@ -55,13 +59,16 @@ export class IdempotencyInterceptor implements NestInterceptor {
           return of(outcome.body);
         }
         return next.handle().pipe(
-          tap((result) => {
-            void this.idempotencyService.complete(outcome.recordId, 200, result);
-          }),
-          catchError((error) => {
-            void this.idempotencyService.fail(outcome.recordId);
-            throw error;
-          }),
+          switchMap((result) =>
+            from(
+              this.idempotencyService.complete(outcome.recordId, response.statusCode, result),
+            ).pipe(map(() => result)),
+          ),
+          catchError((error: unknown) =>
+            from(this.idempotencyService.fail(outcome.recordId)).pipe(
+              switchMap(() => throwError(() => error)),
+            ),
+          ),
         );
       }),
     );

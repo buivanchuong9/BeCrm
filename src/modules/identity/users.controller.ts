@@ -1,4 +1,4 @@
-import { Controller, Get, Param, ParseUUIDPipe, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Put, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
@@ -10,6 +10,12 @@ import { ApiOkEnvelope, ApiOkListEnvelope } from '../../common/http/api-envelope
 import { UsersRepository } from './users.repository';
 import { toUserResponse } from './user-response.mapper';
 import { UserResponseDto } from './dto/responses/user-response.dto';
+import { CurrentUser } from '../../common/auth/current-user.decorator';
+import { AuthenticatedPrincipal } from '../../common/auth/auth.types';
+import { ForbiddenAppError } from '../../common/errors/app-error';
+import { UpdateCurrentUserRequest } from './dto/update-current-user.dto';
+import { UpsertUserPreferenceRequest } from './dto/upsert-preferences.dto';
+import { UserPreferencesRepository } from './user-preferences.repository';
 
 class ListUsersQuery {
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) page = 1;
@@ -24,12 +30,15 @@ class ListUsersQuery {
 /** Reference/admin user directory — `GET /users`, `GET /users/{userId}` per
  * docs/api.md section 25. Restricted to medical/system administrators. */
 @ApiTags('users')
-@Roles('medical_administrator', 'system_administrator')
 @Controller({ path: 'users', version: '1' })
 export class UsersController {
-  constructor(private readonly users: UsersRepository) {}
+  constructor(
+    private readonly users: UsersRepository,
+    private readonly preferences: UserPreferencesRepository,
+  ) {}
 
   @ApiOkListEnvelope(UserResponseDto)
+  @Roles('medical_administrator', 'system_administrator')
   @Get()
   async list(@Query() query: ListUsersQuery) {
     const { rows, total } = await this.users.list(query);
@@ -44,11 +53,72 @@ export class UsersController {
 
   @ApiOkEnvelope(UserResponseDto)
   @Get(':userId')
-  async detail(@Param('userId', ParseUUIDPipe) userId: string) {
+  async detail(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Param('userId', ParseUUIDPipe) userId: string,
+  ) {
+    this.assertCanManage(principal, userId);
     const user = await this.users.findByIdWithMemberships(userId);
     if (!user) {
       throw new NotFoundAppError('User not found.');
     }
     return { data: toUserResponse(user, this.users.toMembershipScopes(user)) };
+  }
+
+  @ApiOkEnvelope(UserResponseDto)
+  @Patch(':userId')
+  async update(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @Body() dto: UpdateCurrentUserRequest,
+  ) {
+    this.assertCanManage(principal, userId);
+    const user = await this.users.updateProfile(userId, dto.version, {
+      ...(dto.name !== undefined ? { displayName: dto.name } : {}),
+      ...(dto.phone !== undefined ? { phone: dto.phone } : {}),
+      ...(dto.avatarFileId !== undefined ? { avatarFileId: dto.avatarFileId } : {}),
+    });
+    return { data: toUserResponse(user, this.users.toMembershipScopes(user)) };
+  }
+
+  @Get(':userId/preferences')
+  async getPreferences(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Param('userId', ParseUUIDPipe) userId: string,
+  ) {
+    this.assertCanManage(principal, userId);
+    return { data: await this.preferences.findOrDefault(userId) };
+  }
+
+  @Put(':userId/preferences')
+  async putPreferences(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @Body() dto: UpsertUserPreferenceRequest,
+  ) {
+    this.assertCanManage(principal, userId);
+    return {
+      data: await this.preferences.upsert(userId, dto.version, {
+        locale: dto.locale,
+        timezone: dto.timezone,
+        dateFormat: dto.dateFormat,
+        theme: dto.theme,
+        notificationChannels: { ...dto.notificationChannels },
+        deviceSettings: { ...dto.deviceSettings },
+      }),
+    };
+  }
+
+  private assertCanManage(principal: AuthenticatedPrincipal, userId: string) {
+    if (principal.userId === userId) return;
+    if (
+      principal.memberships.some((membership) =>
+        ['medical_administrator', 'system_administrator', 'super_administrator'].includes(
+          membership.role,
+        ),
+      )
+    )
+      return;
+    throw new ForbiddenAppError('AUTH_FORBIDDEN', 'You cannot access this user.');
   }
 }

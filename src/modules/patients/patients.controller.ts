@@ -35,6 +35,17 @@ export class PatientsController {
     return this.patientsService.list(principal, query);
   }
 
+  // Declared before ':patientId' so the literal segment is matched first.
+  @ApiOkEnvelope(PatientDetailResponseDto)
+  @Get('me')
+  async self(@CurrentUser() principal: AuthenticatedPrincipal, @Req() req: Request) {
+    return this.patientsService.getSelf(principal, {
+      requestId: req.requestId,
+      ip: req.ip,
+      userAgent: req.header('user-agent'),
+    });
+  }
+
   @ApiOkEnvelope(PatientDetailResponseDto)
   @Get(':patientId')
   async detail(

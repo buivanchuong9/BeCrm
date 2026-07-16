@@ -256,6 +256,79 @@ async function main() {
     }
   }
 
+  // T05 practitioner identities extend the existing doctor users one-to-one.
+  // Clinic assignments and recurring schedules are keyed by stable natural
+  // fields so this block remains idempotent when the seed is run repeatedly.
+  const dermatology = await prisma.specialty.upsert({
+    where: { organizationId_code: { organizationId: organization.id, code: 'DERMATOLOGY' } },
+    update: { name: 'Da liễu', active: true },
+    create: { organizationId: organization.id, code: 'DERMATOLOGY', name: 'Da liễu' },
+  });
+  const doctorSeeds = [
+    { email: 'bs.nguyenthian@example.test', license: 'DH-BS-0001', departmentCode: 'KHOA-DA-LIEU' },
+    { email: 'bs.tranvannam@example.test', license: 'DH-BS-0002', departmentCode: 'KHOA-DA-LIEU-TM' },
+  ];
+  for (const doctorSeed of doctorSeeds) {
+    const doctorId = userIdByEmail.get(doctorSeed.email);
+    const department = departments.get(doctorSeed.departmentCode);
+    if (!doctorId || !department) throw new Error(`Missing practitioner seed dependency: ${doctorSeed.email}`);
+    await prisma.practitionerProfile.upsert({
+      where: { userId: doctorId },
+      update: { licenseNumber: doctorSeed.license, status: 'active', title: 'Bác sĩ' },
+      create: { userId: doctorId, licenseNumber: doctorSeed.license, status: 'active', title: 'Bác sĩ' },
+    });
+    await prisma.practitionerSpecialty.upsert({
+      where: { practitionerUserId_specialtyId: { practitionerUserId: doctorId, specialtyId: dermatology.id } },
+      update: { primary: true },
+      create: { practitionerUserId: doctorId, specialtyId: dermatology.id, primary: true },
+    });
+    const assignment = await prisma.practitionerClinicAssignment.upsert({
+      where: {
+        practitionerUserId_clinicLocationId_departmentId: {
+          practitionerUserId: doctorId,
+          clinicLocationId: clinic.id,
+          departmentId: department.id,
+        },
+      },
+      update: { active: true, slotDurationMinutes: 30, capacity: 1 },
+      create: {
+        practitionerUserId: doctorId,
+        organizationId: organization.id,
+        clinicLocationId: clinic.id,
+        departmentId: department.id,
+        slotDurationMinutes: 30,
+        capacity: 1,
+      },
+    });
+    for (const dayOfWeek of [1, 2, 3, 4, 5]) {
+      const existingSchedule = await prisma.practitionerSchedule.findFirst({
+        where: {
+          assignmentId: assignment.id,
+          dayOfWeek,
+          startMinute: 8 * 60,
+          endMinute: 17 * 60,
+          effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+        },
+      });
+      if (existingSchedule) {
+        await prisma.practitionerSchedule.update({
+          where: { id: existingSchedule.id },
+          data: { active: true, effectiveTo: null },
+        });
+      } else {
+        await prisma.practitionerSchedule.create({
+          data: {
+            assignmentId: assignment.id,
+            dayOfWeek,
+            startMinute: 8 * 60,
+            endMinute: 17 * 60,
+            effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+          },
+        });
+      }
+    }
+  }
+
   // T04: one seeded patient, correcting the frontend's single seed patient
   // (seed.ts PT-1029 "Nguyễn Văn A") — gender normalized from the frontend's
   // Vietnamese 'Nam' literal to the API's 'male'/'female'/'other'/'unknown'

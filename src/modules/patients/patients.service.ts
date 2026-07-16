@@ -58,6 +58,16 @@ export class PatientsService {
     return { data: page.data, meta: page.meta };
   }
 
+  /** docs: `GET /patients/me` — direct self-lookup for a `patient` caller,
+   * avoids paginating a 1-row `GET /patients` list to find themselves. */
+  async getSelf(principal: AuthenticatedPrincipal, context: RequestContext) {
+    const patient = await this.patients.findByUserId(principal.userId);
+    if (!patient) {
+      throw new NotFoundAppError('Patient not found.');
+    }
+    return this.getDetail(principal, patient.id, context);
+  }
+
   async getDetail(principal: AuthenticatedPrincipal, patientId: string, context: RequestContext) {
     const patient = await this.patients.findVisibleById(principal, patientId);
     if (!patient) {

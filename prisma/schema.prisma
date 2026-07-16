@@ -52,38 +52,49 @@ enum ClinicLocationStatus {
 }
 
 model Organization {
-  id          String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  code        String                @unique
+  id          String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code        String               @unique
   name        String
-  timezone    String                @default("Asia/Ho_Chi_Minh")
-  addressJson Json?                 @map("address_json")
-  status      ClinicLocationStatus  @default(active)
-  version     Int                   @default(1)
-  createdAt   DateTime              @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt   DateTime              @updatedAt @map("updated_at") @db.Timestamptz
+  timezone    String               @default("Asia/Ho_Chi_Minh")
+  addressJson Json?                @map("address_json")
+  status      ClinicLocationStatus @default(active)
+  version     Int                  @default(1)
+  createdAt   DateTime             @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime             @updatedAt @map("updated_at") @db.Timestamptz
 
-  clinicLocations ClinicLocation[]
-  departments     Department[]
-  memberships     UserMembership[]
-  patients        Patient[]
+  clinicLocations               ClinicLocation[]
+  departments                   Department[]
+  memberships                   UserMembership[]
+  patients                      Patient[]
+  appointments                  Appointment[]
+  encounters                    MedicalEncounter[]
+  queueTickets                  QueueTicket[]
+  kioskDevices                  KioskDevice[]
+  specialties                   Specialty[]
+  practitionerClinicAssignments PractitionerClinicAssignment[]
 
   @@map("organizations")
 }
 
 model ClinicLocation {
-  id             String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId String                @map("organization_id") @db.Uuid
+  id             String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String               @map("organization_id") @db.Uuid
   code           String
   name           String
-  timezone       String                @default("Asia/Ho_Chi_Minh")
-  addressJson    Json?                 @map("address_json")
-  status         ClinicLocationStatus  @default(active)
-  createdAt      DateTime              @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt      DateTime              @updatedAt @map("updated_at") @db.Timestamptz
+  timezone       String               @default("Asia/Ho_Chi_Minh")
+  addressJson    Json?                @map("address_json")
+  status         ClinicLocationStatus @default(active)
+  createdAt      DateTime             @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime             @updatedAt @map("updated_at") @db.Timestamptz
 
-  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  departments  Department[]
-  memberships  UserMembership[]
+  organization                  Organization                   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  departments                   Department[]
+  memberships                   UserMembership[]
+  appointments                  Appointment[]
+  encounters                    MedicalEncounter[]
+  queueTickets                  QueueTicket[]
+  kioskDevices                  KioskDevice[]
+  practitionerClinicAssignments PractitionerClinicAssignment[]
 
   @@unique([organizationId, code])
   @@index([organizationId])
@@ -91,18 +102,19 @@ model ClinicLocation {
 }
 
 model Department {
-  id               String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId   String                @map("organization_id") @db.Uuid
-  clinicLocationId String?               @map("clinic_location_id") @db.Uuid
+  id               String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId   String               @map("organization_id") @db.Uuid
+  clinicLocationId String?              @map("clinic_location_id") @db.Uuid
   code             String
   name             String
-  status           ClinicLocationStatus  @default(active)
-  createdAt        DateTime              @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt        DateTime              @updatedAt @map("updated_at") @db.Timestamptz
+  status           ClinicLocationStatus @default(active)
+  createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime             @updatedAt @map("updated_at") @db.Timestamptz
 
-  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  clinicLocation ClinicLocation?  @relation(fields: [clinicLocationId], references: [id], onDelete: Restrict)
-  memberships    UserMembership[]
+  organization                  Organization                   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  clinicLocation                ClinicLocation?                @relation(fields: [clinicLocationId], references: [id], onDelete: Restrict)
+  memberships                   UserMembership[]
+  practitionerClinicAssignments PractitionerClinicAssignment[]
 
   @@unique([organizationId, code])
   @@index([organizationId])
@@ -126,12 +138,15 @@ model User {
   createdAt        DateTime   @default(now()) @map("created_at") @db.Timestamptz
   updatedAt        DateTime   @updatedAt @map("updated_at") @db.Timestamptz
 
-  memberships     UserMembership[]
-  refreshSessions RefreshSession[]
-  preference      UserPreference?
-  patientProfile  Patient?                @relation("PatientOwner")
-  primaryDoctorOf Patient[]               @relation("PatientPrimaryDoctor")
-  careTeamOf      PatientCareTeamMember[]
+  memberships             UserMembership[]
+  refreshSessions         RefreshSession[]
+  preference              UserPreference?
+  patientProfile          Patient?                @relation("PatientOwner")
+  primaryDoctorOf         Patient[]               @relation("PatientPrimaryDoctor")
+  careTeamOf              PatientCareTeamMember[]
+  doctorAppointments      Appointment[]           @relation("AppointmentDoctor")
+  currentDoctorEncounters MedicalEncounter[]      @relation("EncounterCurrentDoctor")
+  practitionerProfile     PractitionerProfile?
 
   @@map("users")
 }
@@ -153,17 +168,17 @@ model UserPreference {
 }
 
 model UserMembership {
-  id               String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId           String            @map("user_id") @db.Uuid
-  organizationId   String            @map("organization_id") @db.Uuid
-  clinicLocationId String?           @map("clinic_location_id") @db.Uuid
-  departmentId     String?           @map("department_id") @db.Uuid
+  id               String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String           @map("user_id") @db.Uuid
+  organizationId   String           @map("organization_id") @db.Uuid
+  clinicLocationId String?          @map("clinic_location_id") @db.Uuid
+  departmentId     String?          @map("department_id") @db.Uuid
   role             UserRole
-  status           MembershipStatus  @default(active)
-  startsAt         DateTime          @default(now()) @map("starts_at") @db.Timestamptz
-  endsAt           DateTime?         @map("ends_at") @db.Timestamptz
-  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz
+  status           MembershipStatus @default(active)
+  startsAt         DateTime         @default(now()) @map("starts_at") @db.Timestamptz
+  endsAt           DateTime?        @map("ends_at") @db.Timestamptz
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz
 
   user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
@@ -181,18 +196,18 @@ model UserMembership {
 }
 
 model RefreshSession {
-  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId         String    @map("user_id") @db.Uuid
-  familyId       String    @map("family_id") @db.Uuid
-  tokenHash      String    @unique @map("token_hash")
-  deviceLabel    String?   @map("device_label")
-  ip             String?
-  userAgent      String?   @map("user_agent")
-  issuedAt       DateTime  @default(now()) @map("issued_at") @db.Timestamptz
-  expiresAt      DateTime  @map("expires_at") @db.Timestamptz
-  revokedAt      DateTime? @map("revoked_at") @db.Timestamptz
-  revokedReason  String?   @map("revoked_reason")
-  replacedById   String?   @map("replaced_by_id") @db.Uuid
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId        String    @map("user_id") @db.Uuid
+  familyId      String    @map("family_id") @db.Uuid
+  tokenHash     String    @unique @map("token_hash")
+  deviceLabel   String?   @map("device_label")
+  ip            String?
+  userAgent     String?   @map("user_agent")
+  issuedAt      DateTime  @default(now()) @map("issued_at") @db.Timestamptz
+  expiresAt     DateTime  @map("expires_at") @db.Timestamptz
+  revokedAt     DateTime? @map("revoked_at") @db.Timestamptz
+  revokedReason String?   @map("revoked_reason")
+  replacedById  String?   @map("replaced_by_id") @db.Uuid
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -326,6 +341,8 @@ model Patient {
   primaryDoctor User?                   @relation("PatientPrimaryDoctor", fields: [primaryDoctorId], references: [id], onDelete: SetNull)
   consents      Consent[]
   careTeam      PatientCareTeamMember[]
+  appointments  Appointment[]
+  encounters    MedicalEncounter[]
 
   @@unique([organizationId, code])
   @@index([organizationId])
@@ -391,4 +408,1069 @@ model ConsentEvent {
 
   @@index([patientId, occurredAt])
   @@map("consent_events")
+}
+
+// ---------------------------------------------------------------------------
+// Practitioner directory and server-authoritative scheduling (T05)
+// ---------------------------------------------------------------------------
+
+enum PractitionerStatus {
+  active
+  inactive
+}
+
+enum ScheduleExceptionKind {
+  unavailable
+  override
+}
+
+model PractitionerProfile {
+  // A practitioner is the existing User identity. This one-to-one extension
+  // deliberately has no independent practitioner identifier.
+  userId        String             @id @map("user_id") @db.Uuid
+  licenseNumber String             @unique @map("license_number")
+  title         String?
+  bio           String?
+  status        PractitionerStatus @default(active)
+  createdAt     DateTime           @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime           @updatedAt @map("updated_at") @db.Timestamptz
+
+  user              User                           @relation(fields: [userId], references: [id], onDelete: Restrict)
+  specialties       PractitionerSpecialty[]
+  clinicAssignments PractitionerClinicAssignment[]
+
+  @@map("practitioner_profiles")
+}
+
+model Specialty {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  code           String
+  name           String
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization  Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  practitioners PractitionerSpecialty[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId, active])
+  @@map("specialties")
+}
+
+model PractitionerSpecialty {
+  practitionerUserId String   @map("practitioner_user_id") @db.Uuid
+  specialtyId        String   @map("specialty_id") @db.Uuid
+  primary            Boolean  @default(false)
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  practitioner PractitionerProfile @relation(fields: [practitionerUserId], references: [userId], onDelete: Cascade)
+  specialty    Specialty           @relation(fields: [specialtyId], references: [id], onDelete: Restrict)
+
+  @@id([practitionerUserId, specialtyId])
+  @@index([specialtyId])
+  @@map("practitioner_specialties")
+}
+
+model PractitionerClinicAssignment {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  practitionerUserId  String   @map("practitioner_user_id") @db.Uuid
+  organizationId      String   @map("organization_id") @db.Uuid
+  clinicLocationId    String   @map("clinic_location_id") @db.Uuid
+  departmentId        String   @map("department_id") @db.Uuid
+  slotDurationMinutes Int      @default(30) @map("slot_duration_minutes")
+  capacity            Int      @default(1)
+  active              Boolean  @default(true)
+  version             Int      @default(1)
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  practitioner   PractitionerProfile             @relation(fields: [practitionerUserId], references: [userId], onDelete: Restrict)
+  organization   Organization                    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  clinicLocation ClinicLocation                  @relation(fields: [clinicLocationId], references: [id], onDelete: Restrict)
+  department     Department                      @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  schedules      PractitionerSchedule[]
+  exceptions     PractitionerScheduleException[]
+
+  @@unique([practitionerUserId, clinicLocationId, departmentId])
+  @@index([organizationId, clinicLocationId, active])
+  @@map("practitioner_clinic_assignments")
+}
+
+model PractitionerSchedule {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  assignmentId  String    @map("assignment_id") @db.Uuid
+  dayOfWeek     Int       @map("day_of_week")
+  startMinute   Int       @map("start_minute")
+  endMinute     Int       @map("end_minute")
+  effectiveFrom DateTime  @map("effective_from") @db.Date
+  effectiveTo   DateTime? @map("effective_to") @db.Date
+  active        Boolean   @default(true)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  assignment PractitionerClinicAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+
+  @@index([assignmentId, dayOfWeek, active])
+  @@map("practitioner_schedules")
+}
+
+model PractitionerScheduleException {
+  id           String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  assignmentId String                @map("assignment_id") @db.Uuid
+  kind         ScheduleExceptionKind @default(unavailable)
+  startsAt     DateTime              @map("starts_at") @db.Timestamptz
+  endsAt       DateTime              @map("ends_at") @db.Timestamptz
+  reason       String?
+  createdAt    DateTime              @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime              @updatedAt @map("updated_at") @db.Timestamptz
+
+  assignment PractitionerClinicAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+
+  @@index([assignmentId, startsAt, endsAt])
+  @@map("practitioner_schedule_exceptions")
+}
+
+// ---------------------------------------------------------------------------
+// Appointments, QR check-in, queue, and encounters (T06/T07/T08 — docs/api.md
+// sections 20-23). Double-booking prevention (tstzrange EXCLUDE constraints),
+// the "one active token per appointment" and "one live ticket per appointment"
+// partial unique indexes are handwritten SQL in prisma/migrations, same as the
+// audit-immutability trigger and membership partial unique indexes above —
+// Prisma's declarative schema cannot express GiST exclusion constraints.
+// ---------------------------------------------------------------------------
+
+enum KioskDeviceStatus {
+  active
+  inactive
+}
+
+// Server-registered kiosk/reception devices — replaces the frontend
+// prototype's client-generated deviceId (docs/api.md section 40, SEC-10).
+// Only a device row with status=active may redeem a check-in token.
+model KioskDevice {
+  id               String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId   String            @map("organization_id") @db.Uuid
+  clinicLocationId String            @map("clinic_location_id") @db.Uuid
+  label            String
+  // SHA-256 hash of a server-random device credential, same "hash-only,
+  // shown-once" pattern as AppointmentCheckInToken.tokenHash — replaces the
+  // frontend prototype's client-generated, unauthenticated deviceId
+  // (docs/api.md section 40 SEC-10).
+  secretHash       String            @unique @map("secret_hash")
+  status           KioskDeviceStatus @default(active)
+  registeredBy     String            @map("registered_by") @db.Uuid
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization      Organization              @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  clinicLocation    ClinicLocation            @relation(fields: [clinicLocationId], references: [id], onDelete: Restrict)
+  checkInTokensUsed AppointmentCheckInToken[]
+
+  @@index([clinicLocationId])
+  @@map("kiosk_devices")
+}
+
+enum AppointmentMode {
+  video
+  in_person
+}
+
+enum AppointmentStatus {
+  upcoming
+  done
+  cancelled
+  missed
+}
+
+model Appointment {
+  id               String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId   String            @map("organization_id") @db.Uuid
+  clinicLocationId String            @map("clinic_location_id") @db.Uuid
+  patientId        String            @map("patient_id") @db.Uuid
+  doctorId         String            @map("doctor_id") @db.Uuid
+  department       String
+  consultationType String?           @map("consultation_type")
+  mode             AppointmentMode
+  status           AppointmentStatus @default(upcoming)
+  startAt          DateTime          @map("start_at") @db.Timestamptz
+  endAt            DateTime          @map("end_at") @db.Timestamptz
+  cancelReason     String?           @map("cancel_reason")
+  version          Int               @default(1)
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization   Organization              @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  clinicLocation ClinicLocation            @relation(fields: [clinicLocationId], references: [id], onDelete: Restrict)
+  patient        Patient                   @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  doctor         User                      @relation("AppointmentDoctor", fields: [doctorId], references: [id], onDelete: Restrict)
+  // Virtual reverse of MedicalEncounter.appointmentId (the FK lives on the
+  // encounter side — see that model's comment).
+  encounter      MedicalEncounter?
+  checkInTokens  AppointmentCheckInToken[]
+  queueTickets   QueueTicket[]
+  history        AppointmentHistory[]
+
+  @@index([organizationId, clinicLocationId])
+  @@index([doctorId, startAt])
+  @@index([patientId, startAt])
+  @@map("appointments")
+}
+
+enum CheckInTokenStatus {
+  active
+  used
+  expired
+  revoked
+  replaced
+}
+
+// Only tokenHash (sha256 of a server-random 256-bit token) is ever persisted —
+// the raw token is returned exactly once, at issuance, and never stored
+// (docs/api.md section 21, section 40 SEC-09). Replaces the frontend
+// prototype's client-side FNV-1a "signing" scheme.
+model AppointmentCheckInToken {
+  id               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  appointmentId    String             @map("appointment_id") @db.Uuid
+  patientId        String             @map("patient_id") @db.Uuid
+  clinicLocationId String             @map("clinic_location_id") @db.Uuid
+  tokenHash        String             @unique @map("token_hash")
+  status           CheckInTokenStatus @default(active)
+  issuedAt         DateTime           @default(now()) @map("issued_at") @db.Timestamptz
+  validFrom        DateTime           @map("valid_from") @db.Timestamptz
+  expiresAt        DateTime           @map("expires_at") @db.Timestamptz
+  usedAt           DateTime?          @map("used_at") @db.Timestamptz
+  usedByDeviceId   String?            @map("used_by_device_id") @db.Uuid
+  revokedAt        DateTime?          @map("revoked_at") @db.Timestamptz
+  revokedReason    String?            @map("revoked_reason")
+  version          Int                @default(1)
+  createdAt        DateTime           @default(now()) @map("created_at") @db.Timestamptz
+
+  appointment  Appointment  @relation(fields: [appointmentId], references: [id], onDelete: Restrict)
+  usedByDevice KioskDevice? @relation(fields: [usedByDeviceId], references: [id], onDelete: SetNull)
+
+  @@index([appointmentId])
+  @@map("appointment_check_in_tokens")
+}
+
+model AppointmentHistory {
+  id            String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  appointmentId String             @map("appointment_id") @db.Uuid
+  actorId       String?            @map("actor_id") @db.Uuid
+  action        String
+  fromStatus    AppointmentStatus? @map("from_status")
+  toStatus      AppointmentStatus  @map("to_status")
+  startsAt      DateTime           @map("starts_at") @db.Timestamptz
+  endsAt        DateTime           @map("ends_at") @db.Timestamptz
+  reason        String?
+  occurredAt    DateTime           @default(now()) @map("occurred_at") @db.Timestamptz
+
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Restrict)
+
+  @@index([appointmentId, occurredAt])
+  @@map("appointment_history")
+}
+
+enum EncounterType {
+  standard
+  emergency
+  follow_up
+  remote
+}
+
+enum EncounterOrigin {
+  appointment
+  walk_in
+  follow_up_request
+}
+
+// The 20-state ENCOUNTER_TRANSITIONS machine from docs/api.md section 23 —
+// transcribed verbatim from the frontend's encounterService.ts, enforced in
+// EncounterStateMachine (src/modules/encounters/encounter-state-machine.ts),
+// never a client-suppliable free-form status.
+enum EncounterStatus {
+  registered
+  intake_in_progress
+  intake_complete
+  ai_assessed
+  routed
+  checked_in
+  under_doctor_review
+  awaiting_results
+  diagnosed
+  plan_approved
+  workflow_active
+  in_progress
+  results_complete
+  final_review
+  discharge_ready
+  record_signed
+  closed
+  post_visit_monitoring
+  escalated
+  follow_up_linked
+}
+
+model MedicalEncounter {
+  id                   String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId       String          @map("organization_id") @db.Uuid
+  clinicLocationId     String?         @map("clinic_location_id") @db.Uuid
+  patientId            String          @map("patient_id") @db.Uuid
+  parentEncounterId    String?         @map("parent_encounter_id") @db.Uuid
+  // FK lives here (not on Appointment) so one appointment maps to at most one
+  // encounter; Appointment.encounter is Prisma's virtual reverse of this field.
+  appointmentId        String?         @unique @map("appointment_id") @db.Uuid
+  type                 EncounterType
+  origin               EncounterOrigin
+  status               EncounterStatus @default(registered)
+  department           String
+  room                 String?
+  queueNumber          String?         @map("queue_number")
+  peopleAheadInQueue   Int?            @map("people_ahead_in_queue")
+  estimatedWaitMinutes Int?            @map("estimated_wait_minutes")
+  currentDoctorId      String?         @map("current_doctor_id") @db.Uuid
+  blockingCondition    String?         @map("blocking_condition")
+  version              Int             @default(1)
+  createdAt            DateTime        @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime        @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization     Organization              @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  clinicLocation   ClinicLocation?           @relation(fields: [clinicLocationId], references: [id], onDelete: SetNull)
+  patient          Patient                   @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  appointment      Appointment?              @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  parentEncounter  MedicalEncounter?         @relation("EncounterFollowUp", fields: [parentEncounterId], references: [id], onDelete: SetNull)
+  childEncounters  MedicalEncounter[]        @relation("EncounterFollowUp")
+  currentDoctor    User?                     @relation("EncounterCurrentDoctor", fields: [currentDoctorId], references: [id], onDelete: SetNull)
+  events           EncounterEvent[]
+  queueTickets     QueueTicket[]
+  symptomIntakes   SymptomIntake[]
+  aiAssessments    AIPreliminaryAssessment[]
+  doctorReviews    DoctorReview[]
+  diagnoses        DoctorDiagnosis[]
+  clinicalPlan     ClinicalPlan?
+  clinicalOrders   ClinicalOrder[]
+  workflowInstance WorkflowInstance?
+
+  @@index([organizationId, status])
+  @@index([patientId, updatedAt])
+  @@map("medical_encounters")
+}
+
+enum EncounterEventKind {
+  info
+  warning
+  success
+  danger
+}
+
+// Append-only internal timeline (docs/api.md ENC-3). Not the same table as
+// AuditEvent — this is user-facing "what happened in this visit" narration,
+// AuditEvent is the compliance/security record.
+model EncounterEvent {
+  id          String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  encounterId String             @map("encounter_id") @db.Uuid
+  at          DateTime           @default(now()) @db.Timestamptz
+  label       String
+  kind        EncounterEventKind @default(info)
+
+  encounter MedicalEncounter @relation(fields: [encounterId], references: [id], onDelete: Cascade)
+
+  @@index([encounterId, at])
+  @@map("encounter_events")
+}
+
+enum QueueTicketPriority {
+  normal
+  priority
+  urgent
+}
+
+enum QueueTicketStatus {
+  waiting
+  called
+  acknowledged
+  in_service
+  skipped
+  completed
+  routed
+}
+
+model QueueTicket {
+  id               String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId   String              @map("organization_id") @db.Uuid
+  clinicLocationId String              @map("clinic_location_id") @db.Uuid
+  appointmentId    String              @map("appointment_id") @db.Uuid
+  patientId        String              @map("patient_id") @db.Uuid
+  encounterId      String              @map("encounter_id") @db.Uuid
+  number           String
+  department       String
+  serviceStation   String              @map("service_station")
+  room             String?
+  waitingArea      String              @map("waiting_area")
+  priority         QueueTicketPriority @default(normal)
+  status           QueueTicketStatus   @default(waiting)
+  issuedAt         DateTime            @default(now()) @map("issued_at") @db.Timestamptz
+  calledAt         DateTime?           @map("called_at") @db.Timestamptz
+  acknowledgedAt   DateTime?           @map("acknowledged_at") @db.Timestamptz
+  serviceStartedAt DateTime?           @map("service_started_at") @db.Timestamptz
+  completedAt      DateTime?           @map("completed_at") @db.Timestamptz
+  nextStation      String?             @map("next_station")
+  version          Int                 @default(1)
+  createdAt        DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime            @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  clinicLocation ClinicLocation   @relation(fields: [clinicLocationId], references: [id], onDelete: Restrict)
+  appointment    Appointment      @relation(fields: [appointmentId], references: [id], onDelete: Restrict)
+  encounter      MedicalEncounter @relation(fields: [encounterId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, clinicLocationId, department, status])
+  @@index([appointmentId])
+  @@map("queue_tickets")
+}
+
+// ---------------------------------------------------------------------------
+// Symptom intake, AI preliminary assessment, doctor decision, clinical
+// order/result (T09/T10/T11 — docs section 24-26). Actor-attribution columns
+// (doctorId, orderedByDoctorId, recordedBy) are deliberately plain scalar
+// UUIDs with no Prisma relation/FK, same precedent as AuditEvent.actorId —
+// they identify who acted, not a structural ownership relationship, so
+// FK/back-array bloat on User isn't warranted. Every FK to MedicalEncounter
+// (the core clinical-record parent) is a real Prisma relation.
+// ---------------------------------------------------------------------------
+
+model SymptomIntake {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  encounterId       String   @map("encounter_id") @db.Uuid
+  chiefComplaint    String   @map("chief_complaint")
+  severity          Int
+  durationDays      Int      @map("duration_days")
+  symptoms          String[]
+  history           String[]
+  currentMedication String[] @map("current_medication")
+  // Phase 1/2 simplification: plain string references (no FileObject upload
+  // pipeline exists yet, docs section 16 PROPOSED) — never rendered as a
+  // trusted URL, treated as an opaque label until real uploads ship.
+  images            String[]
+  submittedAt       DateTime @default(now()) @map("submitted_at") @db.Timestamptz
+
+  encounter  MedicalEncounter         @relation(fields: [encounterId], references: [id], onDelete: Restrict)
+  assessment AIPreliminaryAssessment?
+
+  @@index([encounterId])
+  @@map("symptom_intakes")
+}
+
+enum AIAssessmentStatus {
+  completed
+  insufficient_data
+  failed
+}
+
+enum Urgency {
+  routine
+  urgent
+  emergency
+}
+
+// AI must never write DoctorDiagnosis/Prescription/MedicalRecord — enforced
+// structurally by the absence of any such relation/field on this model and
+// by AiAssessmentService never importing those repositories (docs section 4
+// principle 5, section 24).
+model AIPreliminaryAssessment {
+  id                   String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  encounterId          String             @map("encounter_id") @db.Uuid
+  intakeId             String             @unique @map("intake_id") @db.Uuid
+  status               AIAssessmentStatus
+  // CandidateCondition[] — {code,name,confidenceBand,confidenceScore,
+  // supportingEvidence[],conflictingEvidence[],rationale}; kept as JSON
+  // rather than a child table since it is an immutable, append-only
+  // computed-at-generation-time snapshot, never queried/filtered on its own.
+  candidateConditions  Json               @map("candidate_conditions")
+  redFlagTriggered     Boolean            @map("red_flag_triggered")
+  redFlagUrgency       Urgency?           @map("red_flag_urgency")
+  redFlagReasons       String[]           @map("red_flag_reasons")
+  suggestedSpecialty   String?            @map("suggested_specialty")
+  suggestedNextActions String[]           @map("suggested_next_actions")
+  modelVersion         String             @map("model_version")
+  missingDataHints     String[]           @map("missing_data_hints")
+  supersededById       String?            @map("superseded_by_id") @db.Uuid
+  generatedAt          DateTime           @default(now()) @map("generated_at") @db.Timestamptz
+
+  encounter              MedicalEncounter          @relation(fields: [encounterId], references: [id], onDelete: Restrict)
+  intake                 SymptomIntake             @relation(fields: [intakeId], references: [id], onDelete: Restrict)
+  supersededByAssessment AIPreliminaryAssessment?  @relation("AssessmentSupersession", fields: [supersededById], references: [id], onDelete: SetNull)
+  supersedes             AIPreliminaryAssessment[] @relation("AssessmentSupersession")
+  reviews                DoctorReview[]
+  diagnoses              DoctorDiagnosis[]
+
+  @@index([encounterId])
+  @@map("ai_preliminary_assessments")
+}
+
+enum DoctorReviewAction {
+  pending
+  accepted
+  partial
+  rejected
+}
+
+// Sole writer boundary: only doctorDecisionService may create these rows
+// (docs section 25) — enforced by DoctorDecisionService being the only
+// provider injecting DoctorReviewsRepository/DoctorDiagnosesRepository.
+model DoctorReview {
+  id                    String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  encounterId           String             @map("encounter_id") @db.Uuid
+  aiAssessmentId        String?            @map("ai_assessment_id") @db.Uuid
+  doctorId              String             @map("doctor_id") @db.Uuid
+  action                DoctorReviewAction
+  acceptedConditionCode String?            @map("accepted_condition_code")
+  rationale             String?
+  reviewedAt            DateTime           @default(now()) @map("reviewed_at") @db.Timestamptz
+
+  encounter    MedicalEncounter         @relation(fields: [encounterId], references: [id], onDelete: Restrict)
+  aiAssessment AIPreliminaryAssessment? @relation(fields: [aiAssessmentId], references: [id], onDelete: SetNull)
+
+  @@index([encounterId])
+  @@map("doctor_reviews")
+}
+
+enum DiagnosisStatus {
+  none
+  provisional
+  differential
+  confirmed
+  revised
+  signed
+}
+
+// Append-only/versioned: reviseDiagnosis never edits a row in place, it marks
+// the prior row `revised` and inserts a new one with revisionOfId set
+// (docs section 25 DX-5, section 41 "Diagnosis revision").
+model DoctorDiagnosis {
+  id               String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  encounterId      String          @map("encounter_id") @db.Uuid
+  doctorId         String          @map("doctor_id") @db.Uuid
+  status           DiagnosisStatus
+  conditionName    String          @map("condition_name")
+  conditionCode    String?         @map("condition_code")
+  aiAssessmentId   String?         @map("ai_assessment_id") @db.Uuid
+  isAdditionalToAI Boolean         @map("is_additional_to_ai")
+  rationale        String?
+  revisionOfId     String?         @unique @map("revision_of_id") @db.Uuid
+  version          Int             @default(1)
+  recordedAt       DateTime        @default(now()) @map("recorded_at") @db.Timestamptz
+
+  encounter     MedicalEncounter         @relation(fields: [encounterId], references: [id], onDelete: Restrict)
+  aiAssessment  AIPreliminaryAssessment? @relation(fields: [aiAssessmentId], references: [id], onDelete: SetNull)
+  revisionOf    DoctorDiagnosis?         @relation("DiagnosisRevision", fields: [revisionOfId], references: [id], onDelete: SetNull)
+  revisedBy     DoctorDiagnosis?         @relation("DiagnosisRevision")
+  clinicalPlans ClinicalPlan[]
+
+  @@index([encounterId])
+  @@map("doctor_diagnoses")
+}
+
+// One approved plan per encounter (docs section 25 DX-6) — approving it may
+// auto-activate a workflow instance (docs section 28 ACT-1), handled at the
+// service layer once the Workflow module exists.
+model ClinicalPlan {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  encounterId String   @unique @map("encounter_id") @db.Uuid
+  doctorId    String   @map("doctor_id") @db.Uuid
+  diagnosisId String   @map("diagnosis_id") @db.Uuid
+  summary     String
+  approvedAt  DateTime @default(now()) @map("approved_at") @db.Timestamptz
+
+  encounter MedicalEncounter @relation(fields: [encounterId], references: [id], onDelete: Restrict)
+  diagnosis DoctorDiagnosis  @relation(fields: [diagnosisId], references: [id], onDelete: Restrict)
+
+  @@map("clinical_plans")
+}
+
+enum ClinicalOrderType {
+  laboratory
+  imaging
+  consultation
+}
+
+enum ClinicalOrderStatus {
+  requested
+  in_progress
+  invalid_sample
+  result_ready
+  completed
+  cancelled
+}
+
+model ClinicalOrder {
+  id                  String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  encounterId         String              @map("encounter_id") @db.Uuid
+  type                ClinicalOrderType
+  orderedByDoctorId   String              @map("ordered_by_doctor_id") @db.Uuid
+  justification       String
+  status              ClinicalOrderStatus @default(requested)
+  assignedRole        UserRole            @map("assigned_role")
+  invalidSampleReason String?             @map("invalid_sample_reason")
+  version             Int                 @default(1)
+  createdAt           DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime            @updatedAt @map("updated_at") @db.Timestamptz
+
+  encounter MedicalEncounter @relation(fields: [encounterId], references: [id], onDelete: Restrict)
+  result    ClinicalResult?
+
+  @@index([encounterId])
+  @@map("clinical_orders")
+}
+
+model ClinicalResult {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId    String   @unique @map("order_id") @db.Uuid
+  summary    String
+  abnormal   Boolean
+  recordedAt DateTime @default(now()) @map("recorded_at") @db.Timestamptz
+  recordedBy String   @map("recorded_by") @db.Uuid
+
+  order ClinicalOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@map("clinical_results")
+}
+
+// ---------------------------------------------------------------------------
+// Workflow / BPM (T12 — docs section 27-28). WorkflowStepDefinition[] is
+// stored as JSON on the version row rather than a child table: it is edited
+// wholesale as a coherent graph (cycle detection spans the whole array) and
+// copy-on-instantiate snapshots it verbatim into WorkflowTask rows at
+// activation time — there is no independent query/filter need that would
+// justify a relational child table. Step CRUD is exposed as one bulk
+// PUT .../steps replace-the-array endpoint rather than the granular
+// add/edit/remove/reorder/connect/disconnect endpoint-per-operation split a
+// fuller spec might use — same safety guarantees (self-reference rejection,
+// cycle detection, mandatory-step protection), much less surface area.
+// ---------------------------------------------------------------------------
+
+enum WorkflowTemplateStatus {
+  draft
+  in_review
+  published
+  deprecated
+  archived
+}
+
+model WorkflowTemplate {
+  id                       String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId           String   @map("organization_id") @db.Uuid
+  name                     String
+  specialty                String
+  description              String
+  createdBy                String   @map("created_by") @db.Uuid
+  latestPublishedVersionId String?  @map("latest_published_version_id") @db.Uuid
+  version                  Int      @default(1)
+  createdAt                DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  versions WorkflowTemplateVersion[]
+
+  @@index([organizationId, specialty])
+  @@map("workflow_templates")
+}
+
+model WorkflowTemplateVersion {
+  id            String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  templateId    String                 @map("template_id") @db.Uuid
+  versionNumber Int                    @map("version_number")
+  status        WorkflowTemplateStatus @default(draft)
+  // WorkflowStepDefinition[] — {code,icon?,executorType?,name,description,
+  // taskType,responsibleRole,department,skill?,location?,mandatory,
+  // conditionalRule?,estimatedDurationMinutes,maxWaitingMinutes,
+  // skipPermission[],reworkRule?,escalationRule?,notificationRule?,
+  // requiredOutput?,prerequisiteStepCodes[]}
+  steps         Json                   @default("[]")
+  nodePositions Json?                  @map("node_positions")
+  // Optimistic lock for concurrent draft edits — distinct from
+  // `versionNumber` (the human-facing template version, e.g. v1/v2/v3).
+  rowVersion    Int                    @default(1) @map("row_version")
+  createdAt     DateTime               @default(now()) @map("created_at") @db.Timestamptz
+  publishedAt   DateTime?              @map("published_at") @db.Timestamptz
+
+  template  WorkflowTemplate   @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  instances WorkflowInstance[]
+
+  @@unique([templateId, versionNumber])
+  @@index([templateId])
+  @@map("workflow_template_versions")
+}
+
+enum WorkflowInstanceStatus {
+  created
+  active
+  suspended
+  completed
+  cancelled
+}
+
+model WorkflowInstance {
+  id                String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patientId         String                 @map("patient_id") @db.Uuid
+  encounterId       String                 @unique @map("encounter_id") @db.Uuid
+  templateId        String                 @map("template_id") @db.Uuid
+  templateVersionId String                 @map("template_version_id") @db.Uuid
+  instanceCode      String                 @unique @map("instance_code")
+  // Server-side HMAC-SHA256 over patientId|encounterId|templateVersionId|id,
+  // keyed with a server-only secret — replaces the frontend prototype's
+  // client-side FNV-1a placeholder (docs section 28 ACT-1, section 45).
+  integrityHash     String                 @map("integrity_hash")
+  identityVersion   Int                    @default(1) @map("identity_version")
+  status            WorkflowInstanceStatus @default(active)
+  activatedBy       String                 @map("activated_by") @db.Uuid
+  activatedAt       DateTime               @default(now()) @map("activated_at") @db.Timestamptz
+  completedAt       DateTime?              @map("completed_at") @db.Timestamptz
+  suspendedReason   String?                @map("suspended_reason")
+  version           Int                    @default(1)
+
+  encounter       MedicalEncounter        @relation(fields: [encounterId], references: [id], onDelete: Restrict)
+  templateVersion WorkflowTemplateVersion @relation(fields: [templateVersionId], references: [id], onDelete: Restrict)
+  tasks           WorkflowTask[]
+
+  @@index([patientId])
+  @@map("workflow_instances")
+}
+
+enum WorkflowTaskStatus {
+  pending
+  blocked
+  ready
+  assigned
+  accepted
+  in_progress
+  waiting_for_patient
+  waiting_for_result
+  waiting_for_approval
+  completed
+  failed
+  rejected
+  redo_required
+  skipped
+  cancelled
+  expired
+  escalated
+}
+
+enum WorkflowPriority {
+  low
+  medium
+  high
+}
+
+model WorkflowTask {
+  id                 String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  instanceId         String             @map("instance_id") @db.Uuid
+  encounterId        String             @map("encounter_id") @db.Uuid
+  stepCode           String             @map("step_code")
+  name               String
+  responsibleRole    UserRole           @map("responsible_role")
+  department         String
+  status             WorkflowTaskStatus @default(pending)
+  assigneeId         String?            @map("assignee_id") @db.Uuid
+  dependsOnStepCodes String[]           @map("depends_on_step_codes")
+  slaMinutes         Int                @map("sla_minutes")
+  priority           WorkflowPriority   @default(medium)
+  urgency            Urgency            @default(routine)
+  mandatory          Boolean            @default(false)
+  clinicalWarning    String?            @map("clinical_warning")
+  reworkCount        Int                @default(0) @map("rework_count")
+  version            Int                @default(1)
+  createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamptz
+  startedAt          DateTime?          @map("started_at") @db.Timestamptz
+  completedAt        DateTime?          @map("completed_at") @db.Timestamptz
+
+  instance WorkflowInstance @relation(fields: [instanceId], references: [id], onDelete: Restrict)
+
+  @@index([instanceId])
+  @@index([encounterId])
+  @@index([responsibleRole, department, status])
+  @@index([assigneeId, status])
+  @@map("workflow_tasks")
+}
+
+// ---------------------------------------------------------------------------
+// EMR, CRM, notifications and operational API backing stores.
+// Closed state transitions are enforced in their services; JSON is used only
+// for cohesive value objects (medications, discharge instructions, metadata).
+// ---------------------------------------------------------------------------
+
+model MedicalRecord {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  encounterId    String    @unique @map("encounter_id") @db.Uuid
+  status         String    @default("draft")
+  diagnosisId    String?   @map("diagnosis_id") @db.Uuid
+  prescriptionId String?   @map("prescription_id") @db.Uuid
+  discharge      Json?
+  followUp       Json?     @map("follow_up")
+  signedBy       String?   @map("signed_by") @db.Uuid
+  signedAt       DateTime? @map("signed_at") @db.Timestamptz
+  reopenedReason String?   @map("reopened_reason")
+  version        Int       @default(1)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([status])
+  @@map("medical_records")
+}
+
+model MedicalRecordAddendum {
+  id       String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  recordId String   @map("record_id") @db.Uuid
+  text     String
+  addedBy  String   @map("added_by") @db.Uuid
+  addedAt  DateTime @default(now()) @map("added_at") @db.Timestamptz
+
+  @@index([recordId, addedAt])
+  @@map("medical_record_addenda")
+}
+
+model Prescription {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  encounterId String   @map("encounter_id") @db.Uuid
+  doctorId    String   @map("doctor_id") @db.Uuid
+  medications Json
+  issuedAt    DateTime @default(now()) @map("issued_at") @db.Timestamptz
+
+  @@index([encounterId, issuedAt])
+  @@map("prescriptions")
+}
+
+model ClinicalDocument {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  encounterId       String   @map("encounter_id") @db.Uuid
+  workflowTaskId    String?  @map("workflow_task_id") @db.Uuid
+  clinicalOrderId   String?  @map("clinical_order_id") @db.Uuid
+  type              String
+  fileId            String   @map("file_id") @db.Uuid
+  fileName          String   @map("file_name")
+  fileHash          String   @map("file_hash")
+  version           Int      @default(1)
+  uploadedBy        String   @map("uploaded_by") @db.Uuid
+  uploadedAt        DateTime @default(now()) @map("uploaded_at") @db.Timestamptz
+  reviewStatus      String   @default("pending") @map("review_status")
+  signatureStatus   String   @default("unsigned") @map("signature_status")
+  incorrectLinkFlag Boolean  @default(false) @map("incorrect_link_flag")
+
+  @@index([encounterId])
+  @@map("clinical_documents")
+}
+
+model CrmCarePlan {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patientId   String   @map("patient_id") @db.Uuid
+  encounterId String   @map("encounter_id") @db.Uuid
+  status      String   @default("not_started")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@unique([patientId, encounterId])
+  @@index([patientId])
+  @@map("crm_care_plans")
+}
+
+model FollowUpActivity {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  carePlanId         String    @map("care_plan_id") @db.Uuid
+  type               String
+  title              String
+  description        String
+  dueDate            DateTime  @map("due_date") @db.Timestamptz
+  priority           String
+  status             String    @default("scheduled")
+  automationMode     String?   @map("automation_mode")
+  automationAction   String?   @map("automation_action")
+  lastAutomatedAt    DateTime? @map("last_automated_at") @db.Timestamptz
+  automationRunCount Int       @default(0) @map("automation_run_count")
+  version            Int       @default(1)
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([carePlanId, status, dueDate])
+  @@map("follow_up_activities")
+}
+
+model ClinicalAlert {
+  id                      String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  carePlanId              String?   @map("care_plan_id") @db.Uuid
+  patientId               String    @map("patient_id") @db.Uuid
+  encounterId             String?   @map("encounter_id") @db.Uuid
+  trigger                 String
+  severity                String
+  responsibleActor        String    @map("responsible_actor")
+  responseDeadlineHours   Int       @map("response_deadline_hours")
+  requiresLinkedEncounter Boolean   @map("requires_linked_encounter")
+  status                  String    @default("open")
+  note                    String
+  detectedAt              DateTime  @default(now()) @map("detected_at") @db.Timestamptz
+  closedBy                String?   @map("closed_by") @db.Uuid
+  closedAt                DateTime? @map("closed_at") @db.Timestamptz
+  version                 Int       @default(1)
+
+  @@index([patientId, status])
+  @@map("clinical_alerts")
+}
+
+model EncounterCreationRequest {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patientId          String    @map("patient_id") @db.Uuid
+  sourceAlertId      String?   @map("source_alert_id") @db.Uuid
+  requestedByRole    String    @map("requested_by_role")
+  reason             String
+  status             String    @default("requested")
+  requestedAt        DateTime  @default(now()) @map("requested_at") @db.Timestamptz
+  decidedBy          String?   @map("decided_by") @db.Uuid
+  decidedAt          DateTime? @map("decided_at") @db.Timestamptz
+  createdEncounterId String?   @map("created_encounter_id") @db.Uuid
+  version            Int       @default(1)
+
+  @@index([status, requestedAt])
+  @@map("encounter_creation_requests")
+}
+
+model Notification {
+  id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  event                 String
+  recipientId           String    @map("recipient_id") @db.Uuid
+  recipientRole         String    @map("recipient_role")
+  channel               String
+  status                String    @default("queued")
+  message               String
+  relatedPatientId      String?   @map("related_patient_id") @db.Uuid
+  relatedEncounterId    String?   @map("related_encounter_id") @db.Uuid
+  relatedWorkflowTaskId String?   @map("related_workflow_task_id") @db.Uuid
+  deliveredAt           DateTime? @map("delivered_at") @db.Timestamptz
+  failureReason         String?   @map("failure_reason")
+  retryCount            Int       @default(0) @map("retry_count")
+  read                  Boolean   @default(false)
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([recipientId, read, createdAt])
+  @@index([status])
+  @@map("notifications")
+}
+
+model IntegrationConnection {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name            String    @unique
+  status          String    @default("healthy")
+  lastSuccessAt   DateTime? @map("last_success_at") @db.Timestamptz
+  lastFailureAt   DateTime? @map("last_failure_at") @db.Timestamptz
+  pendingMessages Int       @default(0) @map("pending_messages")
+  retryCount      Int       @default(0) @map("retry_count")
+  deadLetterCount Int       @default(0) @map("dead_letter_count")
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("integration_connections")
+}
+
+model IntegrationMessage {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  connectionId   String   @map("connection_id") @db.Uuid
+  correlationId  String   @map("correlation_id")
+  idempotencyKey String   @map("idempotency_key")
+  status         String   @default("pending")
+  payload        Json?
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@unique([connectionId, idempotencyKey])
+  @@index([connectionId, createdAt])
+  @@map("integration_messages")
+}
+
+model UploadObject {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId     String    @map("owner_id") @db.Uuid
+  fileName    String    @map("file_name")
+  contentType String    @map("content_type")
+  context     String
+  storageKey  String    @unique @map("storage_key")
+  fileHash    String?   @map("file_hash")
+  status      String    @default("pending")
+  expiresAt   DateTime  @map("expires_at") @db.Timestamptz
+  confirmedAt DateTime? @map("confirmed_at") @db.Timestamptz
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([ownerId, status])
+  @@map("upload_objects")
+}
+
+model SupportTicket {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  topic     String
+  message   String
+  status    String   @default("open")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([userId, createdAt])
+  @@map("support_tickets")
+}
+
+model MedicationReminder {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patientId      String    @map("patient_id") @db.Uuid
+  prescriptionId String?   @map("prescription_id") @db.Uuid
+  medicationName String    @map("medication_name")
+  schedule       Json
+  active         Boolean   @default(true)
+  takenAt        DateTime? @map("taken_at") @db.Timestamptz
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([patientId, active])
+  @@map("medication_reminders")
+}
+
+model ProgressPhoto {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patientId String   @map("patient_id") @db.Uuid
+  fileId    String   @map("file_id") @db.Uuid
+  takenAt   DateTime @map("taken_at") @db.Timestamptz
+  aiScore   Float?   @map("ai_score")
+  note      String?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([patientId, takenAt])
+  @@map("progress_photos")
+}
+
+model PrescriptionRefillRequest {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  prescriptionId String   @map("prescription_id") @db.Uuid
+  patientId      String   @map("patient_id") @db.Uuid
+  requestedBy    String   @map("requested_by") @db.Uuid
+  reason         String?
+  status         String   @default("requested")
+  requestedAt    DateTime @default(now()) @map("requested_at") @db.Timestamptz
+
+  @@index([patientId, requestedAt])
+  @@map("prescription_refill_requests")
+}
+
+model AccountDeletionRequest {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  reason      String?
+  status      String    @default("requested")
+  requestedAt DateTime  @default(now()) @map("requested_at") @db.Timestamptz
+  decidedAt   DateTime? @map("decided_at") @db.Timestamptz
+
+  @@index([userId, status])
+  @@map("account_deletion_requests")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz
+  usedAt    DateTime? @map("used_at") @db.Timestamptz
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([userId, expiresAt])
+  @@map("password_reset_tokens")
 }
