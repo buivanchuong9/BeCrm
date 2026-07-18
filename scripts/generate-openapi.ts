@@ -7,7 +7,7 @@ import { configureApp } from '../src/bootstrap';
 import { createOpenApiDocument } from '../src/documentation/openapi';
 
 async function main() {
-  const app = await NestFactory.create(AppModule, { logger: false });
+  const app = await NestFactory.create(AppModule, { logger: false, bodyParser: false });
   configureApp(app);
 
   const document = createOpenApiDocument(app);

@@ -1,16 +1,14 @@
 export interface SuccessEnvelope<T> {
+  success: true;
   data: T;
   meta: Record<string, unknown>;
   requestId: string;
 }
 
-export interface ErrorEnvelopeBody {
+export interface ErrorEnvelope {
+  success: false;
   code: string;
   message: string;
-  details: Array<{ field?: string; code: string; message?: string }>;
+  errors: Record<string, string>;
   requestId: string;
-}
-
-export interface ErrorEnvelope {
-  error: ErrorEnvelopeBody;
 }

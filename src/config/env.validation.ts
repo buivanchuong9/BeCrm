@@ -16,6 +16,13 @@ export const envSchema = z.object({
 
   FRONTEND_ORIGINS: z.string().min(1),
   APP_PUBLIC_URL: z.string().url(),
+  REQUEST_BODY_LIMIT: z
+    .string()
+    .regex(/^\d+(?:kb|mb)$/i)
+    .default('1mb'),
+  TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(10).default(0),
+  RATE_LIMIT_TTL_MS: z.coerce.number().int().positive().default(60_000),
+  RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
 
   DATABASE_URL: z.string().min(1),
   REDIS_URL: z.string().min(1),
@@ -27,6 +34,7 @@ export const envSchema = z.object({
   REFRESH_TOKEN_TTL_NOT_REMEMBERED: z.string().min(1).default('24h'),
   COOKIE_DOMAIN: z.string().optional().default(''),
   COOKIE_SECURE: boolFromString.default('false'),
+  COOKIE_SAME_SITE: z.enum(['lax', 'strict', 'none']).default('lax'),
 
   PASSWORD_PEPPER: z.string().min(1),
   FIELD_ENCRYPTION_KEY: z.string().min(1),
@@ -70,6 +78,32 @@ export function validateEnv(raw: Record<string, unknown>): EnvConfig {
   }
   if (parsed.data.NODE_ENV === 'production' && parsed.data.SEED_DEMO_PASSWORD) {
     throw new Error('SEED_DEMO_PASSWORD must not be set when NODE_ENV=production');
+  }
+  const origins = parsed.data.FRONTEND_ORIGINS.split(',').map((origin) => origin.trim());
+  for (const origin of origins) {
+    let url: URL;
+    try {
+      url = new URL(origin);
+    } catch {
+      throw new Error(
+        `Invalid environment configuration: FRONTEND_ORIGINS contains invalid URL: ${origin}`,
+      );
+    }
+    if (url.origin !== origin || !['http:', 'https:'].includes(url.protocol)) {
+      throw new Error(
+        `Invalid environment configuration: FRONTEND_ORIGINS must contain origins only: ${origin}`,
+      );
+    }
+    if (parsed.data.NODE_ENV === 'production' && url.protocol !== 'https:') {
+      throw new Error(
+        `Invalid environment configuration: production frontend origin must use HTTPS: ${origin}`,
+      );
+    }
+  }
+  if (parsed.data.COOKIE_SAME_SITE === 'none' && !parsed.data.COOKIE_SECURE) {
+    throw new Error(
+      'Invalid environment configuration: COOKIE_SECURE must be true when COOKIE_SAME_SITE=none',
+    );
   }
   return parsed.data;
 }

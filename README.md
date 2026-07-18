@@ -29,7 +29,7 @@
 	<a href="#chạy-local-bằng-docker"><img src="https://img.shields.io/badge/Start-Local%20in%2060s-16A34A?style=for-the-badge&logo=rocket&logoColor=white" alt="Start local" /></a>
 	<a href="#deploy-production-thủ-công-dễ-kiểm-soát"><img src="https://img.shields.io/badge/Deploy-Production-F97316?style=for-the-badge&logo=dockers&logoColor=white" alt="Deploy production" /></a>
 	<a href="docs/DEPLOYMENT.md"><img src="https://img.shields.io/badge/Guide-Ubuntu%20Runbook-2563EB?style=for-the-badge&logo=readthedocs&logoColor=white" alt="Deployment guide" /></a>
-	<a href="http://localhost:3000/api/docs/2.0.0"><img src="https://img.shields.io/badge/API-Swagger-0EA5E9?style=for-the-badge&logo=swagger&logoColor=white" alt="Swagger" /></a>
+	<a href="http://localhost:3000/api/docs/2.2.1"><img src="https://img.shields.io/badge/API-Swagger-0EA5E9?style=for-the-badge&logo=swagger&logoColor=white" alt="Swagger" /></a>
 </p>
 
 <p align="center">
@@ -56,7 +56,7 @@ Luồng chính là Docker-first từ local lên production.
 
 ```sh
 docker compose up -d --build
-open http://localhost:3000/api/docs/2.0.0
+open http://localhost:3000/api/docs/2.2.1
 ```
 
 Muốn dừng toàn bộ stack:
@@ -105,8 +105,8 @@ docker compose up -d --build
 Các dịch vụ chính:
 
 - API: http://localhost:3000
-- Swagger UI (release 2.0.0): http://localhost:3000/api/docs/2.0.0
-- OpenAPI JSON: http://localhost:3000/api/docs/2.0.0/openapi.json
+- Swagger UI (release 2.2.1): http://localhost:3000/api/docs/2.2.1
+- OpenAPI JSON: http://localhost:3000/api/docs/2.2.1/openapi.json
 - Legacy Swagger URL (temporary redirect): http://localhost:3000/api/docs
 - PostgreSQL: localhost:5442
 - Redis: localhost:6389
@@ -161,6 +161,18 @@ Build sạch không dùng cache:
 
 Không commit secrets thật vào repository. Secrets production chỉ lưu trên server.
 
+Các biến production liên quan trực tiếp đến HTTP boundary:
+
+- `FRONTEND_ORIGINS`: danh sách origin HTTPS, phân tách bằng dấu phẩy.
+- `REQUEST_BODY_LIMIT`: giới hạn JSON/form body, mặc định `1mb`.
+- `RATE_LIMIT_TTL_MS` và `RATE_LIMIT_MAX`: cửa sổ và số request tối đa.
+- `TRUST_PROXY_HOPS`: số reverse proxy tin cậy; để `0` khi chạy trực tiếp.
+- `COOKIE_SECURE=true` trên HTTPS; `COOKIE_SAME_SITE=none` bắt buộc cookie secure.
+
+Error response luôn có dạng
+`{ "success": false, "code": "...", "message": "...", "errors": {}, "requestId": "..." }`.
+Request registration mới dùng `displayName`; alias `name` chỉ được giữ tạm thời để tương thích ngược.
+
 Phiên bản tài liệu mặc định lấy từ `version` trong `package.json`. Khi phát hành
 release mới (ví dụ `3.0.0`), bump package version trong commit release; sau
 `git pull` và rebuild, Swagger tự xuất hiện tại `/api/docs/3.0.0`. Biến tùy chọn
@@ -177,8 +189,8 @@ npm version 3.0.0 --no-git-tag-version
 docker compose --env-file .env.production -f docker-compose.prod.yml ps
 docker compose --env-file .env.production -f docker-compose.prod.yml logs --tail=200 api
 curl -i http://127.0.0.1:43000/health/live
-curl -i http://127.0.0.1:43000/api/docs/2.0.0
-curl -s http://127.0.0.1:43000/api/docs/2.0.0/openapi.json | jq '.info.version'
+curl -i http://127.0.0.1:43000/api/docs/2.2.1
+curl -s http://127.0.0.1:43000/api/docs/2.2.1/openapi.json | jq '.info.version'
 ```
 
 ## Tài liệu liên quan

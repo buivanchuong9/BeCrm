@@ -5,8 +5,8 @@ Backend production chạy bằng `docker-compose.prod.yml`:
 - API container: `dermahealth-api`
 - API trên host: `127.0.0.1:43000`
 - PostgreSQL và Redis chỉ nằm trong Docker network
-- Swagger UI release hiện tại: `/api/docs/2.0.0`
-- OpenAPI JSON release hiện tại: `/api/docs/2.0.0/openapi.json`
+- Swagger UI release hiện tại: `/api/docs/2.2.1`
+- OpenAPI JSON release hiện tại: `/api/docs/2.2.1/openapi.json`
 - Swagger UI tương thích ngược: `/api/docs` (302 no-store tới release hiện tại)
 
 Swagger runtime được sinh từ source code khi API khởi động, không đọc trực tiếp
@@ -75,6 +75,10 @@ API_BASE_PATH=/api/v1
 
 FRONTEND_ORIGINS=https://dermahealth.fitdnu.id.vn
 APP_PUBLIC_URL=https://dermahealth.fitdnu.id.vn
+REQUEST_BODY_LIMIT=1mb
+TRUST_PROXY_HOPS=1
+RATE_LIMIT_TTL_MS=60000
+RATE_LIMIT_MAX=100
 
 POSTGRES_USER=app
 POSTGRES_PASSWORD=${DB_PASSWORD}
@@ -91,6 +95,7 @@ REFRESH_TOKEN_TTL_NOT_REMEMBERED=24h
 
 COOKIE_DOMAIN=dermahealth.fitdnu.id.vn
 COOKIE_SECURE=true
+COOKIE_SAME_SITE=lax
 
 PASSWORD_PEPPER=${PASSWORD_PEPPER}
 FIELD_ENCRYPTION_KEY=${FIELD_ENCRYPTION_KEY}
@@ -201,12 +206,12 @@ docker compose \
   logs --tail=200 api
 
 curl -i http://127.0.0.1:43000/health/live
-curl -s http://127.0.0.1:43000/api/docs/2.0.0/openapi.json | jq '.info.version'
+curl -s http://127.0.0.1:43000/api/docs/2.2.1/openapi.json | jq '.info.version'
 
-curl -sSI http://127.0.0.1:43000/api/docs/2.0.0/swagger-ui-init.js \
+curl -sSI http://127.0.0.1:43000/api/docs/2.2.1/swagger-ui-init.js \
   | grep -iE 'cache-control|pragma|expires'
 
-curl -sSI http://127.0.0.1:43000/api/docs/2.0.0/openapi.json \
+curl -sSI http://127.0.0.1:43000/api/docs/2.2.1/openapi.json \
   | grep -iE 'cache-control|pragma|expires'
 
 docker inspect \
@@ -231,13 +236,13 @@ sudo systemctl reload nginx
 Swagger production:
 
 ```text
-https://dermahealth.fitdnu.id.vn/api/docs/2.0.0
+https://dermahealth.fitdnu.id.vn/api/docs/2.2.1
 ```
 
 OpenAPI JSON production:
 
 ```text
-https://dermahealth.fitdnu.id.vn/api/docs/2.0.0/openapi.json
+https://dermahealth.fitdnu.id.vn/api/docs/2.2.1/openapi.json
 ```
 
 ## 7. Xóa database và dựng lại hoàn toàn

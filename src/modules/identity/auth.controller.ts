@@ -19,7 +19,11 @@ import {
   UnauthorizedAppError,
   ValidationAppError,
 } from '../../common/errors/app-error';
-import { ApiCreatedEnvelope, ApiOkEnvelope } from '../../common/http/api-envelope.decorator';
+import {
+  ApiCreatedEnvelope,
+  ApiCreatedUnionEnvelope,
+  ApiOkEnvelope,
+} from '../../common/http/api-envelope.decorator';
 import { AppConfiguration } from '../../config/configuration';
 import { PolicyEngineService } from '../../common/authorization/policy-engine.service';
 import { PERMISSIONS } from '../../common/authorization/permissions.catalog';
@@ -38,6 +42,10 @@ import { CurrentUser } from '../../common/auth/current-user.decorator';
 import { AuthenticatedPrincipal } from '../../common/auth/auth.types';
 import { IsEmail, IsString, MinLength } from 'class-validator';
 import { PasswordResetService } from './password-reset.service';
+import {
+  PatientRegistrationResponseDto,
+  StaffInvitationRegistrationResponseDto,
+} from './dto/responses/registration-response.dto';
 
 class ForgotPasswordRequest {
   @IsEmail() email!: string;
@@ -89,7 +97,7 @@ export class AuthController {
    */
   @Public()
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
-  @ApiCreatedEnvelope(SessionResponseDto)
+  @ApiCreatedUnionEnvelope(PatientRegistrationResponseDto, StaffInvitationRegistrationResponseDto)
   @Post('registrations')
   @HttpCode(HttpStatus.CREATED)
   async register(
@@ -118,7 +126,7 @@ export class AuthController {
         principal,
         {
           email: dto.email,
-          displayName: dto.displayName,
+          displayName: dto.displayName ?? dto.name!,
           role: dto.role,
           organizationId: dto.organizationId,
           clinicLocationId: dto.clinicLocationId,
@@ -138,10 +146,10 @@ export class AuthController {
     if (!dto.password || !dto.dob || !dto.gender || !dto.phone) {
       throw new ValidationAppError(
         [
-          { field: 'password', code: 'VALIDATION_FAILED' },
-          { field: 'dob', code: 'VALIDATION_FAILED' },
-          { field: 'gender', code: 'VALIDATION_FAILED' },
-          { field: 'phone', code: 'VALIDATION_FAILED' },
+          { field: 'password', code: 'VALIDATION_ERROR', message: 'Password is required.' },
+          { field: 'dob', code: 'VALIDATION_ERROR', message: 'Date of birth is required.' },
+          { field: 'gender', code: 'VALIDATION_ERROR', message: 'Gender is required.' },
+          { field: 'phone', code: 'VALIDATION_ERROR', message: 'Phone is required.' },
         ].filter((d) => !dto[d.field as keyof CreateAccountRequest]),
         'password, dob, gender, and phone are required to self-register.',
       );
@@ -150,7 +158,7 @@ export class AuthController {
       {
         email: dto.email,
         password: dto.password,
-        name: dto.displayName,
+        displayName: dto.displayName ?? dto.name!,
         dob: dto.dob,
         gender: dto.gender,
         phone: dto.phone,
@@ -333,7 +341,7 @@ export class AuthController {
     res.cookie(REFRESH_COOKIE_NAME, rawToken, {
       httpOnly: true,
       secure: auth.cookieSecure,
-      sameSite: 'lax',
+      sameSite: auth.cookieSameSite,
       domain: auth.cookieDomain,
       path: REFRESH_COOKIE_PATH,
       expires: expiresAt,

@@ -83,7 +83,74 @@ export function createOpenApiDocument(app: INestApplication): OpenAPIObject {
     .addCookieAuth('refresh_token')
     .build();
 
-  return SwaggerModule.createDocument(app, swaggerConfig);
+  const document = SwaggerModule.createDocument(app, swaggerConfig);
+  document.components ??= {};
+  document.components.schemas ??= {};
+  document.components.schemas.ApiErrorResponse = {
+    type: 'object',
+    required: ['success', 'code', 'message', 'errors', 'requestId'],
+    properties: {
+      success: { type: 'boolean', enum: [false] },
+      code: { type: 'string', example: 'VALIDATION_ERROR' },
+      message: { type: 'string' },
+      errors: { type: 'object', additionalProperties: { type: 'string' } },
+      requestId: { type: 'string', format: 'uuid' },
+    },
+  };
+  document.components.schemas.GenericSuccessEnvelope = {
+    type: 'object',
+    required: ['success', 'data', 'meta', 'requestId'],
+    properties: {
+      success: { type: 'boolean', enum: [true] },
+      data: {},
+      meta: { type: 'object', additionalProperties: true },
+      requestId: { type: 'string', format: 'uuid' },
+    },
+    description:
+      'Fallback envelope for legacy endpoints that do not yet expose a concrete response DTO.',
+  };
+  const errorResponse = {
+    description: 'Standard API error response',
+    content: {
+      'application/json': { schema: { $ref: '#/components/schemas/ApiErrorResponse' } },
+    },
+  };
+  for (const path of Object.values(document.paths)) {
+    for (const operation of Object.values(path ?? {})) {
+      if (!operation || typeof operation !== 'object' || !('responses' in operation)) continue;
+      const responses = operation.responses as Record<string, unknown>;
+      for (const status of [
+        '400',
+        '401',
+        '403',
+        '404',
+        '405',
+        '409',
+        '413',
+        '415',
+        '422',
+        '429',
+        '500',
+        '503',
+      ]) {
+        responses[status] ??= errorResponse;
+      }
+      for (const [status, rawResponse] of Object.entries(responses)) {
+        if (!/^2\d\d$/.test(status) || status === '204' || !rawResponse) continue;
+        const successResponse = rawResponse as {
+          content?: Record<string, unknown>;
+        };
+        if (successResponse.content && Object.keys(successResponse.content).length > 0) continue;
+        successResponse.content = {
+          'application/json': {
+            schema: { $ref: '#/components/schemas/GenericSuccessEnvelope' },
+          },
+        };
+        (operation as Record<string, unknown>)['x-success-schema'] = 'generic-fallback';
+      }
+    }
+  }
+  return document;
 }
 
 export function configureOpenApi(app: INestApplication): OpenApiEndpoints {

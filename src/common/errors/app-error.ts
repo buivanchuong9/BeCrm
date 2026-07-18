@@ -49,6 +49,6 @@ export class UnauthorizedAppError extends AppError {
 
 export class ValidationAppError extends AppError {
   constructor(details: AppErrorDetail[], message = 'Validation failed') {
-    super('VALIDATION_FAILED', message, HttpStatus.BAD_REQUEST, details);
+    super('VALIDATION_ERROR', message, HttpStatus.BAD_REQUEST, details);
   }
 }

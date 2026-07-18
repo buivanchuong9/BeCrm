@@ -12,7 +12,7 @@ import {
   Sse,
   MessageEvent,
 } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiProduces, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { IsIn, IsOptional, IsString, IsUUID } from 'class-validator';
 import { QueueTicketStatus } from '@prisma/client';
@@ -162,6 +162,15 @@ export class QueueContractController {
     return this.service.list(p, q);
   }
   @Sse('stream')
+  @ApiProduces('text/event-stream')
+  @ApiOkResponse({
+    description: 'Queue snapshots as Server-Sent Events.',
+    content: {
+      'text/event-stream': {
+        schema: { type: 'string', example: 'event: queue.snapshot\ndata: {...}\n\n' },
+      },
+    },
+  })
   stream(
     @CurrentUser() p: AuthenticatedPrincipal,
     @Query() q: ListQueueTicketsQuery,

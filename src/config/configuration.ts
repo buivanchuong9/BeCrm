@@ -20,6 +20,9 @@ export function buildConfiguration(env: EnvConfig) {
     documentation: { version: env.OPENAPI_VERSION ?? packageVersion() },
     frontendOrigins: env.FRONTEND_ORIGINS.split(',').map((origin) => origin.trim()),
     appPublicUrl: env.APP_PUBLIC_URL,
+    requestBodyLimit: env.REQUEST_BODY_LIMIT,
+    trustProxyHops: env.TRUST_PROXY_HOPS,
+    rateLimit: { ttlMs: env.RATE_LIMIT_TTL_MS, max: env.RATE_LIMIT_MAX },
     database: { url: env.DATABASE_URL },
     redis: { url: env.REDIS_URL },
     auth: {
@@ -30,6 +33,7 @@ export function buildConfiguration(env: EnvConfig) {
       refreshTokenTtlNotRemembered: env.REFRESH_TOKEN_TTL_NOT_REMEMBERED,
       cookieDomain: env.COOKIE_DOMAIN || undefined,
       cookieSecure: env.COOKIE_SECURE,
+      cookieSameSite: env.COOKIE_SAME_SITE,
       passwordPepper: env.PASSWORD_PEPPER,
       fieldEncryptionKey: env.FIELD_ENCRYPTION_KEY,
     },

@@ -8,6 +8,9 @@ export class UserResponseDto {
   id!: string;
 
   @ApiProperty()
+  displayName!: string;
+
+  @ApiProperty({ deprecated: true, description: 'Deprecated alias for displayName.' })
   name!: string;
 
   @ApiProperty()

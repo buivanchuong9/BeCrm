@@ -1,6 +1,6 @@
 {
   "name": "dermahealth-backend",
-  "version": "2.1.0",
+  "version": "2.2.1",
   "description": "DermaHealth clinic workflow backend (NestJS modular monolith)",
   "private": true,
   "license": "UNLICENSED",
@@ -16,6 +16,8 @@
     "start:prod": "node dist/main.js",
     "lint": "eslint \"src/**/*.ts\" --fix",
     "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test:integration": "node --test --test-concurrency=1 -r ts-node/register -r tsconfig-paths/register test/*.test.ts",
+    "contract:audit": "node scripts/audit-openapi.js",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
     "db:migrate:dev": "prisma migrate dev",

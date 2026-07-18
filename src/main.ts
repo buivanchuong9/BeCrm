@@ -8,7 +8,7 @@ import { AppConfiguration } from './config/configuration';
 import { configureOpenApi } from './documentation/openapi';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  const app = await NestFactory.create(AppModule, { bufferLogs: true, bodyParser: false });
   app.useLogger(app.get(Logger));
 
   configureApp(app);

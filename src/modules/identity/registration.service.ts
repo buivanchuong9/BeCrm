@@ -73,7 +73,7 @@ export class RegistrationService {
         const user = await this.users.createWithMembership(tx, {
           email: dto.email,
           passwordHash,
-          displayName: dto.name,
+          displayName: dto.displayName,
           phone: dto.phone,
           organizationId: organization.id,
           role: 'patient',
@@ -84,7 +84,7 @@ export class RegistrationService {
           organizationId: organization.id,
           code,
           userId: user.id,
-          name: dto.name,
+          name: dto.displayName,
           dob: new Date(`${dto.dob}T00:00:00.000Z`),
           gender: dto.gender,
           phone: dto.phone,

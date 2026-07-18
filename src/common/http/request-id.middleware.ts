@@ -14,11 +14,17 @@ declare module 'express' {
 export class RequestIdMiddleware implements NestMiddleware {
   use(req: Request, res: Response, next: NextFunction) {
     const incoming = req.header(REQUEST_ID_HEADER);
-    const requestId = incoming && isUuidLike(incoming) ? incoming : randomUUID();
+    const loggerRequestId = (req as Request & { id?: string }).id;
+    const requestId = loggerRequestId ?? createRequestId(incoming);
+    (req as Request & { id?: string }).id = requestId;
     req.requestId = requestId;
     res.setHeader(REQUEST_ID_HEADER, requestId);
     next();
   }
+}
+
+export function createRequestId(incoming?: string): string {
+  return incoming && isUuidLike(incoming) ? incoming : randomUUID();
 }
 
 function isUuidLike(value: string): boolean {

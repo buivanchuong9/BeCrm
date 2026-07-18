@@ -1,6 +1,18 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
-import { IsEmail, IsIn, IsOptional, IsString, IsUUID, Matches, MinLength } from 'class-validator';
+import { Transform } from 'class-transformer';
+import {
+  IsDateString,
+  IsEmail,
+  IsIn,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  MinLength,
+  ValidateIf,
+} from 'class-validator';
 import { INVITABLE_ROLES } from './invite-staff.dto';
 
 const GENDER_VALUES = ['male', 'female', 'other', 'unknown'] as const;
@@ -17,22 +29,55 @@ const GENDER_VALUES = ['male', 'female', 'other', 'unknown'] as const;
  * password — the invitee sets one at activation).
  */
 export class CreateAccountRequest {
-  @ApiProperty() @IsEmail() email!: string;
+  @ApiProperty({ example: 'patient@example.com', format: 'email', maxLength: 254 })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
+  @IsEmail({}, { message: 'Email must be a valid email address.' })
+  @MaxLength(254)
+  email!: string;
 
-  @ApiProperty({ description: 'Full name.' }) @IsString() @MinLength(2) displayName!: string;
+  @ApiProperty({
+    description: 'Full name. The legacy field `name` is also accepted temporarily.',
+    minLength: 2,
+    maxLength: 120,
+  })
+  @ValidateIf((request: CreateAccountRequest) => request.name === undefined)
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString({ message: 'Display name is required.' })
+  @IsNotEmpty({ message: 'Display name is required.' })
+  @MinLength(2, { message: 'Display name must be at least 2 characters.' })
+  @MaxLength(120)
+  displayName?: string;
+
+  @ApiProperty({
+    required: false,
+    deprecated: true,
+    description: 'Deprecated alias for displayName. Remove after the frontend migration window.',
+    minLength: 2,
+    maxLength: 120,
+  })
+  @ValidateIf((request: CreateAccountRequest) => request.displayName === undefined)
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString({ message: 'Display name is required.' })
+  @IsNotEmpty({ message: 'Display name is required.' })
+  @MinLength(2, { message: 'Display name must be at least 2 characters.' })
+  @MaxLength(120)
+  name?: string;
 
   @ApiProperty({
     required: false,
     description: 'Required for self-registration; omitted for a staff invite.',
+    minLength: 12,
+    maxLength: 128,
   })
   @IsOptional()
   @IsString()
-  @MinLength(12)
+  @MinLength(12, { message: 'Password must be at least 12 characters.' })
+  @MaxLength(128)
   password?: string;
 
   @ApiProperty({ required: false, format: 'date', example: '1995-03-15' })
   @IsOptional()
-  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'dob must be YYYY-MM-DD' })
+  @IsDateString({ strict: true }, { message: 'Date of birth must be a valid ISO date.' })
   dob?: string;
 
   @ApiProperty({ required: false, enum: GENDER_VALUES })
@@ -40,15 +85,31 @@ export class CreateAccountRequest {
   @IsIn(GENDER_VALUES)
   gender?: (typeof GENDER_VALUES)[number];
 
-  @ApiProperty({ required: false }) @IsOptional() @IsString() phone?: string;
+  @ApiProperty({ required: false, maxLength: 30 })
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @IsNotEmpty({ message: 'Phone is required.' })
+  @MaxLength(30)
+  phone?: string;
 
-  @ApiProperty({ required: false }) @IsOptional() @IsString() address?: string;
+  @ApiProperty({ required: false, maxLength: 500 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  address?: string;
 
   @ApiProperty({ required: false, format: 'uuid' }) @IsOptional() @IsUUID() organizationId?: string;
 
-  @ApiProperty({ required: false, description: 'Public organization code, e.g. dermahealth.' })
+  @ApiProperty({
+    required: false,
+    maxLength: 100,
+    description: 'Public organization code, e.g. dermahealth.',
+  })
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
+  @MaxLength(100)
   organizationCode?: string;
 
   @ApiProperty({

@@ -1,10 +1,23 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsInt, IsOptional, IsString, IsUUID, Min } from 'class-validator';
+import { IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength, Min } from 'class-validator';
 
 export class UpdateCurrentUserRequest {
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
+  @MaxLength(120)
+  displayName?: string;
+
+  @ApiProperty({
+    required: false,
+    deprecated: true,
+    description: 'Deprecated alias for displayName.',
+  })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(120)
   name?: string;
 
   @ApiProperty({ required: false })

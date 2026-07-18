@@ -129,7 +129,9 @@ export class UsersController {
   ) {
     this.assertCanManage(principal, userId);
     const user = await this.users.updateProfile(userId, dto.version, {
-      ...(dto.name !== undefined ? { displayName: dto.name } : {}),
+      ...(dto.displayName !== undefined || dto.name !== undefined
+        ? { displayName: dto.displayName ?? dto.name }
+        : {}),
       ...(dto.phone !== undefined ? { phone: dto.phone } : {}),
       ...(dto.avatarFileId !== undefined ? { avatarFileId: dto.avatarFileId } : {}),
     });

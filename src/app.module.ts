@@ -1,4 +1,4 @@
-import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -16,7 +16,8 @@ import { AuditModule } from './common/audit/audit.module';
 import { OutboxModule } from './common/outbox/outbox.module';
 import { IdempotencyModule } from './common/idempotency/idempotency.module';
 import { IdempotencyInterceptor } from './common/idempotency/idempotency.interceptor';
-import { RequestIdMiddleware } from './common/http/request-id.middleware';
+import { createRequestId } from './common/http/request-id.middleware';
+import { CsrfOriginGuard } from './common/http/csrf-origin.guard';
 import { JwtAuthGuard } from './common/auth/jwt-auth.guard';
 import { RolesGuard } from './common/authorization/roles.guard';
 import { AuthorizationModule } from './common/authorization/authorization.module';
@@ -60,18 +61,33 @@ import { OwnerGovernanceModule } from './modules/owner-governance/owner-governan
               'req.body.token',
               'req.body.refreshToken',
               'req.body.accessToken',
+              'req.body.deviceSecret',
+              'req.body.mfaCode',
               'req.body.mfaSecret',
               'req.body.otp',
+              'req.body.*.password',
+              'req.body.*.token',
             ],
             censor: '[REDACTED]',
           },
           autoLogging: true,
-          customProps: (req) => ({ requestId: (req as { requestId?: string }).requestId }),
+          genReqId: (req, res) => {
+            const requestId = createRequestId(req.headers['x-request-id'] as string | undefined);
+            res.setHeader('x-request-id', requestId);
+            return requestId;
+          },
+          customProps: (req) => ({ requestId: req.id }),
         },
       }),
     }),
     ScheduleModule.forRoot(),
-    ThrottlerModule.forRoot({ throttlers: [{ ttl: 60_000, limit: 100 }] }),
+    ThrottlerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<AppConfiguration, true>) => {
+        const rateLimit = config.get('rateLimit', { infer: true });
+        return { throttlers: [{ ttl: rateLimit.ttlMs, limit: rateLimit.max }] };
+      },
+    }),
     BullModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService<AppConfiguration, true>) => ({
@@ -106,12 +122,9 @@ import { OwnerGovernanceModule } from './modules/owner-governance/owner-governan
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
+    { provide: APP_GUARD, useClass: CsrfOriginGuard },
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_INTERCEPTOR, useClass: IdempotencyInterceptor },
   ],
 })
-export class AppModule implements NestModule {
-  configure(consumer: MiddlewareConsumer) {
-    consumer.apply(RequestIdMiddleware).forRoutes('*');
-  }
-}
+export class AppModule {}

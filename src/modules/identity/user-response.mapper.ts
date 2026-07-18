@@ -23,6 +23,8 @@ export function toApiUserStatus(status: UserStatus): ApiUserStatus {
 
 export interface CurrentUserResponse {
   id: string;
+  displayName: string;
+  /** @deprecated Use displayName. */
   name: string;
   email: string;
   phone: string | null;
@@ -39,6 +41,7 @@ export function toCurrentUserResponse(
 ): CurrentUserResponse {
   return {
     id: user.id,
+    displayName: user.displayName,
     name: user.displayName,
     email: user.email,
     phone: user.phone,
@@ -54,6 +57,8 @@ export function toCurrentUserResponse(
 
 export interface UserResponse {
   id: string;
+  displayName: string;
+  /** @deprecated Use displayName. */
   name: string;
   email: string;
   phone: string | null;
@@ -70,6 +75,7 @@ export function toUserResponse(
 ): UserResponse {
   return {
     id: user.id,
+    displayName: user.displayName,
     name: user.displayName,
     email: user.email,
     phone: user.phone,
