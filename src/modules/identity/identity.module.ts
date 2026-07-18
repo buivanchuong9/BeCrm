@@ -15,6 +15,8 @@ import { RefreshSessionsRepository } from './refresh-sessions.repository';
 import { JwtStrategy } from '../../common/auth/jwt.strategy';
 import { PasswordResetService } from './password-reset.service';
 import { AuditModule } from '../../common/audit/audit.module';
+import { MfaService } from './mfa/mfa.service';
+import { StaffInvitationsService } from './staff-invitations.service';
 
 @Module({
   imports: [PassportModule, JwtModule.register({}), PatientsModule, AuditModule],
@@ -29,7 +31,9 @@ import { AuditModule } from '../../common/audit/audit.module';
     UserPreferencesRepository,
     RefreshSessionsRepository,
     JwtStrategy,
+    MfaService,
+    StaffInvitationsService,
   ],
-  exports: [UsersRepository],
+  exports: [UsersRepository, MfaService, StaffInvitationsService],
 })
 export class IdentityModule {}

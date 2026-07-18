@@ -1,5 +1,18 @@
-import { Body, Controller, Get, Put, Patch } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Post,
+  Put,
+  Patch,
+  Req,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Request } from 'express';
+import { IsString, Length } from 'class-validator';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
 import { AuthenticatedPrincipal } from '../../common/auth/auth.types';
 import { ApiOkEnvelope } from '../../common/http/api-envelope.decorator';
@@ -11,6 +24,13 @@ import { CurrentUserResponseDto } from './dto/responses/current-user-response.dt
 import { UserPreferenceResponseDto } from './dto/responses/user-preference-response.dto';
 import { UpdateCurrentUserRequest } from './dto/update-current-user.dto';
 import { UpsertUserPreferenceRequest } from './dto/upsert-preferences.dto';
+import { MfaService } from './mfa/mfa.service';
+
+class MfaCodeRequest {
+  @IsString()
+  @Length(6, 6)
+  code!: string;
+}
 
 @ApiTags('me')
 @Controller({ path: 'me', version: '1' })
@@ -18,6 +38,7 @@ export class MeController {
   constructor(
     private readonly users: UsersRepository,
     private readonly preferences: UserPreferencesRepository,
+    private readonly mfa: MfaService,
   ) {}
 
   @ApiOkEnvelope(CurrentUserResponseDto)
@@ -66,6 +87,47 @@ export class MeController {
       deviceSettings: { ...dto.deviceSettings },
     });
     return { data: this.toPreferenceResponse(updated) };
+  }
+
+  // MFA: enroll (get a secret + otpauth:// URI, not yet active) →
+  // confirm (prove a live code, activates) → disable (requires a live code).
+  // Each of the 4 platform Owners is expected to enroll their own — break-
+  // glass and dangerous-action approval both require it (docs permission
+  // model box 2 "MFA riêng").
+  @ApiOkEnvelope(CurrentUserResponseDto)
+  @Post('mfa')
+  @HttpCode(HttpStatus.OK)
+  async beginMfaEnrollment(@CurrentUser() principal: AuthenticatedPrincipal) {
+    const result = await this.mfa.beginEnrollment(principal.userId, principal.email);
+    return { data: result };
+  }
+
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Post('mfa/confirmations')
+  async confirmMfaEnrollment(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Body() dto: MfaCodeRequest,
+    @Req() req: Request,
+  ): Promise<void> {
+    await this.mfa.confirmEnrollment(principal.userId, dto.code, {
+      requestId: req.requestId,
+      ip: req.ip,
+      userAgent: req.header('user-agent'),
+    });
+  }
+
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Delete('mfa')
+  async disableMfa(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Body() dto: MfaCodeRequest,
+    @Req() req: Request,
+  ): Promise<void> {
+    await this.mfa.disable(principal.userId, dto.code, {
+      requestId: req.requestId,
+      ip: req.ip,
+      userAgent: req.header('user-agent'),
+    });
   }
 
   private toPreferenceResponse(preference: {

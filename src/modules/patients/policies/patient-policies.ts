@@ -77,7 +77,10 @@ export function assertUpdateFieldsAllowed(
   patient: { userId: string | null; organizationId: string },
   requestedFields: PatientUpdatableField[],
 ): void {
-  if (isSuperAdministrator(principal) || hasRole(principal, 'medical_administrator')) {
+  // No `super_administrator` bypass — reassigning `primaryDoctorId`/
+  // `bloodType` etc. is clinical/administrative patient data, not platform
+  // administration (see encounter-policies.ts for the same rule).
+  if (hasRole(principal, 'medical_administrator')) {
     return;
   }
   const isSelf = patient.userId !== null && patient.userId === principal.userId;

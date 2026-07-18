@@ -72,6 +72,8 @@ model Organization {
   kioskDevices                  KioskDevice[]
   specialties                   Specialty[]
   practitionerClinicAssignments PractitionerClinicAssignment[]
+  staffInvitations              StaffInvitation[]
+  featureFlagOverrides          FeatureFlagOverride[]
 
   @@map("organizations")
 }
@@ -1473,4 +1475,209 @@ model PasswordResetToken {
 
   @@index([userId, expiresAt])
   @@map("password_reset_tokens")
+}
+
+// ---------------------------------------------------------------------------
+// Authorization engine (Role + Permission + Resource Scope + Feature Flag),
+// staff invitation (the single non-self-service account-creation path), Owner
+// dual-control quorum, and break-glass emergency access.
+// ---------------------------------------------------------------------------
+
+// Static catalog of fine-grained capabilities (e.g. "diagnosis.create",
+// "queue.call", "record.sign"). Resource scope (org/clinic/patient
+// membership+ownership) and feature flags are checked separately by
+// PolicyEngine — this table alone only answers "does this role ever get to
+// do X at all".
+model Permission {
+  code        String   @id
+  description String
+  // Permissions flagged dangerous are never satisfied by a bare role check —
+  // PolicyEngine additionally requires an executed DangerousActionRequest
+  // (2-of-4 Owner quorum) in the same request.
+  dangerous   Boolean  @default(false)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  role           UserRole
+  permissionCode String   @map("permission_code")
+  grantedAt      DateTime @default(now()) @map("granted_at") @db.Timestamptz
+  grantedBy      String?  @map("granted_by") @db.Uuid
+
+  permission Permission @relation(fields: [permissionCode], references: [code], onDelete: Cascade)
+
+  @@id([role, permissionCode])
+  @@map("role_permissions")
+}
+
+model FeatureFlag {
+  key            String   @id
+  description    String
+  enabledDefault Boolean  @default(false) @map("enabled_default")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  overrides FeatureFlagOverride[]
+
+  @@map("feature_flags")
+}
+
+// Per-organization override of a flag's platform-wide default. Resolution
+// order (FeatureFlagsService.isEnabled): override for this org, else
+// FeatureFlag.enabledDefault.
+model FeatureFlagOverride {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  featureKey     String   @map("feature_key")
+  organizationId String   @map("organization_id") @db.Uuid
+  enabled        Boolean
+  updatedBy      String?  @map("updated_by") @db.Uuid
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  featureFlag  FeatureFlag  @relation(fields: [featureKey], references: [key], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([featureKey, organizationId])
+  @@map("feature_flag_overrides")
+}
+
+enum InvitationStatus {
+  pending
+  accepted
+  revoked
+  expired
+}
+
+// The sole staff/admin account-creation path: an Owner (or a role holding
+// `user.invite`) invites by email+role+clinic+department, the invitee sets
+// their own password to activate (docs/api.md account model box 1, right
+// side). Patient self-registration (`POST /auth/registrations`) is the only
+// other account-creation entry point — never a generic "create user" API a
+// client can call with an arbitrary role. Hash-only/shown-once token, same
+// pattern as PasswordResetToken.
+model StaffInvitation {
+  id               String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email            String           @db.Citext
+  displayName      String           @map("display_name")
+  role             UserRole
+  organizationId   String           @map("organization_id") @db.Uuid
+  clinicLocationId String?          @map("clinic_location_id") @db.Uuid
+  departmentId     String?          @map("department_id") @db.Uuid
+  invitedBy        String           @map("invited_by") @db.Uuid
+  userId           String?          @map("user_id") @db.Uuid
+  tokenHash        String           @unique @map("token_hash")
+  status           InvitationStatus @default(pending)
+  expiresAt        DateTime         @map("expires_at") @db.Timestamptz
+  acceptedAt       DateTime?        @map("accepted_at") @db.Timestamptz
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@index([email, status])
+  @@map("staff_invitations")
+}
+
+enum DangerousActionType {
+  add_owner
+  revoke_all_sessions
+  bulk_directory_export
+  bulk_membership_revoke
+  disable_audit
+}
+
+enum DangerousActionStatus {
+  pending
+  approved
+  rejected
+  executed
+  expired
+}
+
+enum ApprovalDecision {
+  approved
+  rejected
+}
+
+// Dual-control (2-of-4 Owner quorum) gate for the platform's most
+// destructive actions ("Tác vụ cực nguy hiểm: cần 2/4"). The requester's own
+// vote is recorded as the first approval (DangerousActionsService.propose),
+// so exactly one more super_administrator must approve before execution.
+// Actor columns are plain scalar UUIDs with no Prisma relation, same
+// precedent as AuditEvent.actorId — they identify who acted, not a
+// structural ownership relationship.
+model DangerousActionRequest {
+  id                String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  type              DangerousActionType
+  payload           Json
+  reason            String
+  requestedBy       String                @map("requested_by") @db.Uuid
+  status            DangerousActionStatus @default(pending)
+  requiredApprovals Int                   @default(2) @map("required_approvals")
+  expiresAt         DateTime              @map("expires_at") @db.Timestamptz
+  executedAt        DateTime?             @map("executed_at") @db.Timestamptz
+  executionResult   Json?                 @map("execution_result")
+  createdAt         DateTime              @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime              @updatedAt @map("updated_at") @db.Timestamptz
+
+  approvals DangerousActionApproval[]
+
+  @@index([status, expiresAt])
+  @@map("dangerous_action_requests")
+}
+
+model DangerousActionApproval {
+  id         String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  requestId  String           @map("request_id") @db.Uuid
+  approverId String           @map("approver_id") @db.Uuid
+  decision   ApprovalDecision
+  reason     String?
+  decidedAt  DateTime         @default(now()) @map("decided_at") @db.Timestamptz
+
+  request DangerousActionRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@unique([requestId, approverId])
+  @@map("dangerous_action_approvals")
+}
+
+enum BreakGlassStatus {
+  active
+  ended
+  expired
+}
+
+// Emergency, time-limited, MFA-gated read access to one patient's clinical
+// record for a super_administrator (Owner) — Owners otherwise never see
+// clinical content (see the removed super_administrator bypasses in
+// encounter/clinical-orders/medical-records policies). Every grant and every
+// read made under it is CRITICAL-audited (AuditEvent.breakGlass = true).
+model BreakGlassGrant {
+  id        String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  granteeId String           @map("grantee_id") @db.Uuid
+  patientId String           @map("patient_id") @db.Uuid
+  reason    String
+  status    BreakGlassStatus @default(active)
+  grantedAt DateTime         @default(now()) @map("granted_at") @db.Timestamptz
+  expiresAt DateTime         @map("expires_at") @db.Timestamptz
+  endedAt   DateTime?        @map("ended_at") @db.Timestamptz
+
+  @@index([granteeId, patientId, status])
+  @@map("break_glass_grants")
+}
+
+// Singleton row (id is always 1) holding platform-wide security posture.
+// Audit writes for anything security/compliance-critical (break-glass,
+// owner-governance, permission/feature-flag changes) are hard-coded in
+// AuditService to ignore auditSuspendedUntil — see that class for why a
+// literal "disable audit" switch is intentionally not offered.
+model PlatformSecuritySetting {
+  id                   Int       @id @default(1)
+  auditSuspendedUntil  DateTime? @map("audit_suspended_until") @db.Timestamptz
+  auditSuspendedBy     String?   @map("audit_suspended_by") @db.Uuid
+  auditSuspendedReason String?   @map("audit_suspended_reason")
+  updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("platform_security_settings")
 }

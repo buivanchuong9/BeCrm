@@ -6,9 +6,17 @@ import { ForbiddenAppError } from '../errors/app-error';
 import { AuthenticatedPrincipal } from '../auth/auth.types';
 import { ROLES_KEY } from './roles.decorator';
 
-/** super_administrator passes every role gate, mirroring the frontend's
- * `hasRoleAccess` override — but unlike the frontend, this alone never grants
- * clinical-content access (see BREAK_GLASS policy for that). */
+/** super_administrator passes every *role* gate here, mirroring the
+ * frontend's `hasRoleAccess` override — but this guard only proves "this
+ * actor may reach this route", never "this actor may author clinical
+ * content". The individual policy functions called inside each clinical
+ * service (encounter-policies.assertCanTransition/CreateEncounter/
+ * CloseEncounter, clinical-orders' assertAssignedRole, medical-records'
+ * DOCTOR/reopen checks, workflow-policies.assertHasRole/assertCanActOnTask)
+ * deliberately do NOT extend this bypass to super_administrator — an Owner
+ * reaches clinical data only through BreakGlassGrant (see
+ * modules/owner-governance/break-glass.service.ts), never a standing
+ * permission. */
 @Injectable()
 export class RolesGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}

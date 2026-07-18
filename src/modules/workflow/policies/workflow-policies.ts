@@ -26,17 +26,16 @@ export const WORKFLOW_ACTIVATION_ROLES: UserRole[] = ['doctor', 'medical_adminis
 export const WORKFLOW_CANCEL_ROLES: UserRole[] = ['doctor', 'medical_administrator'];
 export const TASK_REASSIGN_ROLES: UserRole[] = ['nurse', 'doctor', 'medical_administrator'];
 
-function isSuperAdministrator(principal: AuthenticatedPrincipal): boolean {
-  return principal.memberships.some((m) => m.role === 'super_administrator');
-}
-
+/** No `super_administrator` bypass on either function below — authoring a
+ * clinical workflow template and executing/reassigning a patient's workflow
+ * task are both clinical-process authorship, not platform administration.
+ * See encounter-policies.ts for the same rule applied to encounters. */
 export function assertHasRole(
   principal: AuthenticatedPrincipal,
   organizationId: string,
   roles: UserRole[],
   message: string,
 ): void {
-  if (isSuperAdministrator(principal)) return;
   const has = principal.memberships.some(
     (m) => m.organizationId === organizationId && roles.includes(m.role),
   );
@@ -56,7 +55,6 @@ export function assertCanActOnTask(
   responsibleRole: UserRole,
   assigneeId: string | null,
 ): void {
-  if (isSuperAdministrator(principal)) return;
   if (assigneeId && assigneeId === principal.userId) return;
   const holdsRole = principal.memberships.some(
     (m) => m.organizationId === organizationId && m.role === responsibleRole,

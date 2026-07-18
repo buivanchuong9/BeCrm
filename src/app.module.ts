@@ -19,6 +19,8 @@ import { IdempotencyInterceptor } from './common/idempotency/idempotency.interce
 import { RequestIdMiddleware } from './common/http/request-id.middleware';
 import { JwtAuthGuard } from './common/auth/jwt-auth.guard';
 import { RolesGuard } from './common/authorization/roles.guard';
+import { AuthorizationModule } from './common/authorization/authorization.module';
+import { PermissionsGuard } from './common/authorization/permissions.guard';
 
 import { IdentityModule } from './modules/identity/identity.module';
 import { OrganizationsModule } from './modules/organizations/organizations.module';
@@ -34,6 +36,7 @@ import { PractitionersModule } from './modules/practitioners/practitioners.modul
 import { WorkflowModule } from './modules/workflow/workflow.module';
 import { MedicalRecordsModule } from './modules/medical-records/medical-records.module';
 import { OperationsModule } from './modules/operations/operations.module';
+import { OwnerGovernanceModule } from './modules/owner-governance/owner-governance.module';
 
 @Module({
   imports: [
@@ -81,6 +84,7 @@ import { OperationsModule } from './modules/operations/operations.module';
     AuditModule,
     OutboxModule,
     IdempotencyModule,
+    AuthorizationModule,
 
     IdentityModule,
     OrganizationsModule,
@@ -95,11 +99,13 @@ import { OperationsModule } from './modules/operations/operations.module';
     WorkflowModule,
     MedicalRecordsModule,
     OperationsModule,
+    OwnerGovernanceModule,
     HealthModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
+    { provide: APP_GUARD, useClass: PermissionsGuard },
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_INTERCEPTOR, useClass: IdempotencyInterceptor },
   ],

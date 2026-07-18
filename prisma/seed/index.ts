@@ -1,6 +1,11 @@
 import 'dotenv/config';
 import { PrismaClient, UserRole } from '@prisma/client';
 import * as argon2 from 'argon2';
+import {
+  PERMISSION_CATALOG,
+  DEFAULT_ROLE_PERMISSIONS,
+} from '../../src/common/authorization/permissions.catalog';
+import { FEATURE_FLAG_CATALOG } from '../../src/common/authorization/feature-flags.catalog';
 
 /**
  * Deterministic, idempotent development seed. Keyed by natural codes (org/clinic/
@@ -8,8 +13,15 @@ import * as argon2 from 'argon2';
  *
  * Corrects the frontend's confirmed seed defects (spec section 37/45): every
  * seeded user gets a unique identity instead of the frontend's duplicated
- * `U-0014`/`U-0015` ids, and the implicit single clinic (`CS-HCM-01` /
- * "DermaHealth TP.HCM") becomes a real ClinicLocation row instead of a free string.
+ * `U-0014`/`U-0015` ids, and the implicit single clinic (`CS-HN-01` /
+ * "DermaHealth Hà Nội") becomes a real ClinicLocation row instead of a free
+ * string.
+ *
+ * Also fixes a real defect the previous version of this file had: 'Asia/Hà
+ * Nội' is not a valid IANA timezone identifier (accented characters aren't
+ * legal in tzdata zone names — the only real zone covering Vietnam is
+ * 'Asia/Ho_Chi_Minh'). Any timezone-aware date library given the old string
+ * would throw or silently fall back to UTC.
  */
 
 const prisma = new PrismaClient();
@@ -32,12 +44,12 @@ async function main() {
   });
 
   const clinic = await prisma.clinicLocation.upsert({
-    where: { organizationId_code: { organizationId: organization.id, code: 'CS-HCM-01' } },
-    update: { name: 'DermaHealth TP.HCM', status: 'active' },
+    where: { organizationId_code: { organizationId: organization.id, code: 'CS-HN-01' } },
+    update: { name: 'DermaHealth Hà Nội', status: 'active' },
     create: {
       organizationId: organization.id,
-      code: 'CS-HCM-01',
-      name: 'DermaHealth TP.HCM',
+      code: 'CS-HN-01',
+      name: 'DermaHealth Hà Nội',
       timezone: 'Asia/Ho_Chi_Minh',
       status: 'active',
     },
@@ -82,7 +94,12 @@ async function main() {
   }
 
   const users: SeedUser[] = [
-    { email: 'nguyenvana@example.test', displayName: 'Nguyễn Văn A', role: 'patient', clinicScoped: false },
+    {
+      email: 'nguyenvana@example.test',
+      displayName: 'Nguyễn Văn A',
+      role: 'patient',
+      clinicScoped: false,
+    },
     {
       email: 'bs.nguyenthian@example.test',
       displayName: 'Bs. Nguyễn Thị An',
@@ -147,22 +164,22 @@ async function main() {
       clinicScoped: true,
     },
     {
-      email: 'buivanchuong.ma@example.test',
-      displayName: 'Bùi Văn Chương',
+      email: 'lythingoc@example.test',
+      displayName: 'Lý Thị Ngọc',
       role: 'medical_administrator',
       departmentCode: 'QUAN-TRI-YT',
       clinicScoped: false,
     },
     {
-      email: 'daovanduong.ma@example.test',
-      displayName: 'Đào Văn Dương',
+      email: 'hoangvanbinh@example.test',
+      displayName: 'Hoàng Văn Bình',
       role: 'medical_administrator',
       departmentCode: 'QUAN-TRI-YT',
       clinicScoped: false,
     },
     {
-      email: 'nguyenmanhcuong.ma@example.test',
-      displayName: 'Nguyễn Mạnh Cường',
+      email: 'vuthikimanh@example.test',
+      displayName: 'Vũ Thị Kim Anh',
       role: 'medical_administrator',
       departmentCode: 'QUAN-TRI-YT',
       clinicScoped: false,
@@ -181,30 +198,37 @@ async function main() {
       departmentCode: 'THIET-KE-QT',
       clinicScoped: false,
     },
+    // The 4 platform Owners (docs permission model box 2: "4 tài khoản quyền
+    // cao nhất") — each a distinct account with its own email, own MFA
+    // (enrolled separately after first login, see MfaService), own audit
+    // trail (AuditEvent.actorId), never shared credentials. All based in Hà
+    // Nội. Any action tagged `dangerous: true` in the permission catalog
+    // requires 2 of these 4 to approve (see DangerousActionsService) — no
+    // single Owner account can execute one alone.
     {
-      email: 'daovanduong.sa@example.test',
-      displayName: 'Đào Văn Dương',
+      email: 'buivanchuong@dermahealth.vn',
+      displayName: 'Bùi Văn Chương',
       role: 'super_administrator',
       departmentCode: 'BQT-HE-THONG',
       clinicScoped: false,
     },
     {
-      email: 'nguyenmanhcuong.sa@example.test',
+      email: 'nguyenmanhcuong@dermahealth.vn',
       displayName: 'Nguyễn Mạnh Cường',
       role: 'super_administrator',
       departmentCode: 'BQT-HE-THONG',
       clinicScoped: false,
     },
     {
-      email: 'phamthihongchuc@example.test',
-      displayName: 'Phạm Thị Hồng Chúc',
+      email: 'daovanduong@dermahealth.vn',
+      displayName: 'Đào Văn Dương',
       role: 'super_administrator',
       departmentCode: 'BQT-HE-THONG',
       clinicScoped: false,
     },
     {
-      email: 'buivanchuong.sa@example.test',
-      displayName: 'Bùi Văn Chương',
+      email: 'phamthihongchuc@dermahealth.vn',
+      displayName: 'Phạm Thị Hồng Chúc',
       role: 'super_administrator',
       departmentCode: 'BQT-HE-THONG',
       clinicScoped: false,
@@ -403,8 +427,56 @@ async function main() {
     });
   }
 
+  // Permission catalog + default role→permission matrix (authorization
+  // engine's "Role + Permission" box). Upserted so re-running the seed picks
+  // up catalog additions without duplicating rows.
+  for (const permission of PERMISSION_CATALOG) {
+    await prisma.permission.upsert({
+      where: { code: permission.code },
+      update: { description: permission.description, dangerous: permission.dangerous ?? false },
+      create: {
+        code: permission.code,
+        description: permission.description,
+        dangerous: permission.dangerous ?? false,
+      },
+    });
+  }
+  for (const [role, permissionCodes] of Object.entries(DEFAULT_ROLE_PERMISSIONS) as Array<
+    [UserRole, string[]]
+  >) {
+    for (const permissionCode of permissionCodes) {
+      const existing = await prisma.rolePermission.findUnique({
+        where: { role_permissionCode: { role, permissionCode } },
+      });
+      if (!existing) {
+        await prisma.rolePermission.create({ data: { role, permissionCode } });
+      }
+    }
+  }
+
+  // Feature flag catalog ("Feature Flag" box) — platform-wide defaults only;
+  // per-organization overrides are created at runtime via FeatureFlagsService.
+  for (const flag of FEATURE_FLAG_CATALOG) {
+    await prisma.featureFlag.upsert({
+      where: { key: flag.key },
+      update: { description: flag.description },
+      create: { key: flag.key, description: flag.description, enabledDefault: flag.enabledDefault },
+    });
+  }
+
+  // Singleton platform security posture row (audit-suspension state).
+  await prisma.platformSecuritySetting.upsert({
+    where: { id: 1 },
+    update: {},
+    create: { id: 1 },
+  });
+
   // eslint-disable-next-line no-console
   console.log(`Seed complete: organization=${organization.code}, clinic=${clinic.code}, users=${users.length}`);
+  // eslint-disable-next-line no-console
+  console.log(
+    `${userIdByEmail.size} users, ${PERMISSION_CATALOG.length} permissions, ${FEATURE_FLAG_CATALOG.length} feature flags seeded.`,
+  );
   // eslint-disable-next-line no-console
   console.log(`Development login password for every seeded user: value of SEED_DEMO_PASSWORD in .env`);
 }

@@ -6,7 +6,7 @@ export class RegisterKioskDeviceRequest {
   @IsUUID()
   clinicLocationId!: string;
 
-  @ApiProperty({ example: 'Kiosk — Sảnh chính CS-HCM-01' })
+  @ApiProperty({ example: 'Kiosk — Sảnh chính CS-HN-01' })
   @IsString()
   label!: string;
 }

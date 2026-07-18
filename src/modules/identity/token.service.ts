@@ -2,7 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { randomBytes, createHash } from 'crypto';
-import { AccessTokenClaims, MembershipScope } from '../../common/auth/auth.types';
+import {
+  AccessTokenClaims,
+  AuthenticatedPrincipal,
+  MembershipScope,
+} from '../../common/auth/auth.types';
 import { AppConfiguration } from '../../config/configuration';
 
 export interface IssuedAccessToken {
@@ -38,6 +42,32 @@ export class TokenService {
       expiresIn: auth.accessTokenTtl,
     } as never);
     return { token, expiresInSeconds: ttlToSeconds(auth.accessTokenTtl) };
+  }
+
+  /** Optional-auth support for `POST /auth/registrations`: the single
+   * account-creation endpoint reads an already-issued access token, if any,
+   * to decide "self-registering patient" vs "Owner/admin inviting staff" —
+   * without JwtAuthGuard's usual hard-fail, since this route must remain
+   * reachable with no token at all. Returns null on any verification
+   * failure rather than throwing — an invalid/expired token on this
+   * specific route just means "treat this as an anonymous self-registration
+   * attempt", not an auth error. */
+  verifyAccessToken(rawToken: string): AuthenticatedPrincipal | null {
+    const auth = this.config.get('auth', { infer: true });
+    try {
+      const claims = this.jwtService.verify<AccessTokenClaims>(rawToken, {
+        algorithms: ['RS256'],
+        publicKey: auth.accessTokenPublicKey,
+      } as never);
+      return {
+        userId: claims.sub,
+        email: claims.email,
+        displayName: claims.displayName,
+        memberships: claims.memberships,
+      };
+    } catch {
+      return null;
+    }
   }
 
   issueRefreshToken(remember: boolean): IssuedRefreshToken {

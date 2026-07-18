@@ -45,14 +45,17 @@ export class ClinicalOrdersService {
   /** docs/api.md section 26: technician actions require holding the order's
    * `assignedRole` in the encounter's organization — department-string
    * matching is out of scope for Phase 2 (Encounter.department is free text,
-   * not linked to the Department reference table yet). */
+   * not linked to the Department reference table yet).
+   *
+   * No `super_administrator` bypass, matching `create` below (which never
+   * had one) — recording a clinical result is authorship of clinical
+   * content, same category as diagnosis/order creation, not platform
+   * administration. */
   private assertAssignedRole(
     principal: AuthenticatedPrincipal,
     organizationId: string,
     role: UserRole,
   ) {
-    const isSuperAdmin = principal.memberships.some((m) => m.role === 'super_administrator');
-    if (isSuperAdmin) return;
     const has = principal.memberships.some(
       (m) => m.organizationId === organizationId && m.role === role,
     );

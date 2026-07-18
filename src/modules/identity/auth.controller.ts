@@ -14,13 +14,22 @@ import { ConfigService } from '@nestjs/config';
 import { Request, Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { Public } from '../../common/auth/public.decorator';
-import { UnauthorizedAppError } from '../../common/errors/app-error';
+import {
+  ForbiddenAppError,
+  UnauthorizedAppError,
+  ValidationAppError,
+} from '../../common/errors/app-error';
 import { ApiCreatedEnvelope, ApiOkEnvelope } from '../../common/http/api-envelope.decorator';
 import { AppConfiguration } from '../../config/configuration';
+import { PolicyEngineService } from '../../common/authorization/policy-engine.service';
+import { PERMISSIONS } from '../../common/authorization/permissions.catalog';
 import { AuthService, LoginResult } from './auth.service';
 import { RegistrationService } from './registration.service';
 import { CreateSessionRequest, EndAllSessionsRequest } from './dto/create-session.dto';
-import { RegisterPatientRequest } from './dto/register-patient.dto';
+import { CreateAccountRequest } from './dto/create-account.dto';
+import { AcceptInvitationRequest } from './dto/invite-staff.dto';
+import { StaffInvitationsService } from './staff-invitations.service';
+import { TokenService } from './token.service';
 import { SessionResponseDto } from './dto/responses/current-user-response.dto';
 import { PasswordService } from './password.service';
 import { UsersRepository } from './users.repository';
@@ -54,41 +63,129 @@ export class AuthController {
     private readonly passwordResetService: PasswordResetService,
     private readonly users: UsersRepository,
     private readonly config: ConfigService<AppConfiguration, true>,
+    private readonly staffInvitations: StaffInvitationsService,
+    private readonly tokenService: TokenService,
+    private readonly policyEngine: PolicyEngineService,
   ) {}
 
-  // Public patient self-registration — auto-issues a session on success so
-  // the client doesn't need a separate login round trip immediately after.
+  /**
+   * The ONE account-creation endpoint — not two. Marked `@Public()` so it's
+   * reachable with no token at all, but it still reads an optional bearer
+   * token to decide which of the two branches applies:
+   *
+   * - No valid token → anonymous self-registration. `role` must be absent
+   *   (always becomes `patient`); `password`/`dob`/`gender`/`phone` are
+   *   required. Auto-issues a session, same as before.
+   * - Valid token, caller holds `user.invite` → staff invitation. `role`
+   *   (from INVITABLE_ROLES — never `patient` or `super_administrator`) and
+   *   `organizationId` are required; no `password` (the invitee sets one at
+   *   `POST /auth/invitations/activation`). Returns the invitation, not a
+   *   session — the caller creating the account isn't the one logging in.
+   *
+   * A single compromised/careless client can therefore never mint a
+   * privileged account by simply omitting a header: the branch is decided
+   * server-side from a cryptographically verified token, not a client-sent
+   * flag.
+   */
   @Public()
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @ApiCreatedEnvelope(SessionResponseDto)
   @Post('registrations')
   @HttpCode(HttpStatus.CREATED)
   async register(
-    @Body() dto: RegisterPatientRequest,
+    @Body() dto: CreateAccountRequest,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const result = await this.registrationService.registerPatient(dto, {
+    const principal = this.extractPrincipal(req);
+    const context = { ip: req.ip, userAgent: req.header('user-agent'), requestId: req.requestId };
+
+    if (principal) {
+      await this.policyEngine.assert(principal, PERMISSIONS.USER_INVITE);
+      if (!dto.role) {
+        throw new ValidationAppError(
+          [{ field: 'role', code: 'VALIDATION_FAILED' }],
+          'role is required when creating a staff account.',
+        );
+      }
+      if (!dto.organizationId) {
+        throw new ValidationAppError(
+          [{ field: 'organizationId', code: 'VALIDATION_FAILED' }],
+          'organizationId is required when creating a staff account.',
+        );
+      }
+      const invitation = await this.staffInvitations.invite(
+        principal,
+        {
+          email: dto.email,
+          displayName: dto.displayName,
+          role: dto.role,
+          organizationId: dto.organizationId,
+          clinicLocationId: dto.clinicLocationId,
+          departmentId: dto.departmentId,
+        },
+        context,
+      );
+      return { data: { mode: 'invited', ...invitation } };
+    }
+
+    if (dto.role) {
+      throw new ForbiddenAppError(
+        'AUTH_FORBIDDEN',
+        'Only an authenticated caller with permission may set a role — self-registration is always a patient account.',
+      );
+    }
+    if (!dto.password || !dto.dob || !dto.gender || !dto.phone) {
+      throw new ValidationAppError(
+        [
+          { field: 'password', code: 'VALIDATION_FAILED' },
+          { field: 'dob', code: 'VALIDATION_FAILED' },
+          { field: 'gender', code: 'VALIDATION_FAILED' },
+          { field: 'phone', code: 'VALIDATION_FAILED' },
+        ].filter((d) => !dto[d.field as keyof CreateAccountRequest]),
+        'password, dob, gender, and phone are required to self-register.',
+      );
+    }
+    const result = await this.registrationService.registerPatient(
+      {
+        email: dto.email,
+        password: dto.password,
+        name: dto.displayName,
+        dob: dto.dob,
+        gender: dto.gender,
+        phone: dto.phone,
+        address: dto.address,
+        organizationId: dto.organizationId,
+        organizationCode: dto.organizationCode,
+      },
+      context,
+    );
+    this.setRefreshCookie(res, result.refreshToken, result.refreshTokenExpiresAt);
+    return { data: { mode: 'registered', ...this.toSessionResponse(result) } };
+  }
+
+  private extractPrincipal(req: Request): AuthenticatedPrincipal | null {
+    const header = req.header('authorization');
+    if (!header?.startsWith('Bearer ')) return null;
+    return this.tokenService.verifyAccessToken(header.slice('Bearer '.length));
+  }
+
+  // Sets a password to activate an account created by the invite branch of
+  // `POST /auth/registrations` above — a follow-up activation step for an
+  // already-created account, not a second account-creation entry point.
+  @Public()
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Post('invitations/activation')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async activateInvitation(
+    @Body() dto: AcceptInvitationRequest,
+    @Req() req: Request,
+  ): Promise<void> {
+    await this.staffInvitations.activate(dto.token, dto.password, {
       ip: req.ip,
       userAgent: req.header('user-agent'),
       requestId: req.requestId,
     });
-    this.setRefreshCookie(res, result.refreshToken, result.refreshTokenExpiresAt);
-    return { data: this.toSessionResponse(result) };
-  }
-
-  /** Compatibility path from tailieuapi.md. */
-  @Public()
-  @Throttle({ default: { limit: 5, ttl: 60_000 } })
-  @ApiCreatedEnvelope(SessionResponseDto)
-  @Post('register')
-  @HttpCode(HttpStatus.CREATED)
-  registerAccount(
-    @Body() dto: RegisterPatientRequest,
-    @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    return this.register(dto, req, res);
   }
 
   @Public()

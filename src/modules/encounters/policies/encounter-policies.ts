@@ -66,9 +66,15 @@ export function viewOrgWideOrganizationIds(principal: AuthenticatedPrincipal): s
 
 /** Roles allowed to create a walk-in/follow-up encounter directly (docs/api.md
  * ENC-5). Appointment-origin encounters are only ever created as a side effect
- * of AppointmentsService.book — never through this endpoint. */
+ * of AppointmentsService.book — never through this endpoint.
+ *
+ * No `super_administrator` bypass here (unlike `resolveEncounterListScope`
+ * above, which is read-only administrative visibility): creating an
+ * encounter is authoring clinical activity, and per the permission model an
+ * Owner never does that directly — see the removed bypass this replaced,
+ * and DoctorDecisionService's identical precedent for diagnosis/plan
+ * authorship. */
 export function assertCanCreateEncounter(principal: AuthenticatedPrincipal): void {
-  if (isSuperAdministrator(principal)) return;
   const allowed = ['receptionist', 'doctor', 'medical_administrator'];
   if (!principal.memberships.some((m) => allowed.includes(m.role))) {
     throw new ForbiddenAppError('AUTH_FORBIDDEN', 'This role cannot create encounters.');
@@ -78,13 +84,17 @@ export function assertCanCreateEncounter(principal: AuthenticatedPrincipal): voi
 /** docs/api.md section 23 / section 40 SEC-01: the generic transition command
  * additionally requires the caller to hold one of the roles the state machine
  * assigns to this specific edge — EncounterStateMachine.assertTransitionAllowed
- * only proves the edge is legal, not that this actor may drive it. */
+ * only proves the edge is legal, not that this actor may drive it.
+ *
+ * No `super_administrator` bypass: driving an encounter's clinical state is
+ * an authorship action, not platform administration — an Owner forging a
+ * transition (e.g. into `record_signed`) would be indistinguishable from a
+ * real clinician doing it. */
 export function assertCanTransition(
   principal: AuthenticatedPrincipal,
   from: EncounterStatus,
   to: EncounterStatus,
 ): void {
-  if (isSuperAdministrator(principal)) return;
   const allowedRoles = rolesAllowedForTransition(from, to) ?? [];
   if (!principal.memberships.some((m) => allowedRoles.includes(m.role))) {
     throw new ForbiddenAppError(
@@ -95,9 +105,9 @@ export function assertCanTransition(
 }
 
 /** docs/api.md ENC-7: close is doctor/medical_administrator only, on top of
- * the state-machine + signed-record preconditions enforced in the service. */
+ * the state-machine + signed-record preconditions enforced in the service.
+ * No `super_administrator` bypass — same reasoning as assertCanTransition. */
 export function assertCanCloseEncounter(principal: AuthenticatedPrincipal): void {
-  if (isSuperAdministrator(principal)) return;
   const allowed = ['doctor', 'medical_administrator'];
   if (!principal.memberships.some((m) => allowed.includes(m.role))) {
     throw new ForbiddenAppError(

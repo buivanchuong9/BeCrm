@@ -12,7 +12,12 @@ import {
 import { EncountersRepository } from '../encounters/encounters.repository';
 
 type Context = { requestId?: string; ip?: string; userAgent?: string };
-const DOCTOR = ['doctor', 'super_administrator'];
+// No `super_administrator` bypass: prescribing, diagnosing, signing, and
+// annotating a medical record are clinical authorship, the one category of
+// action the permission model never lets an Owner perform directly (see
+// DoctorDecisionService's identical precedent and the removed bypasses in
+// encounter-policies.ts / clinical-orders.service.ts).
+const DOCTOR = ['doctor'];
 
 @Injectable()
 export class MedicalRecordsService {
@@ -317,7 +322,8 @@ export class MedicalRecordsService {
     return { data: added };
   }
   async reopen(p: AuthenticatedPrincipal, recordId: string, reason: string, c: Context) {
-    this.requireRole(p, ['medical_administrator', 'super_administrator']);
+    // No `super_administrator` bypass — same reasoning as DOCTOR above.
+    this.requireRole(p, ['medical_administrator']);
     const { record, encounter: e } = await this.recordVisible(p, recordId);
     const updated = await this.prisma.$transaction(async (tx) => {
       const row = await tx.medicalRecord.update({
