@@ -11,14 +11,15 @@ import {
   Req,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { Request } from 'express';
 import { IsString, Length } from 'class-validator';
-import { CurrentUser } from '../../common/auth/current-user.decorator';
-import { AuthenticatedPrincipal } from '../../common/auth/auth.types';
-import { ApiOkEnvelope } from '../../common/http/api-envelope.decorator';
+import { CurrentUser } from '../../core/security/current-user.decorator';
+import { AuthenticatedPrincipal } from '../../core/security/auth.types';
+import { ApiOkEnvelope } from '../../core/http/api-envelope.decorator';
 import { UsersRepository } from './users.repository';
 import { UserPreferencesRepository } from './user-preferences.repository';
-import { NotFoundAppError } from '../../common/errors/app-error';
+import { NotFoundAppError } from '../../core/errors/app-error';
 import { toCurrentUserResponse } from './user-response.mapper';
 import { CurrentUserResponseDto } from './dto/responses/current-user-response.dto';
 import { UserPreferenceResponseDto } from './dto/responses/user-preference-response.dto';
@@ -104,6 +105,12 @@ export class MeController {
     return { data: result };
   }
 
+  // SECURITY HARDENING: a 6-digit TOTP code is only ~10^6 possibilities;
+  // this previously relied solely on the global default throttle
+  // (RATE_LIMIT_MAX, 100/60s) which is not tight enough for a per-account
+  // code-guessing endpoint. Matches the tighter throttle already used for
+  // login/reset-password.
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @HttpCode(HttpStatus.NO_CONTENT)
   @Post('mfa/confirmations')
   async confirmMfaEnrollment(
@@ -118,6 +125,7 @@ export class MeController {
     });
   }
 
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @HttpCode(HttpStatus.NO_CONTENT)
   @Delete('mfa')
   async disableMfa(

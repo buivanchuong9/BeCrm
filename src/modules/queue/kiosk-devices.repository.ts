@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { KioskDevice, Prisma } from '@prisma/client';
 import { randomBytes, createHash, timingSafeEqual } from 'crypto';
-import { PrismaService } from '../../infrastructure/database/prisma.service';
+import { PrismaService } from '../../core/database/prisma.service';
 
 export function generateDeviceSecret(): string {
   return randomBytes(32).toString('base64url');

@@ -1,6 +1,6 @@
 import { UserRole } from '@prisma/client';
-import { AuthenticatedPrincipal } from '../../../common/auth/auth.types';
-import { ForbiddenAppError } from '../../../common/errors/app-error';
+import { AuthenticatedPrincipal } from '../../../core/security/auth.types';
+import { ForbiddenAppError } from '../../../core/errors/app-error';
 
 /** docs/api.md section 27: template authoring roles; publish/archive is
  * medical_administrator-only (confirmed verbatim `assertRole` sites). */

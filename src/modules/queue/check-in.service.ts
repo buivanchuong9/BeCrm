@@ -1,13 +1,13 @@
 import { Injectable, HttpStatus } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { PrismaService } from '../../infrastructure/database/prisma.service';
-import { AuditService } from '../../common/audit/audit.service';
+import { PrismaService } from '../../core/database/prisma.service';
+import { AuditService } from '../../core/audit/audit.service';
 import {
   AppError,
   ConflictAppError,
   ForbiddenAppError,
   NotFoundAppError,
-} from '../../common/errors/app-error';
+} from '../../core/errors/app-error';
 import { AppointmentsRepository } from '../appointments/appointments.repository';
 import { CheckInTokensRepository, hashToken } from '../appointments/check-in-tokens.repository';
 import { EncountersRepository } from '../encounters/encounters.repository';
@@ -17,7 +17,7 @@ import { toQueueTicketResponse } from './queue-ticket-response.mapper';
 import { estimateQueuePosition } from './queue-estimate.util';
 import { CreateCheckInRequest } from './dto/create-check-in.dto';
 import { CheckInResponseDto } from './dto/responses/check-in-response.dto';
-import { OutboxService } from '../../common/outbox/outbox.service';
+import { OutboxService } from '../../core/outbox/outbox.service';
 
 export interface RequestContext {
   requestId?: string;

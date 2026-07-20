@@ -1,6 +1,6 @@
 import { EncounterStatus } from '@prisma/client';
-import { AuthenticatedPrincipal } from '../../../common/auth/auth.types';
-import { ForbiddenAppError } from '../../../common/errors/app-error';
+import { AuthenticatedPrincipal } from '../../../core/security/auth.types';
+import { ForbiddenAppError } from '../../../core/errors/app-error';
 import { rolesAllowedForTransition } from '../encounter-state-machine';
 
 const LIST_STAFF_ROLES = [

@@ -1,15 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { AppointmentStatus } from '@prisma/client';
-import { PrismaService } from '../../infrastructure/database/prisma.service';
-import { AuditService } from '../../common/audit/audit.service';
-import { OutboxService } from '../../common/outbox/outbox.service';
-import { AuthenticatedPrincipal } from '../../common/auth/auth.types';
+import { PrismaService } from '../../core/database/prisma.service';
+import { AuditService } from '../../core/audit/audit.service';
+import { OutboxService } from '../../core/outbox/outbox.service';
+import { AuthenticatedPrincipal } from '../../core/security/auth.types';
 import {
   ConflictAppError,
   NotFoundAppError,
   ValidationAppError,
-} from '../../common/errors/app-error';
-import { toOffsetPage } from '../../common/pagination/pagination.util';
+} from '../../core/errors/app-error';
+import { toOffsetPage } from '../../core/pagination/pagination.util';
 import { PatientsRepository } from '../patients/patients.repository';
 import { EncountersRepository } from '../encounters/encounters.repository';
 import { AppointmentsRepository } from './appointments.repository';

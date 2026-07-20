@@ -1,5 +1,5 @@
 import { EncounterStatus, UserRole } from '@prisma/client';
-import { ConflictAppError } from '../../common/errors/app-error';
+import { ConflictAppError } from '../../core/errors/app-error';
 
 /**
  * Transcribed verbatim from the frontend prototype's ENCOUNTER_TRANSITIONS

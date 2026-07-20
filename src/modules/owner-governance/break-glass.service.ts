@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../infrastructure/database/prisma.service';
-import { AuditService } from '../../common/audit/audit.service';
-import { AuthenticatedPrincipal } from '../../common/auth/auth.types';
+import { PrismaService } from '../../core/database/prisma.service';
+import { AuditService } from '../../core/audit/audit.service';
+import { AuthenticatedPrincipal } from '../../core/security/auth.types';
 import { FeatureFlagsService } from '../../common/authorization/feature-flags.service';
 import { FEATURE_FLAGS } from '../../common/authorization/feature-flags.catalog';
-import { NotFoundAppError } from '../../common/errors/app-error';
+import { NotFoundAppError } from '../../core/errors/app-error';
 import { MfaService } from '../identity/mfa/mfa.service';
 import { RequestBreakGlassRequest } from './dto/owner-governance.dto';
 

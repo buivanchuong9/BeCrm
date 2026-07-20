@@ -20,9 +20,9 @@ import {
   IsUUID,
   MaxLength,
 } from 'class-validator';
-import { AuthenticatedPrincipal } from '../../common/auth/auth.types';
-import { CurrentUser } from '../../common/auth/current-user.decorator';
-import { RequireIdempotencyKey } from '../../common/idempotency/idempotency-key.decorator';
+import { AuthenticatedPrincipal } from '../../core/security/auth.types';
+import { CurrentUser } from '../../core/security/current-user.decorator';
+import { RequireIdempotencyKey } from '../../core/idempotency/idempotency-key.decorator';
 import { OperationsService } from './operations.service';
 
 const context = (req: Request) => ({
@@ -31,19 +31,6 @@ const context = (req: Request) => ({
   userAgent: req.header('user-agent'),
 });
 
-class ActivityRequest {
-  @IsString() type!: string;
-  @IsString() title!: string;
-  @IsString() description!: string;
-  @IsDateString() dueDate!: string;
-  @IsString() priority!: string;
-  @IsOptional() @IsString() status?: string;
-  @IsOptional() @IsString() automationMode?: string;
-  @IsOptional() @IsString() automationAction?: string;
-}
-class TransitionRequest {
-  @IsString() toStatus!: string;
-}
 class AlertRequest {
   @IsIn([
     'new_red_flag_symptom',
@@ -114,12 +101,6 @@ class RefillRequest {
 @Controller({ path: 'patients', version: '1' })
 export class PatientOperationsController {
   constructor(private readonly service: OperationsService) {}
-  @Get(':patientId/care-plan') carePlan(
-    @CurrentUser() p: AuthenticatedPrincipal,
-    @Param('patientId', ParseUUIDPipe) id: string,
-  ) {
-    return this.service.getCarePlan(p, id);
-  }
   @Post(':patientId/alerts') createAlert(
     @CurrentUser() p: AuthenticatedPrincipal,
     @Param('patientId', ParseUUIDPipe) id: string,
@@ -216,52 +197,6 @@ export class PatientOperationsController {
   }
 }
 
-@Controller({ path: 'care-plans', version: '1' })
-export class CarePlansController {
-  constructor(private readonly service: OperationsService) {}
-  @Get(':carePlanId/activities') activities(
-    @CurrentUser() p: AuthenticatedPrincipal,
-    @Param('carePlanId', ParseUUIDPipe) id: string,
-  ) {
-    return this.service.activities(p, id);
-  }
-  @Post(':carePlanId/activities') create(
-    @CurrentUser() p: AuthenticatedPrincipal,
-    @Param('carePlanId', ParseUUIDPipe) id: string,
-    @Body() d: ActivityRequest,
-    @Req() r: Request,
-  ) {
-    return this.service.createActivity(p, id, d, context(r));
-  }
-  @Post(':carePlanId/run-automation') automation(
-    @CurrentUser() p: AuthenticatedPrincipal,
-    @Param('carePlanId', ParseUUIDPipe) id: string,
-    @Req() r: Request,
-  ) {
-    return this.service.runAutomation(p, id, context(r));
-  }
-}
-
-@Controller({ path: 'activities', version: '1' })
-export class ActivitiesController {
-  constructor(private readonly service: OperationsService) {}
-  @Post(':activityId/advance') advance(
-    @CurrentUser() p: AuthenticatedPrincipal,
-    @Param('activityId', ParseUUIDPipe) id: string,
-    @Body() d: TransitionRequest,
-    @Req() r: Request,
-  ) {
-    return this.service.advanceActivity(p, id, d.toStatus, context(r));
-  }
-  @Post(':activityId/confirm') confirm(
-    @CurrentUser() p: AuthenticatedPrincipal,
-    @Param('activityId', ParseUUIDPipe) id: string,
-    @Req() r: Request,
-  ) {
-    return this.service.confirmActivity(p, id, context(r));
-  }
-}
-
 @Controller({ path: 'alerts', version: '1' })
 export class AlertsController {
   constructor(private readonly service: OperationsService) {}
@@ -290,38 +225,6 @@ export class EncounterRequestsController {
     @Req() r: Request,
   ) {
     return this.service.decideEncounterRequest(p, id, d.decision, d.department, context(r));
-  }
-}
-
-@Controller({ path: 'notifications', version: '1' })
-export class NotificationsController {
-  constructor(private readonly service: OperationsService) {}
-  @Get() list(
-    @CurrentUser() p: AuthenticatedPrincipal,
-    @Query('userId') userId?: string,
-    @Query('scope') scope?: string,
-  ) {
-    return this.service.notifications(p, userId, scope === 'all');
-  }
-  @Get('unread-count') unread(
-    @CurrentUser() p: AuthenticatedPrincipal,
-    @Query('userId') userId?: string,
-  ) {
-    return this.service.unreadCount(p, userId);
-  }
-  @Post(':notificationId/read') read(
-    @CurrentUser() p: AuthenticatedPrincipal,
-    @Param('notificationId', ParseUUIDPipe) id: string,
-    @Req() r: Request,
-  ) {
-    return this.service.readNotification(p, id, context(r));
-  }
-  @Post(':notificationId/retry') retry(
-    @CurrentUser() p: AuthenticatedPrincipal,
-    @Param('notificationId', ParseUUIDPipe) id: string,
-    @Req() r: Request,
-  ) {
-    return this.service.retryNotification(p, id, context(r));
   }
 }
 

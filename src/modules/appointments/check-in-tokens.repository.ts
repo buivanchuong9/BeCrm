@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { AppointmentCheckInToken, Prisma } from '@prisma/client';
 import { randomBytes, createHash } from 'crypto';
-import { PrismaService } from '../../infrastructure/database/prisma.service';
+import { PrismaService } from '../../core/database/prisma.service';
 
 /** docs/api.md section 21 / section 40 SEC-09: server-random 256-bit token,
  * only the SHA-256 hash is ever persisted — replaces the frontend prototype's

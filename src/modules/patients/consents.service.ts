@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../infrastructure/database/prisma.service';
-import { AuditService } from '../../common/audit/audit.service';
-import { OutboxService } from '../../common/outbox/outbox.service';
-import { AuthenticatedPrincipal } from '../../common/auth/auth.types';
-import { NotFoundAppError } from '../../common/errors/app-error';
-import { toOffsetPage } from '../../common/pagination/pagination.util';
+import { PrismaService } from '../../core/database/prisma.service';
+import { AuditService } from '../../core/audit/audit.service';
+import { OutboxService } from '../../core/outbox/outbox.service';
+import { AuthenticatedPrincipal } from '../../core/security/auth.types';
+import { NotFoundAppError } from '../../core/errors/app-error';
+import { toOffsetPage } from '../../core/pagination/pagination.util';
 import { PatientsRepository } from './patients.repository';
 import { ConsentsRepository, ConsentType } from './consents.repository';
 import { assertCanChangeConsent, canViewConsentReadOnly } from './policies/patient-policies';

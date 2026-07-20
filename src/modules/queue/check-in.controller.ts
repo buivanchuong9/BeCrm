@@ -2,8 +2,8 @@ import { Body, Controller, HttpCode, HttpStatus, Post, Req } from '@nestjs/commo
 import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { Request } from 'express';
-import { Public } from '../../common/auth/public.decorator';
-import { ApiOkEnvelope } from '../../common/http/api-envelope.decorator';
+import { Public } from '../../core/security/public.decorator';
+import { ApiOkEnvelope } from '../../core/http/api-envelope.decorator';
 import { CreateCheckInRequest } from './dto/create-check-in.dto';
 import { CheckInResponseDto } from './dto/responses/check-in-response.dto';
 import { CheckInService } from './check-in.service';

@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
-import { PrismaService } from '../../infrastructure/database/prisma.service';
-import { AuditService } from '../../common/audit/audit.service';
+import { PrismaService } from '../../core/database/prisma.service';
+import { AuditService } from '../../core/audit/audit.service';
 import { PolicyEngineService } from '../../common/authorization/policy-engine.service';
-import { NotFoundAppError } from '../../common/errors/app-error';
+import { NotFoundAppError } from '../../core/errors/app-error';
 
 export interface RequestContext {
   requestId?: string;

@@ -2,19 +2,21 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
 import { WorkflowTaskStatus } from '@prisma/client';
-import { PrismaService } from '../../infrastructure/database/prisma.service';
-import { AuditService } from '../../common/audit/audit.service';
-import { OutboxService } from '../../common/outbox/outbox.service';
-import { AuthenticatedPrincipal } from '../../common/auth/auth.types';
-import { AppConfiguration } from '../../config/configuration';
-import { ConflictAppError, NotFoundAppError } from '../../common/errors/app-error';
+import { PrismaService } from '../../core/database/prisma.service';
+import { AuditService } from '../../core/audit/audit.service';
+import { OutboxService } from '../../core/outbox/outbox.service';
+import { AuthenticatedPrincipal } from '../../core/security/auth.types';
+import { AppConfiguration } from '../../core/configuration/configuration';
+import { ConflictAppError, ForbiddenAppError, NotFoundAppError } from '../../core/errors/app-error';
 import { EncountersRepository } from '../encounters/encounters.repository';
 import { canTransition } from '../encounters/encounter-state-machine';
+import { PatientsRepository } from '../patients/patients.repository';
 import { WorkflowTemplatesRepository } from './workflow-templates.repository';
 import { WorkflowRuntimeRepository } from './workflow-runtime.repository';
 import {
   assertHasRole,
   assertCanActOnTask,
+  STAFF_QUEUE_ROLES,
   WORKFLOW_ACTIVATION_ROLES,
   WORKFLOW_CANCEL_ROLES,
   TASK_REASSIGN_ROLES,
@@ -37,6 +39,7 @@ export class WorkflowRuntimeService {
     private readonly templates: WorkflowTemplatesRepository,
     private readonly runtime: WorkflowRuntimeRepository,
     private readonly encounters: EncountersRepository,
+    private readonly patients: PatientsRepository,
     private readonly audit: AuditService,
     private readonly outbox: OutboxService,
     private readonly config: ConfigService<AppConfiguration, true>,
@@ -225,7 +228,16 @@ export class WorkflowRuntimeService {
     return { data: { valid } };
   }
 
-  async listForPatient(_principal: AuthenticatedPrincipal, patientId: string) {
+  async listForPatient(principal: AuthenticatedPrincipal, patientId: string) {
+    // SECURITY FIX: this previously took `patientId` from the caller with no
+    // visibility check at all (the `principal` parameter was unused), letting
+    // any authenticated user enumerate any other patient's workflow instance
+    // history — a confirmed IDOR / tenant-isolation failure. Scoped the same
+    // way every other read in this file already is.
+    const patient = await this.patients.findVisibleById(principal, patientId);
+    if (!patient) {
+      throw new NotFoundAppError('Patient not found.');
+    }
     const rows = await this.runtime.listInstancesForPatient(patientId);
     return { data: rows.map(toWorkflowInstanceResponse) };
   }
@@ -473,8 +485,19 @@ export class WorkflowRuntimeService {
     return { data: toWorkflowInstanceResponse(updated) };
   }
 
+  /**
+   * SECURITY FIX: previously ignored `principal` entirely (unused parameter)
+   * and had no scoping filter of any kind — `GET /workflow-tasks` with no
+   * `encounterId` returned every workflow task for every patient across
+   * every organization on the platform to any authenticated caller,
+   * including a `patient` role. Confirmed critical IDOR / tenant-isolation
+   * failure. Now gated by STAFF_QUEUE_ROLES (this file's own pre-existing
+   * "work-queue visibility" constant, previously defined but never actually
+   * applied here) and scoped to the caller's organizations, exactly like
+   * every by-ID read in this file already is via findVisibleById.
+   */
   async listTasks(
-    _principal: AuthenticatedPrincipal,
+    principal: AuthenticatedPrincipal,
     filters: {
       encounterId?: string;
       role?: string;
@@ -485,8 +508,42 @@ export class WorkflowRuntimeService {
       urgency?: string;
     },
   ) {
+    const isSuperAdministrator = principal.memberships.some(
+      (m) => m.role === 'super_administrator',
+    );
+    if (
+      !isSuperAdministrator &&
+      !principal.memberships.some((m) => STAFF_QUEUE_ROLES.includes(m.role))
+    ) {
+      throw new ForbiddenAppError(
+        'AUTH_FORBIDDEN',
+        'This role cannot view the workflow task queue.',
+      );
+    }
+
+    let encounterIds: string[];
+    if (filters.encounterId) {
+      const encounter = await this.encounters.findVisibleById(principal, filters.encounterId);
+      if (!encounter) {
+        throw new NotFoundAppError('Workflow task not found.');
+      }
+      encounterIds = [filters.encounterId];
+    } else if (isSuperAdministrator) {
+      encounterIds = (await this.prisma.medicalEncounter.findMany({ select: { id: true } })).map(
+        (e) => e.id,
+      );
+    } else {
+      const organizationIds = [...new Set(principal.memberships.map((m) => m.organizationId))];
+      encounterIds = (
+        await this.prisma.medicalEncounter.findMany({
+          where: { organizationId: { in: organizationIds } },
+          select: { id: true },
+        })
+      ).map((e) => e.id);
+    }
+
     const rows = await this.runtime.list({
-      encounterId: filters.encounterId,
+      encounterIds,
       responsibleRole: filters.role,
       assigneeId: filters.assigneeId,
       department: filters.department,

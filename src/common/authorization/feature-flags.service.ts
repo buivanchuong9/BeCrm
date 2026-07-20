@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../infrastructure/database/prisma.service';
-import { AuditService } from '../audit/audit.service';
-import { ForbiddenAppError, NotFoundAppError } from '../errors/app-error';
+import { PrismaService } from '../../core/database/prisma.service';
+import { AuditService } from '../../core/audit/audit.service';
+import { ForbiddenAppError, NotFoundAppError } from '../../core/errors/app-error';
 
 @Injectable()
 export class FeatureFlagsService {

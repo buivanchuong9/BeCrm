@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../infrastructure/database/prisma.service';
-import { AuthenticatedPrincipal } from '../../common/auth/auth.types';
-import { toOffsetPage } from '../../common/pagination/pagination.util';
+import { PrismaService } from '../../core/database/prisma.service';
+import { AuthenticatedPrincipal } from '../../core/security/auth.types';
+import { toOffsetPage } from '../../core/pagination/pagination.util';
 
 @Injectable()
 export class OrganizationsService {

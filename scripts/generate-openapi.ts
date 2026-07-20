@@ -4,7 +4,7 @@ import { writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/bootstrap';
-import { createOpenApiDocument } from '../src/documentation/openapi';
+import { createOpenApiDocument } from '../src/core/documentation/openapi';
 
 async function main() {
   const app = await NestFactory.create(AppModule, { logger: false, bodyParser: false });

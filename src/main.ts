@@ -4,8 +4,8 @@ import { ConfigService } from '@nestjs/config';
 import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module';
 import { configureApp } from './bootstrap';
-import { AppConfiguration } from './config/configuration';
-import { configureOpenApi } from './documentation/openapi';
+import { AppConfiguration } from './core/configuration/configuration';
+import { configureOpenApi } from './core/documentation/openapi';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true, bodyParser: false });

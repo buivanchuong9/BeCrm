@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { DangerousActionType, Prisma } from '@prisma/client';
-import { PrismaService } from '../../infrastructure/database/prisma.service';
-import { AuditService } from '../../common/audit/audit.service';
-import { AuthenticatedPrincipal } from '../../common/auth/auth.types';
+import { PrismaService } from '../../core/database/prisma.service';
+import { AuditService } from '../../core/audit/audit.service';
+import { AuthenticatedPrincipal } from '../../core/security/auth.types';
 import {
   ConflictAppError,
   NotFoundAppError,
   ValidationAppError,
-} from '../../common/errors/app-error';
+} from '../../core/errors/app-error';
 import { MfaService } from '../identity/mfa/mfa.service';
 import { StaffInvitationsService } from '../identity/staff-invitations.service';
 import {

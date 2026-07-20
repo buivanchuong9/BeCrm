@@ -1,7 +1,7 @@
 import { Controller, Get, HttpStatus, Version, VERSION_NEUTRAL } from '@nestjs/common';
-import { PrismaService } from '../../infrastructure/database/prisma.service';
-import { Public } from '../../common/auth/public.decorator';
-import { AppError } from '../../common/errors/app-error';
+import { PrismaService } from '../../core/database/prisma.service';
+import { Public } from '../../core/security/public.decorator';
+import { AppError } from '../../core/errors/app-error';
 
 @Controller('health')
 export class HealthController {

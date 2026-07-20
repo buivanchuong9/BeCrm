@@ -1,5 +1,5 @@
-import { AuthenticatedPrincipal } from '../../../common/auth/auth.types';
-import { ForbiddenAppError } from '../../../common/errors/app-error';
+import { AuthenticatedPrincipal } from '../../../core/security/auth.types';
+import { ForbiddenAppError } from '../../../core/errors/app-error';
 
 const LIST_STAFF_ROLES = ['receptionist', 'medical_administrator', 'doctor', 'nurse'] as const;
 const VIEW_ORG_WIDE_ROLES = ['medical_administrator', 'receptionist'] as const;

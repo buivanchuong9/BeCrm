@@ -1,14 +1,14 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Req } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
-import { CurrentUser } from '../../common/auth/current-user.decorator';
-import { AuthenticatedPrincipal } from '../../common/auth/auth.types';
-import { RequireIdempotencyKey } from '../../common/idempotency/idempotency-key.decorator';
+import { CurrentUser } from '../../core/security/current-user.decorator';
+import { AuthenticatedPrincipal } from '../../core/security/auth.types';
+import { RequireIdempotencyKey } from '../../core/idempotency/idempotency-key.decorator';
 import {
   ApiCreatedEnvelope,
   ApiOkEnvelope,
   ApiOkListEnvelope,
-} from '../../common/http/api-envelope.decorator';
+} from '../../core/http/api-envelope.decorator';
 import { CreateClinicalOrderRequest } from './dto/create-clinical-order.dto';
 import { InvalidSampleRequest } from './dto/invalid-sample.dto';
 import { SubmitResultRequest } from './dto/submit-result.dto';

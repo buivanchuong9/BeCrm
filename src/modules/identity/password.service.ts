@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as argon2 from 'argon2';
-import { AppConfiguration } from '../../config/configuration';
+import { AppConfiguration } from '../../core/configuration/configuration';
 
 const COMPROMISED_PASSWORD_DENYLIST = new Set([
   'password123',
@@ -10,6 +10,13 @@ const COMPROMISED_PASSWORD_DENYLIST = new Set([
   'qwertyuiop1',
   'letmein12345',
 ]);
+
+/** Fixed, never-matching argon2id hash used only to keep `login()`'s timing
+ * profile constant when no real user/password hash exists to verify against
+ * (see PasswordService.verifyDummy). Not a secret — it deliberately verifies
+ * no real password. */
+const DUMMY_HASH =
+  '$argon2id$v=19$m=65536,t=3,p=4$oS6bFxffn8U/BqfDVxnPYQ$FzHQKcZK7uAO72i51B1pOYXrLWn0tRbItZlrC761+lg';
 
 @Injectable()
 export class PasswordService {
@@ -21,6 +28,17 @@ export class PasswordService {
 
   async verify(hash: string, plainPassword: string): Promise<boolean> {
     return argon2.verify(hash, this.withPepper(plainPassword));
+  }
+
+  /** SECURITY FIX: run the same-cost argon2id verify against a fixed dummy
+   * hash when there is no real user/passwordHash to check — e.g. an unknown
+   * email at login. Without this, "unknown email" short-circuits before any
+   * hashing work while "known email, wrong password" always pays the full
+   * argon2id cost, making the two cases distinguishable by response time
+   * alone (an email-enumeration side channel despite both returning the same
+   * generic error body). The result is always discarded/false. */
+  async verifyDummy(plainPassword: string): Promise<void> {
+    await argon2.verify(DUMMY_HASH, this.withPepper(plainPassword)).catch(() => false);
   }
 
   /** Minimum 12 characters for staff-created passwords per spec section 28; rejects

@@ -1,17 +1,14 @@
 import { Module } from '@nestjs/common';
-import { AuditModule } from '../../common/audit/audit.module';
+import { AuditModule } from '../../core/audit/audit.module';
 import { EncountersModule } from '../encounters/encounters.module';
 import { PatientsModule } from '../patients/patients.module';
 import {
-  ActivitiesController,
   AlertsController,
   AuditController,
-  CarePlansController,
   DashboardController,
   EncounterRequestsController,
   IntegrationsController,
   MedicationRemindersController,
-  NotificationsController,
   PatientOperationsController,
   PrescriptionOperationsController,
   SupportController,
@@ -25,11 +22,8 @@ import { OperationsService } from './operations.service';
   controllers: [
     PatientOperationsController,
     PrescriptionOperationsController,
-    CarePlansController,
-    ActivitiesController,
     AlertsController,
     EncounterRequestsController,
-    NotificationsController,
     AuditController,
     IntegrationsController,
     DashboardController,

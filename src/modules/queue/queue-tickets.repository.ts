@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma, QueueTicket, QueueTicketStatus } from '@prisma/client';
-import { PrismaService } from '../../infrastructure/database/prisma.service';
+import { PrismaService } from '../../core/database/prisma.service';
 
 const LIVE_STATUSES: QueueTicketStatus[] = ['waiting', 'called', 'acknowledged', 'in_service'];
 

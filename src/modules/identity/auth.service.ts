@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { UnauthorizedAppError } from '../../common/errors/app-error';
-import { AuditService } from '../../common/audit/audit.service';
+import { randomUUID } from 'crypto';
+import { UnauthorizedAppError } from '../../core/errors/app-error';
+import { AuditService } from '../../core/audit/audit.service';
 import { PasswordService } from './password.service';
 import { TokenService, hashRefreshToken } from './token.service';
 import { UsersRepository, UserWithMemberships } from './users.repository';
@@ -38,6 +39,12 @@ export class AuthService {
     // Generic error for unknown email, wrong password, or non-active status — never
     // reveal which case occurred (spec section 28: "Login uses generic error").
     if (!user || !user.passwordHash || user.status !== 'active') {
+      // SECURITY FIX: perform the same argon2id-cost work this branch used to
+      // skip entirely, so this response takes comparable time to the "known
+      // email, wrong password" branch below — otherwise the two are
+      // distinguishable by timing alone, letting an attacker enumerate valid
+      // emails despite the identical response body.
+      await this.passwordService.verifyDummy(password);
       await this.audit.write({
         actorId: user?.id ?? null,
         action: 'auth.login.failed',
@@ -160,6 +167,36 @@ export class AuthService {
       );
     }
 
+    // SECURITY FIX: rotation must be atomic. Previously this created the new
+    // session first and marked the old one rotated after, with no locking
+    // between the earlier `findByTokenHash` read and this write — two
+    // concurrent requests presenting the same still-valid token would both
+    // pass the read, both create a child session, and reuse detection would
+    // never fire. Now the old session is atomically claimed (CAS on
+    // `revokedAt: null`) *before* any new session is created; the request
+    // that loses the race is treated as reuse, exactly like presenting an
+    // already-rotated token, which invalidates the whole family.
+    const newSessionId = randomUUID();
+    const rotated = await this.refreshSessions.markRotated(session.id, newSessionId);
+    if (rotated.count === 0) {
+      await this.refreshSessions.revokeFamily(session.familyId, 'reuse_detected');
+      await this.audit.write({
+        actorId: session.userId,
+        action: 'auth.refresh.reuse_detected',
+        resourceType: 'refresh_session',
+        resourceId: session.id,
+        result: 'denied',
+        reason: 'concurrent_rotation_race',
+        ip: context.ip ?? null,
+        userAgent: context.userAgent ?? null,
+        requestId: context.requestId ?? null,
+      });
+      throw new UnauthorizedAppError(
+        'AUTH_REFRESH_REUSED',
+        'Session invalidated. Please log in again.',
+      );
+    }
+
     const memberships = this.users.toMembershipScopes(user);
     const accessToken = this.tokenService.signAccessToken(
       user.id,
@@ -168,13 +205,13 @@ export class AuthService {
       memberships,
     );
     const newRefreshToken = this.tokenService.issueRefreshToken(remember);
-    const newSession = await this.refreshSessions.createInFamily(
+    await this.refreshSessions.createInFamily(
+      newSessionId,
       user.id,
       session.familyId,
       newRefreshToken,
       context,
     );
-    await this.refreshSessions.markRotated(session.id, newSession.id);
 
     return {
       accessToken: accessToken.token,

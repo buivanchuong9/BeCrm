@@ -1,5 +1,5 @@
-import { AuthenticatedPrincipal } from '../../../common/auth/auth.types';
-import { ForbiddenAppError } from '../../../common/errors/app-error';
+import { AuthenticatedPrincipal } from '../../../core/security/auth.types';
+import { ForbiddenAppError } from '../../../core/errors/app-error';
 
 const ORG_WIDE_ROLES = ['receptionist', 'medical_administrator'] as const;
 

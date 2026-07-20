@@ -1,6 +1,6 @@
 import { UserRole } from '@prisma/client';
-import { AuthenticatedPrincipal } from '../../../common/auth/auth.types';
-import { ForbiddenAppError } from '../../../common/errors/app-error';
+import { AuthenticatedPrincipal } from '../../../core/security/auth.types';
+import { ForbiddenAppError } from '../../../core/errors/app-error';
 
 /** docs/api.md App.tsx STAFF_QUEUE_ROLES — everyone allowed to view the
  * (non-public) queue/work-queue surface. */

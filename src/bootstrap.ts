@@ -4,12 +4,12 @@ import { json, urlencoded } from 'express';
 import { ValidationError } from 'class-validator';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
-import { GlobalExceptionFilter } from './common/http/global-exception.filter';
-import { ResponseInterceptor } from './common/http/response.interceptor';
-import { ValidationAppError } from './common/errors/app-error';
-import { AppConfiguration } from './config/configuration';
-import { RejectBlankStringsPipe } from './common/http/reject-blank-strings.pipe';
-import { RequestIdMiddleware } from './common/http/request-id.middleware';
+import { GlobalExceptionFilter } from './core/http/global-exception.filter';
+import { ResponseInterceptor } from './core/http/response.interceptor';
+import { ValidationAppError } from './core/errors/app-error';
+import { AppConfiguration } from './core/configuration/configuration';
+import { RejectBlankStringsPipe } from './core/http/reject-blank-strings.pipe';
+import { RequestIdMiddleware } from './core/http/request-id.middleware';
 
 /**
  * Shared between main.ts and the e2e test harness so tests exercise the exact

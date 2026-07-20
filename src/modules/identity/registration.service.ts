@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { PrismaService } from '../../infrastructure/database/prisma.service';
-import { AuditService } from '../../common/audit/audit.service';
+import { PrismaService } from '../../core/database/prisma.service';
+import { AuditService } from '../../core/audit/audit.service';
 import {
   ConflictAppError,
   NotFoundAppError,
   ValidationAppError,
-} from '../../common/errors/app-error';
+} from '../../core/errors/app-error';
 import { PatientsRepository } from '../patients/patients.repository';
 import { PasswordService } from './password.service';
 import { TokenService } from './token.service';

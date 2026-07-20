@@ -1,5 +1,5 @@
 import { UserRole } from '@prisma/client';
-import { AppError, ValidationAppError } from '../../common/errors/app-error';
+import { AppError, ValidationAppError } from '../../core/errors/app-error';
 
 export interface WorkflowStepDefinition {
   code: string;

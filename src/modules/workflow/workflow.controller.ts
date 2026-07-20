@@ -13,9 +13,9 @@ import {
 } from '@nestjs/common';
 import { Request } from 'express';
 import { IsArray, IsIn, IsInt, IsObject, IsOptional, IsString, IsUUID, Min } from 'class-validator';
-import { CurrentUser } from '../../common/auth/current-user.decorator';
-import { AuthenticatedPrincipal } from '../../common/auth/auth.types';
-import { RequireIdempotencyKey } from '../../common/idempotency/idempotency-key.decorator';
+import { CurrentUser } from '../../core/security/current-user.decorator';
+import { AuthenticatedPrincipal } from '../../core/security/auth.types';
+import { RequireIdempotencyKey } from '../../core/idempotency/idempotency-key.decorator';
 import {
   ActivateWorkflowRequest,
   CreateWorkflowTemplateRequest,
@@ -355,7 +355,7 @@ export class WorkflowTasksController {
   @Post(':taskId/start')
   start(
     @CurrentUser() p: AuthenticatedPrincipal,
-    @Param('taskId') id: string,
+    @Param('taskId', ParseUUIDPipe) id: string,
     @Body() d: VersionOnlyRequest,
     @Req() r: Request,
   ) {
@@ -365,7 +365,7 @@ export class WorkflowTasksController {
   @Post(':taskId/complete')
   complete(
     @CurrentUser() p: AuthenticatedPrincipal,
-    @Param('taskId') id: string,
+    @Param('taskId', ParseUUIDPipe) id: string,
     @Body() d: VersionOnlyRequest,
     @Req() r: Request,
   ) {
@@ -375,7 +375,7 @@ export class WorkflowTasksController {
   @Post(':taskId/redo')
   redo(
     @CurrentUser() p: AuthenticatedPrincipal,
-    @Param('taskId') id: string,
+    @Param('taskId', ParseUUIDPipe) id: string,
     @Body() d: ReasonedVersionRequest,
     @Req() r: Request,
   ) {
@@ -385,7 +385,7 @@ export class WorkflowTasksController {
   @Post(':taskId/reject')
   reject(
     @CurrentUser() p: AuthenticatedPrincipal,
-    @Param('taskId') id: string,
+    @Param('taskId', ParseUUIDPipe) id: string,
     @Body() d: ReasonedVersionRequest,
     @Req() r: Request,
   ) {
@@ -395,7 +395,7 @@ export class WorkflowTasksController {
   @Post(':taskId/escalate')
   escalate(
     @CurrentUser() p: AuthenticatedPrincipal,
-    @Param('taskId') id: string,
+    @Param('taskId', ParseUUIDPipe) id: string,
     @Body() d: ReasonedVersionRequest,
     @Req() r: Request,
   ) {
@@ -405,7 +405,7 @@ export class WorkflowTasksController {
   @Post(':taskId/skip')
   skip(
     @CurrentUser() p: AuthenticatedPrincipal,
-    @Param('taskId') id: string,
+    @Param('taskId', ParseUUIDPipe) id: string,
     @Body() d: ReasonedVersionRequest,
     @Req() r: Request,
   ) {
@@ -415,7 +415,7 @@ export class WorkflowTasksController {
   @Post(':taskId/reassign')
   reassign(
     @CurrentUser() p: AuthenticatedPrincipal,
-    @Param('taskId') id: string,
+    @Param('taskId', ParseUUIDPipe) id: string,
     @Body() d: ReassignTaskRequest,
     @Req() r: Request,
   ) {

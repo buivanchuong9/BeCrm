@@ -1,5 +1,5 @@
 import { WorkflowTaskStatus } from '@prisma/client';
-import { ConflictAppError } from '../../common/errors/app-error';
+import { ConflictAppError } from '../../core/errors/app-error';
 
 /** Transcribed verbatim from the source evidence's ALLOWED_TASK_TRANSITIONS
  * (docs/api.md section 28 / docs/tailieuapi.md section 5.2). */

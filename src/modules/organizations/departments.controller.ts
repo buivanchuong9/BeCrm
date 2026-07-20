@@ -1,7 +1,7 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { IsIn, IsOptional, IsString, IsUUID } from 'class-validator';
-import { ApiOkListEnvelope } from '../../common/http/api-envelope.decorator';
+import { ApiOkListEnvelope } from '../../core/http/api-envelope.decorator';
 import { OrganizationsService } from './organizations.service';
 import { DepartmentResponseDto } from './dto/organization-response.dto';
 

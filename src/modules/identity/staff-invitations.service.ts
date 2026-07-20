@@ -2,11 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHash, randomBytes } from 'crypto';
 import { Prisma } from '@prisma/client';
-import { PrismaService } from '../../infrastructure/database/prisma.service';
-import { AuditService } from '../../common/audit/audit.service';
-import { AuthenticatedPrincipal } from '../../common/auth/auth.types';
-import { ConflictAppError, ForbiddenAppError } from '../../common/errors/app-error';
-import { AppConfiguration } from '../../config/configuration';
+import { PrismaService } from '../../core/database/prisma.service';
+import { AuditService } from '../../core/audit/audit.service';
+import { AuthenticatedPrincipal } from '../../core/security/auth.types';
+import { ConflictAppError, ForbiddenAppError } from '../../core/errors/app-error';
+import { AppConfiguration } from '../../core/configuration/configuration';
 import { PasswordService } from './password.service';
 import { InviteStaffRequest } from './dto/invite-staff.dto';
 
@@ -161,10 +161,30 @@ export class StaffInvitationsService {
     };
   }
 
+  /** SECURITY FIX: previously `findMany()` with no `select`, which returned
+   * every column — including `tokenHash` — straight into the `GET
+   * /users/invitations` response body. A SHA-256 hash of a 256-bit random
+   * token isn't reversible or brute-forceable, so this wasn't an
+   * account-takeover path, but it's still an internal secret artifact with
+   * no reason to leave the server (Task 7: never expose secrets/internal
+   * claims). Now selects only the fields the endpoint actually needs. */
   async listPending(organizationId: string) {
     return this.prisma.staffInvitation.findMany({
       where: { organizationId, status: 'pending' },
       orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        email: true,
+        displayName: true,
+        role: true,
+        organizationId: true,
+        clinicLocationId: true,
+        departmentId: true,
+        invitedBy: true,
+        status: true,
+        expiresAt: true,
+        createdAt: true,
+      },
     });
   }
 

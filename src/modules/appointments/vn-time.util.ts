@@ -1,4 +1,4 @@
-import { ValidationAppError } from '../../common/errors/app-error';
+import { ValidationAppError } from '../../core/errors/app-error';
 
 /**
  * Every clinic location in this deployment defaults to `Asia/Ho_Chi_Minh`

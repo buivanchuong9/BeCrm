@@ -13,18 +13,18 @@ import { ApiNoContentResponse, ApiTags } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { Request, Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
-import { Public } from '../../common/auth/public.decorator';
+import { Public } from '../../core/security/public.decorator';
 import {
   ForbiddenAppError,
   UnauthorizedAppError,
   ValidationAppError,
-} from '../../common/errors/app-error';
+} from '../../core/errors/app-error';
 import {
   ApiCreatedEnvelope,
   ApiCreatedUnionEnvelope,
   ApiOkEnvelope,
-} from '../../common/http/api-envelope.decorator';
-import { AppConfiguration } from '../../config/configuration';
+} from '../../core/http/api-envelope.decorator';
+import { AppConfiguration } from '../../core/configuration/configuration';
 import { PolicyEngineService } from '../../common/authorization/policy-engine.service';
 import { PERMISSIONS } from '../../common/authorization/permissions.catalog';
 import { AuthService, LoginResult } from './auth.service';
@@ -38,8 +38,8 @@ import { SessionResponseDto } from './dto/responses/current-user-response.dto';
 import { PasswordService } from './password.service';
 import { UsersRepository } from './users.repository';
 import { toCurrentUserResponse } from './user-response.mapper';
-import { CurrentUser } from '../../common/auth/current-user.decorator';
-import { AuthenticatedPrincipal } from '../../common/auth/auth.types';
+import { CurrentUser } from '../../core/security/current-user.decorator';
+import { AuthenticatedPrincipal } from '../../core/security/auth.types';
 import { IsEmail, IsString, MinLength } from 'class-validator';
 import { PasswordResetService } from './password-reset.service';
 import {

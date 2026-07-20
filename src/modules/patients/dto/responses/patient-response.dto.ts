@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { ReferenceResponseDto } from '../../../../common/http/reference-response.dto';
+import { ReferenceResponseDto } from '../../../../core/http/reference-response.dto';
 
 const GENDER_VALUES = ['male', 'female', 'other', 'unknown'] as const;
 const BLOOD_TYPE_VALUES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'unknown'] as const;

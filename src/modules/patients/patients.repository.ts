@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Patient, Prisma } from '@prisma/client';
-import { PrismaService } from '../../infrastructure/database/prisma.service';
-import { AuthenticatedPrincipal } from '../../common/auth/auth.types';
+import { PrismaService } from '../../core/database/prisma.service';
+import { AuthenticatedPrincipal } from '../../core/security/auth.types';
 import { isSuperAdministrator, viewOrgWideOrganizationIds } from './policies/patient-policies';
 
 export type PatientWithDoctor = Patient & {
@@ -56,6 +56,21 @@ export class PatientsRepository {
 
   findByUserId(userId: string): Promise<PatientWithDoctor | null> {
     return this.prisma.patient.findUnique({ where: { userId }, include: withPrimaryDoctor });
+  }
+
+  /** Unscoped id->userId lookup (no visibility check) for callers that have
+   * already established visibility upstream in the same request — e.g.
+   * care-plans' automation run, which resolves the patient's notification
+   * recipient after `CarePlanAccessService` already proved the caller can
+   * see this patient. Matches the pre-extraction operations.service.ts
+   * runAutomation()'s plain `prisma.patient.findUnique` exactly; does not
+   * re-apply findVisibleById's scoping. */
+  async findUserId(patientId: string): Promise<string | null> {
+    const row = await this.prisma.patient.findUnique({
+      where: { id: patientId },
+      select: { userId: true },
+    });
+    return row?.userId ?? null;
   }
 
   /** Registration-time patient row creation (docs: self-registration). Code

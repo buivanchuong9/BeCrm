@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Consent, Prisma } from '@prisma/client';
-import { PrismaService } from '../../infrastructure/database/prisma.service';
-import { ConflictAppError } from '../../common/errors/app-error';
+import { PrismaService } from '../../core/database/prisma.service';
+import { ConflictAppError } from '../../core/errors/app-error';
 
 export const KNOWN_CONSENT_TYPES = [
   'data_processing',

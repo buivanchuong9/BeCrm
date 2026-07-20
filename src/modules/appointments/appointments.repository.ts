@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { Appointment, AppointmentStatus, Prisma } from '@prisma/client';
-import { PrismaService } from '../../infrastructure/database/prisma.service';
-import { ConflictAppError } from '../../common/errors/app-error';
-import { AuthenticatedPrincipal } from '../../common/auth/auth.types';
+import { PrismaService } from '../../core/database/prisma.service';
+import { ConflictAppError } from '../../core/errors/app-error';
+import { AuthenticatedPrincipal } from '../../core/security/auth.types';
 import { isSuperAdministrator } from './policies/appointment-policies';
 
 /** docs/api.md section 41 "Appointment booking": the tstzrange EXCLUDE

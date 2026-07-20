@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma, WorkflowTemplate, WorkflowTemplateVersion } from '@prisma/client';
-import { PrismaService } from '../../infrastructure/database/prisma.service';
+import { PrismaService } from '../../core/database/prisma.service';
 
 @Injectable()
 export class WorkflowTemplatesRepository {

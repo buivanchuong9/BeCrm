@@ -2,9 +2,9 @@ import { Controller, Get, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
-import { CurrentUser } from '../../common/auth/current-user.decorator';
-import { AuthenticatedPrincipal } from '../../common/auth/auth.types';
-import { ApiOkListEnvelope } from '../../common/http/api-envelope.decorator';
+import { CurrentUser } from '../../core/security/current-user.decorator';
+import { AuthenticatedPrincipal } from '../../core/security/auth.types';
+import { ApiOkListEnvelope } from '../../core/http/api-envelope.decorator';
 import { OrganizationsService } from './organizations.service';
 import { OrganizationResponseDto } from './dto/organization-response.dto';
 

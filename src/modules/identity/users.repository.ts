@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma, User } from '@prisma/client';
-import { PrismaService } from '../../infrastructure/database/prisma.service';
-import { MembershipScope } from '../../common/auth/auth.types';
-import { ConflictAppError, NotFoundAppError } from '../../common/errors/app-error';
+import { PrismaService } from '../../core/database/prisma.service';
+import { MembershipScope } from '../../core/security/auth.types';
+import { ConflictAppError, NotFoundAppError } from '../../core/errors/app-error';
 
 export type UserWithMemberships = User & {
   memberships: Array<{

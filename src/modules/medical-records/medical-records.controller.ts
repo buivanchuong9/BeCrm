@@ -11,9 +11,9 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
-import { CurrentUser } from '../../common/auth/current-user.decorator';
-import { AuthenticatedPrincipal } from '../../common/auth/auth.types';
-import { RequireIdempotencyKey } from '../../common/idempotency/idempotency-key.decorator';
+import { CurrentUser } from '../../core/security/current-user.decorator';
+import { AuthenticatedPrincipal } from '../../core/security/auth.types';
+import { RequireIdempotencyKey } from '../../core/idempotency/idempotency-key.decorator';
 import { MedicalRecordsService } from './medical-records.service';
 
 function ctx(req: Request) {

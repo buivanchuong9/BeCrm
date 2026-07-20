@@ -2,15 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma, UserRole } from '@prisma/client';
 import { createHash, randomUUID } from 'crypto';
-import { AuthenticatedPrincipal } from '../../common/auth/auth.types';
-import { AuditService } from '../../common/audit/audit.service';
-import {
-  ConflictAppError,
-  ForbiddenAppError,
-  NotFoundAppError,
-} from '../../common/errors/app-error';
-import { AppConfiguration } from '../../config/configuration';
-import { PrismaService } from '../../infrastructure/database/prisma.service';
+import { AuthenticatedPrincipal } from '../../core/security/auth.types';
+import { AuditService } from '../../core/audit/audit.service';
+import { ConflictAppError, ForbiddenAppError, NotFoundAppError } from '../../core/errors/app-error';
+import { AppConfiguration } from '../../core/configuration/configuration';
+import { PrismaService } from '../../core/database/prisma.service';
 import { EncountersRepository } from '../encounters/encounters.repository';
 import { PatientsRepository } from '../patients/patients.repository';
 
@@ -27,15 +23,6 @@ const ALERT_RULES = {
   no_response: ['medium', 'customer_care_employee', 24, false],
   medication_non_adherence: ['low', 'care_coordinator', 48, false],
 } as const;
-
-const AUTOMATED_ACTIVITY_TYPES = new Set([
-  'medication_reminder',
-  'lifestyle_guidance',
-  'patient_education',
-  'symptom_questionnaire',
-  'satisfaction_survey',
-  'adherence_check',
-]);
 
 @Injectable()
 export class OperationsService {
@@ -62,12 +49,6 @@ export class OperationsService {
     if (!row) throw new NotFoundAppError('Patient not found.');
     return row;
   }
-  private async carePlan(p: AuthenticatedPrincipal, id: string) {
-    const row = await this.prisma.crmCarePlan.findUnique({ where: { id } });
-    if (!row) throw new NotFoundAppError('Care plan not found.');
-    await this.patient(p, row.patientId);
-    return row;
-  }
   private async log(
     p: AuthenticatedPrincipal,
     action: string,
@@ -88,144 +69,6 @@ export class OperationsService {
       ip: c.ip ?? null,
       userAgent: c.userAgent ?? null,
     });
-  }
-
-  async getCarePlan(p: AuthenticatedPrincipal, patientId: string) {
-    await this.patient(p, patientId);
-    let plan = await this.prisma.crmCarePlan.findFirst({
-      where: { patientId },
-      orderBy: { updatedAt: 'desc' },
-    });
-    if (!plan) {
-      const encounter = await this.encounters.findMostRecentlyUpdatedForPatient(patientId);
-      if (!encounter)
-        throw new NotFoundAppError('No encounter is available to create a care plan.');
-      plan = await this.prisma.crmCarePlan.create({
-        data: { patientId, encounterId: encounter.id },
-      });
-    }
-    return { data: plan };
-  }
-
-  async activities(p: AuthenticatedPrincipal, carePlanId: string) {
-    await this.carePlan(p, carePlanId);
-    return {
-      data: await this.prisma.followUpActivity.findMany({
-        where: { carePlanId },
-        orderBy: { dueDate: 'asc' },
-      }),
-    };
-  }
-  async createActivity(
-    p: AuthenticatedPrincipal,
-    carePlanId: string,
-    dto: {
-      type: string;
-      title: string;
-      description: string;
-      dueDate: string;
-      priority: string;
-      status?: string;
-      automationMode?: string;
-      automationAction?: string;
-    },
-    c: RequestContext,
-  ) {
-    this.require(p, ['care_coordinator', 'medical_administrator']);
-    const plan = await this.carePlan(p, carePlanId);
-    const row = await this.prisma.followUpActivity.create({
-      data: {
-        carePlanId,
-        ...dto,
-        dueDate: new Date(dto.dueDate),
-        status: dto.status ?? 'scheduled',
-      },
-    });
-    await this.log(
-      p,
-      'follow_up_activity.created',
-      'follow_up_activity',
-      row.id,
-      c,
-      plan.patientId,
-    );
-    return { data: row };
-  }
-  async advanceActivity(
-    p: AuthenticatedPrincipal,
-    id: string,
-    toStatus: string,
-    c: RequestContext,
-  ) {
-    const row = await this.prisma.followUpActivity.findUnique({ where: { id } });
-    if (!row) throw new NotFoundAppError('Activity not found.');
-    const plan = await this.carePlan(p, row.carePlanId);
-    const transitions: Record<string, string[]> = {
-      scheduled: ['due', 'cancelled', 'escalated'],
-      due: ['completed', 'escalated', 'cancelled'],
-      escalated: ['completed', 'cancelled'],
-    };
-    if (!transitions[row.status]?.includes(toStatus))
-      throw new ConflictAppError(
-        'INVALID_STATE_TRANSITION',
-        `${row.status} cannot transition to ${toStatus}.`,
-      );
-    const updated = await this.prisma.followUpActivity.update({
-      where: { id },
-      data: { status: toStatus, version: { increment: 1 } },
-    });
-    await this.log(p, 'follow_up_activity.advanced', 'follow_up_activity', id, c, plan.patientId);
-    return { data: updated };
-  }
-  async confirmActivity(p: AuthenticatedPrincipal, id: string, c: RequestContext) {
-    this.require(p, ['patient']);
-    const row = await this.prisma.followUpActivity.findUnique({ where: { id } });
-    if (!row) throw new NotFoundAppError('Activity not found.');
-    const plan = await this.carePlan(p, row.carePlanId);
-    if (!['scheduled', 'due'].includes(row.status))
-      throw new ConflictAppError(
-        'INVALID_STATE_TRANSITION',
-        'Only scheduled or due activities can be confirmed.',
-      );
-    const updated = await this.prisma.followUpActivity.update({
-      where: { id },
-      data: { status: 'completed', version: { increment: row.status === 'scheduled' ? 2 : 1 } },
-    });
-    await this.log(p, 'follow_up_activity.confirmed', 'follow_up_activity', id, c, plan.patientId);
-    return { data: updated };
-  }
-  async runAutomation(p: AuthenticatedPrincipal, carePlanId: string, c: RequestContext) {
-    this.require(p, ['system_administrator', 'medical_administrator']);
-    const plan = await this.carePlan(p, carePlanId);
-    const rows = await this.prisma.followUpActivity.findMany({
-      where: { carePlanId, status: { in: ['scheduled', 'due'] } },
-    });
-    const eligible = rows.filter((r) => AUTOMATED_ACTIVITY_TYPES.has(r.type));
-    const patient = await this.prisma.patient.findUnique({ where: { id: plan.patientId } });
-    const recipientId = patient?.userId;
-    if (recipientId)
-      await this.prisma.$transaction(
-        eligible.map((row) =>
-          this.prisma.notification.create({
-            data: {
-              event: 'crm_activity_reminder',
-              recipientId,
-              recipientRole: 'patient',
-              channel: 'in_app',
-              message: row.title,
-              relatedPatientId: plan.patientId,
-            },
-          }),
-        ),
-      );
-    await this.prisma.followUpActivity.updateMany({
-      where: { id: { in: eligible.map((r) => r.id) } },
-      data: { lastAutomatedAt: new Date(), automationRunCount: { increment: 1 } },
-    });
-    await this.log(p, 'care_plan.automation_run', 'crm_care_plan', carePlanId, c, plan.patientId);
-    return {
-      data: { processed: eligible.length, notifications: recipientId ? eligible.length : 0 },
-    };
   }
 
   async createAlert(
@@ -415,56 +258,6 @@ export class OperationsService {
       id,
       c,
       request.patientId,
-    );
-    return { data: updated };
-  }
-
-  async notifications(p: AuthenticatedPrincipal, userId?: string, all = false) {
-    const isAdmin = this.has(p, ['medical_administrator', 'system_administrator']);
-    const recipientId = all && isAdmin ? undefined : (userId ?? p.userId);
-    if (recipientId !== p.userId && !isAdmin) throw new ForbiddenAppError('AUTH_FORBIDDEN');
-    return {
-      data: await this.prisma.notification.findMany({
-        where: recipientId ? { recipientId } : {},
-        orderBy: { createdAt: 'desc' },
-      }),
-    };
-  }
-  async unreadCount(p: AuthenticatedPrincipal, userId?: string) {
-    const recipientId = userId ?? p.userId;
-    if (recipientId !== p.userId && !this.has(p, ['medical_administrator', 'system_administrator']))
-      throw new ForbiddenAppError('AUTH_FORBIDDEN');
-    return {
-      data: {
-        count: await this.prisma.notification.count({ where: { recipientId, read: false } }),
-      },
-    };
-  }
-  async readNotification(p: AuthenticatedPrincipal, id: string, c: RequestContext) {
-    const row = await this.prisma.notification.findUnique({ where: { id } });
-    if (!row) throw new NotFoundAppError('Notification not found.');
-    if (
-      row.recipientId !== p.userId &&
-      !this.has(p, ['medical_administrator', 'system_administrator'])
-    )
-      throw new ForbiddenAppError('AUTH_FORBIDDEN');
-    const updated = await this.prisma.notification.update({ where: { id }, data: { read: true } });
-    await this.log(p, 'notification.read', 'notification', id, c, row.relatedPatientId);
-    return { data: updated };
-  }
-  async retryNotification(p: AuthenticatedPrincipal, id: string, c: RequestContext) {
-    this.require(p, ['medical_administrator', 'system_administrator']);
-    const updated = await this.prisma.notification.update({
-      where: { id },
-      data: { status: 'queued', failureReason: null, retryCount: { increment: 1 } },
-    });
-    await this.log(
-      p,
-      'notification.retry_requested',
-      'notification',
-      id,
-      c,
-      updated.relatedPatientId,
     );
     return { data: updated };
   }

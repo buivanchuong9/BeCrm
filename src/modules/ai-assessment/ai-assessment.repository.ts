@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { AIPreliminaryAssessment, Prisma, SymptomIntake } from '@prisma/client';
-import { PrismaService } from '../../infrastructure/database/prisma.service';
+import { PrismaService } from '../../core/database/prisma.service';
 
 @Injectable()
 export class AiAssessmentRepository {

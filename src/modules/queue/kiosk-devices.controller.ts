@@ -13,14 +13,14 @@ import {
 import { ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { IsOptional, IsUUID } from 'class-validator';
-import { CurrentUser } from '../../common/auth/current-user.decorator';
-import { AuthenticatedPrincipal } from '../../common/auth/auth.types';
-import { RequireIdempotencyKey } from '../../common/idempotency/idempotency-key.decorator';
+import { CurrentUser } from '../../core/security/current-user.decorator';
+import { AuthenticatedPrincipal } from '../../core/security/auth.types';
+import { RequireIdempotencyKey } from '../../core/idempotency/idempotency-key.decorator';
 import {
   ApiCreatedEnvelope,
   ApiOkEnvelope,
   ApiOkListEnvelope,
-} from '../../common/http/api-envelope.decorator';
+} from '../../core/http/api-envelope.decorator';
 import {
   KioskDeviceRegisteredResponseDto,
   KioskDeviceResponseDto,

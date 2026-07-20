@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma, WorkflowInstance, WorkflowTask, WorkflowTaskStatus } from '@prisma/client';
-import { PrismaService } from '../../infrastructure/database/prisma.service';
+import { PrismaService } from '../../core/database/prisma.service';
 import { TERMINAL_TASK_STATUSES } from './workflow-task-state-machine';
 
 @Injectable()
@@ -57,7 +57,14 @@ export class WorkflowRuntimeRepository {
   }
 
   list(filters: {
-    encounterId?: string;
+    /** Tenant-scoping filter — the caller (WorkflowRuntimeService.listTasks)
+     * always supplies this, either as [a single caller-visible encounterId]
+     * or [every encounterId within the caller's organizations]. There is no
+     * "no encounterIds means all tasks platform-wide" mode here on purpose:
+     * that was a confirmed IDOR (any authenticated user could list every
+     * organization's workflow tasks) — see docs/module-capability-map.md's
+     * security-audit findings. */
+    encounterIds: string[];
     responsibleRole?: string;
     assigneeId?: string;
     department?: string;
@@ -66,7 +73,7 @@ export class WorkflowRuntimeRepository {
     urgency?: string;
   }): Promise<WorkflowTask[]> {
     const where: Prisma.WorkflowTaskWhereInput = {
-      ...(filters.encounterId ? { encounterId: filters.encounterId } : {}),
+      encounterId: { in: filters.encounterIds },
       ...(filters.responsibleRole ? { responsibleRole: filters.responsibleRole as never } : {}),
       ...(filters.assigneeId ? { assigneeId: filters.assigneeId } : {}),
       ...(filters.department ? { department: filters.department } : {}),

@@ -1,14 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { EncounterStatus } from '@prisma/client';
-import { PrismaService } from '../../infrastructure/database/prisma.service';
-import { AuditService } from '../../common/audit/audit.service';
-import { AuthenticatedPrincipal } from '../../common/auth/auth.types';
-import {
-  ConflictAppError,
-  ForbiddenAppError,
-  NotFoundAppError,
-} from '../../common/errors/app-error';
-import { toOffsetPage, toCursorPage, decodeCursor } from '../../common/pagination/pagination.util';
+import { PrismaService } from '../../core/database/prisma.service';
+import { AuditService } from '../../core/audit/audit.service';
+import { AuthenticatedPrincipal } from '../../core/security/auth.types';
+import { ConflictAppError, ForbiddenAppError, NotFoundAppError } from '../../core/errors/app-error';
+import { toOffsetPage, toCursorPage, decodeCursor } from '../../core/pagination/pagination.util';
 import { PatientsRepository } from '../patients/patients.repository';
 import { EncountersRepository } from './encounters.repository';
 import {

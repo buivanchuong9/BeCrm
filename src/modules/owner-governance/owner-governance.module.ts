@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { AuditModule } from '../../common/audit/audit.module';
+import { AuditModule } from '../../core/audit/audit.module';
 import { IdentityModule } from '../identity/identity.module';
 import { FeatureFlagsService } from '../../common/authorization/feature-flags.service';
 import { FeatureFlagsController } from './feature-flags.controller';

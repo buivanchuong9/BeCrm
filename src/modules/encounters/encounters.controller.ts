@@ -15,13 +15,13 @@ import { Request } from 'express';
 import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
 import { EncounterStatus } from '@prisma/client';
-import { CurrentUser } from '../../common/auth/current-user.decorator';
-import { AuthenticatedPrincipal } from '../../common/auth/auth.types';
+import { CurrentUser } from '../../core/security/current-user.decorator';
+import { AuthenticatedPrincipal } from '../../core/security/auth.types';
 import {
   ApiCreatedEnvelope,
   ApiOkEnvelope,
   ApiOkListEnvelope,
-} from '../../common/http/api-envelope.decorator';
+} from '../../core/http/api-envelope.decorator';
 import {
   EncounterResponseDto,
   EncounterEventResponseDto,

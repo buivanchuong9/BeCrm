@@ -6,8 +6,8 @@ import {
   AccessTokenClaims,
   AuthenticatedPrincipal,
   MembershipScope,
-} from '../../common/auth/auth.types';
-import { AppConfiguration } from '../../config/configuration';
+} from '../../core/security/auth.types';
+import { AppConfiguration } from '../../core/configuration/configuration';
 
 export interface IssuedAccessToken {
   token: string;

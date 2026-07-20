@@ -1,13 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
-import { PrismaService } from '../../infrastructure/database/prisma.service';
-import { AuditService } from '../../common/audit/audit.service';
-import { AuthenticatedPrincipal } from '../../common/auth/auth.types';
-import {
-  ConflictAppError,
-  ForbiddenAppError,
-  NotFoundAppError,
-} from '../../common/errors/app-error';
+import { PrismaService } from '../../core/database/prisma.service';
+import { AuditService } from '../../core/audit/audit.service';
+import { AuthenticatedPrincipal } from '../../core/security/auth.types';
+import { ConflictAppError, ForbiddenAppError, NotFoundAppError } from '../../core/errors/app-error';
 import { EncountersRepository } from '../encounters/encounters.repository';
 import { canTransition } from '../encounters/encounter-state-machine';
 import { ClinicalOrdersRepository } from './clinical-orders.repository';

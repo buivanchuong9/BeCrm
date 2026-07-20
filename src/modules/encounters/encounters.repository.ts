@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { EncounterStatus, MedicalEncounter, Prisma } from '@prisma/client';
-import { PrismaService } from '../../infrastructure/database/prisma.service';
-import { AuthenticatedPrincipal } from '../../common/auth/auth.types';
+import { PrismaService } from '../../core/database/prisma.service';
+import { AuthenticatedPrincipal } from '../../core/security/auth.types';
 import { isSuperAdministrator, viewOrgWideOrganizationIds } from './policies/encounter-policies';
 
 const CLOSED_STATUSES: EncounterStatus[] = ['closed', 'follow_up_linked'];

@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
-import { PrismaService } from '../../infrastructure/database/prisma.service';
-import { AuthenticatedPrincipal } from '../auth/auth.types';
-import { ForbiddenAppError } from '../errors/app-error';
+import { PrismaService } from '../../core/database/prisma.service';
+import { AuthenticatedPrincipal } from '../../core/security/auth.types';
+import { ForbiddenAppError } from '../../core/errors/app-error';
 
 const CACHE_TTL_MS = 5 * 60_000;
 

@@ -1,7 +1,7 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
-import { AuthenticatedPrincipal } from '../auth/auth.types';
+import { AuthenticatedPrincipal } from '../../core/security/auth.types';
 import { PolicyEngineService } from './policy-engine.service';
 import { PERMISSION_KEY } from './require-permission.decorator';
 

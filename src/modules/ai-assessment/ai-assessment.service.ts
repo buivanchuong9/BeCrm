@@ -1,14 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { EncounterStatus, Prisma } from '@prisma/client';
-import { PrismaService } from '../../infrastructure/database/prisma.service';
-import { AuditService } from '../../common/audit/audit.service';
-import { OutboxService } from '../../common/outbox/outbox.service';
-import { AuthenticatedPrincipal } from '../../common/auth/auth.types';
-import {
-  ConflictAppError,
-  ForbiddenAppError,
-  NotFoundAppError,
-} from '../../common/errors/app-error';
+import { PrismaService } from '../../core/database/prisma.service';
+import { AuditService } from '../../core/audit/audit.service';
+import { OutboxService } from '../../core/outbox/outbox.service';
+import { AuthenticatedPrincipal } from '../../core/security/auth.types';
+import { ConflictAppError, ForbiddenAppError, NotFoundAppError } from '../../core/errors/app-error';
 import { EncountersRepository } from '../encounters/encounters.repository';
 import { canTransition } from '../encounters/encounter-state-machine';
 import { AiAssessmentRepository } from './ai-assessment.repository';

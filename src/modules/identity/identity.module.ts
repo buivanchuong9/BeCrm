@@ -12,9 +12,9 @@ import { TokenService } from './token.service';
 import { UsersRepository } from './users.repository';
 import { UserPreferencesRepository } from './user-preferences.repository';
 import { RefreshSessionsRepository } from './refresh-sessions.repository';
-import { JwtStrategy } from '../../common/auth/jwt.strategy';
+import { JwtStrategy } from '../../core/security/jwt.strategy';
 import { PasswordResetService } from './password-reset.service';
-import { AuditModule } from '../../common/audit/audit.module';
+import { AuditModule } from '../../core/audit/audit.module';
 import { MfaService } from './mfa/mfa.service';
 import { StaffInvitationsService } from './staff-invitations.service';
 

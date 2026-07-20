@@ -6,19 +6,19 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 import { BullModule } from '@nestjs/bullmq';
 
-import { validateEnv } from './config/env.validation';
-import { buildConfiguration, AppConfiguration } from './config/configuration';
+import { validateEnv } from './core/configuration/env.validation';
+import { buildConfiguration, AppConfiguration } from './core/configuration/configuration';
 
-import { PrismaModule } from './infrastructure/database/prisma.module';
-import { RedisModule } from './infrastructure/redis/redis.module';
+import { PrismaModule } from './core/database/prisma.module';
+import { RedisModule } from './core/cache/redis.module';
 
-import { AuditModule } from './common/audit/audit.module';
-import { OutboxModule } from './common/outbox/outbox.module';
-import { IdempotencyModule } from './common/idempotency/idempotency.module';
-import { IdempotencyInterceptor } from './common/idempotency/idempotency.interceptor';
-import { createRequestId } from './common/http/request-id.middleware';
-import { CsrfOriginGuard } from './common/http/csrf-origin.guard';
-import { JwtAuthGuard } from './common/auth/jwt-auth.guard';
+import { AuditModule } from './core/audit/audit.module';
+import { OutboxModule } from './core/outbox/outbox.module';
+import { IdempotencyModule } from './core/idempotency/idempotency.module';
+import { IdempotencyInterceptor } from './core/idempotency/idempotency.interceptor';
+import { createRequestId } from './core/http/request-id.middleware';
+import { CsrfOriginGuard } from './core/http/csrf-origin.guard';
+import { JwtAuthGuard } from './core/security/jwt-auth.guard';
 import { RolesGuard } from './common/authorization/roles.guard';
 import { AuthorizationModule } from './common/authorization/authorization.module';
 import { PermissionsGuard } from './common/authorization/permissions.guard';
@@ -38,6 +38,8 @@ import { WorkflowModule } from './modules/workflow/workflow.module';
 import { MedicalRecordsModule } from './modules/medical-records/medical-records.module';
 import { OperationsModule } from './modules/operations/operations.module';
 import { OwnerGovernanceModule } from './modules/owner-governance/owner-governance.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { CarePlansModule } from './modules/care-plans/care-plans.module';
 
 @Module({
   imports: [
@@ -116,6 +118,8 @@ import { OwnerGovernanceModule } from './modules/owner-governance/owner-governan
     MedicalRecordsModule,
     OperationsModule,
     OwnerGovernanceModule,
+    NotificationsModule,
+    CarePlansModule,
     HealthModule,
   ],
   providers: [

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ClinicalPlan, DoctorDiagnosis, DoctorReview, Prisma } from '@prisma/client';
-import { PrismaService } from '../../infrastructure/database/prisma.service';
+import { PrismaService } from '../../core/database/prisma.service';
 
 @Injectable()
 export class DoctorDecisionRepository {

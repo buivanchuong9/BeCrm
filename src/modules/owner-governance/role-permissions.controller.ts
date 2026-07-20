@@ -6,14 +6,15 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  ParseEnumPipe,
   Post,
   Req,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { Request } from 'express';
-import { CurrentUser } from '../../common/auth/current-user.decorator';
-import { AuthenticatedPrincipal } from '../../common/auth/auth.types';
+import { CurrentUser } from '../../core/security/current-user.decorator';
+import { AuthenticatedPrincipal } from '../../core/security/auth.types';
 import { RequirePermission } from '../../common/authorization/require-permission.decorator';
 import { PERMISSIONS, PERMISSION_CATALOG } from '../../common/authorization/permissions.catalog';
 import { RolePermissionsService } from './role-permissions.service';
@@ -43,16 +44,11 @@ export class RolePermissionsController {
     @Body() dto: GrantRolePermissionRequest,
     @Req() req: Request,
   ) {
-    const row = await this.rolePermissions.grant(
-      dto.role as UserRole,
-      dto.permissionCode,
-      principal.userId,
-      {
-        requestId: req.requestId,
-        ip: req.ip,
-        userAgent: req.header('user-agent'),
-      },
-    );
+    const row = await this.rolePermissions.grant(dto.role, dto.permissionCode, principal.userId, {
+      requestId: req.requestId,
+      ip: req.ip,
+      userAgent: req.header('user-agent'),
+    });
     return { data: row };
   }
 
@@ -61,11 +57,14 @@ export class RolePermissionsController {
   @Delete(':role/:permissionCode')
   async revoke(
     @CurrentUser() principal: AuthenticatedPrincipal,
-    @Param('role') role: string,
+    // BUG FIX: was a raw `@Param('role') role: string` with no validation at
+    // all (not even a type assertion's false comfort) - same
+    // PrismaClientValidationError -> 500 as the grant() bug above.
+    @Param('role', new ParseEnumPipe(UserRole)) role: UserRole,
     @Param('permissionCode') permissionCode: string,
     @Req() req: Request,
   ): Promise<void> {
-    await this.rolePermissions.revoke(role as UserRole, permissionCode, principal.userId, {
+    await this.rolePermissions.revoke(role, permissionCode, principal.userId, {
       requestId: req.requestId,
       ip: req.ip,
       userAgent: req.header('user-agent'),

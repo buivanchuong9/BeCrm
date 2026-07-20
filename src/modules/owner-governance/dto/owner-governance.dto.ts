@@ -1,7 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { DangerousActionType } from '@prisma/client';
+import { DangerousActionType, UserRole } from '@prisma/client';
 import {
   IsBoolean,
+  IsEnum,
   IsIn,
   IsObject,
   IsOptional,
@@ -24,7 +25,12 @@ export class SetFeatureFlagOverrideRequest {
 }
 
 export class GrantRolePermissionRequest {
-  @ApiProperty() @IsString() role!: string;
+  // BUG FIX: was `@IsString()`, so any string reached
+  // RolePermissionsService.grant() -> Prisma's `role` enum column, which
+  // throws a PrismaClientValidationError (uncaught by GlobalExceptionFilter,
+  // falls through to 500) instead of a 400. `@IsEnum` rejects it at the DTO
+  // boundary instead.
+  @ApiProperty({ enum: UserRole }) @IsEnum(UserRole) role!: UserRole;
   @ApiProperty() @IsString() permissionCode!: string;
 }
 

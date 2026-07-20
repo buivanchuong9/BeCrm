@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../../../infrastructure/database/prisma.service';
-import { AuditService } from '../../../common/audit/audit.service';
+import { PrismaService } from '../../../core/database/prisma.service';
+import { AuditService } from '../../../core/audit/audit.service';
 import {
   ConflictAppError,
   ForbiddenAppError,
   NotFoundAppError,
-} from '../../../common/errors/app-error';
-import { AppConfiguration } from '../../../config/configuration';
+} from '../../../core/errors/app-error';
+import { AppConfiguration } from '../../../core/configuration/configuration';
 import { decryptMfaSecret, encryptMfaSecret } from './mfa-crypto.util';
 import { buildOtpAuthUri, generateBase32Secret, verifyTotp } from './totp.util';
 

@@ -16,9 +16,9 @@ import { ApiOkResponse, ApiProduces, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { IsIn, IsOptional, IsString, IsUUID } from 'class-validator';
 import { QueueTicketStatus } from '@prisma/client';
-import { CurrentUser } from '../../common/auth/current-user.decorator';
-import { AuthenticatedPrincipal } from '../../common/auth/auth.types';
-import { ApiOkEnvelope, ApiOkListEnvelope } from '../../common/http/api-envelope.decorator';
+import { CurrentUser } from '../../core/security/current-user.decorator';
+import { AuthenticatedPrincipal } from '../../core/security/auth.types';
+import { ApiOkEnvelope, ApiOkListEnvelope } from '../../core/http/api-envelope.decorator';
 import {
   QueueStationSummaryResponseDto,
   QueueTicketResponseDto,

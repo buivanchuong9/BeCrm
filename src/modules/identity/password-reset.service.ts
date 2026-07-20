@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHash, randomBytes } from 'crypto';
-import { AuditService } from '../../common/audit/audit.service';
-import { ConflictAppError } from '../../common/errors/app-error';
-import { AppConfiguration } from '../../config/configuration';
-import { PrismaService } from '../../infrastructure/database/prisma.service';
+import { AuditService } from '../../core/audit/audit.service';
+import { ConflictAppError } from '../../core/errors/app-error';
+import { AppConfiguration } from '../../core/configuration/configuration';
+import { PrismaService } from '../../core/database/prisma.service';
 import { PasswordService } from './password.service';
 
 @Injectable()

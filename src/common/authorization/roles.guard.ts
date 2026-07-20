@@ -2,8 +2,8 @@ import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
 import { UserRole } from '@prisma/client';
-import { ForbiddenAppError } from '../errors/app-error';
-import { AuthenticatedPrincipal } from '../auth/auth.types';
+import { ForbiddenAppError } from '../../core/errors/app-error';
+import { AuthenticatedPrincipal } from '../../core/security/auth.types';
 import { ROLES_KEY } from './roles.decorator';
 
 /** super_administrator passes every *role* gate here, mirroring the

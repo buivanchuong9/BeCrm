@@ -1,5 +1,5 @@
-import { AuthenticatedPrincipal, MembershipScope } from '../auth/auth.types';
-import { ForbiddenAppError } from '../errors/app-error';
+import { AuthenticatedPrincipal, MembershipScope } from '../../core/security/auth.types';
+import { ForbiddenAppError } from '../../core/errors/app-error';
 
 /**
  * Every scoped query/command must call this (or filter directly in the Prisma

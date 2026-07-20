@@ -11,8 +11,8 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
-import { CurrentUser } from '../../common/auth/current-user.decorator';
-import { AuthenticatedPrincipal } from '../../common/auth/auth.types';
+import { CurrentUser } from '../../core/security/current-user.decorator';
+import { AuthenticatedPrincipal } from '../../core/security/auth.types';
 import { RequirePermission } from '../../common/authorization/require-permission.decorator';
 import { PERMISSIONS } from '../../common/authorization/permissions.catalog';
 import { BreakGlassService } from './break-glass.service';

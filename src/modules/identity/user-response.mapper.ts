@@ -1,5 +1,5 @@
 import { UserStatus } from '@prisma/client';
-import { MembershipScope } from '../../common/auth/auth.types';
+import { MembershipScope } from '../../core/security/auth.types';
 import { UserWithMemberships } from './users.repository';
 
 export type ApiUserStatus = 'invited' | 'active' | 'locked' | 'disabled';

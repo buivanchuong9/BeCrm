@@ -1,14 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
-import { AuthenticatedPrincipal } from '../../common/auth/auth.types';
+import { AuthenticatedPrincipal } from '../../core/security/auth.types';
 import {
   ConflictAppError,
   ForbiddenAppError,
   ValidationAppError,
-} from '../../common/errors/app-error';
-import { PrismaService } from '../../infrastructure/database/prisma.service';
-import { AppConfiguration } from '../../config/configuration';
+} from '../../core/errors/app-error';
+import { PrismaService } from '../../core/database/prisma.service';
+import { AppConfiguration } from '../../core/configuration/configuration';
 import { AvailabilityQuery } from './dto/availability.query';
 import { ListPractitionersQuery } from './dto/list-practitioners.query';
 import { clinicLocalMinuteToUtc, weekdayForDate } from './timezone.util';

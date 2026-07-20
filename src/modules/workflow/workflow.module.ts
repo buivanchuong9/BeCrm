@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { EncountersModule } from '../encounters/encounters.module';
+import { PatientsModule } from '../patients/patients.module';
 import {
   EncounterWorkflowController,
   WorkflowInstancesController,
@@ -13,7 +14,7 @@ import { WorkflowRuntimeRepository } from './workflow-runtime.repository';
 import { WorkflowRuntimeService } from './workflow-runtime.service';
 
 @Module({
-  imports: [EncountersModule],
+  imports: [EncountersModule, PatientsModule],
   controllers: [
     WorkflowTemplatesController,
     WorkflowTemplateVersionsController,

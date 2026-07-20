@@ -1,14 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { PrismaService } from '../../infrastructure/database/prisma.service';
-import { AuditService } from '../../common/audit/audit.service';
-import { OutboxService } from '../../common/outbox/outbox.service';
-import { AuthenticatedPrincipal } from '../../common/auth/auth.types';
-import {
-  ConflictAppError,
-  ForbiddenAppError,
-  NotFoundAppError,
-} from '../../common/errors/app-error';
+import { PrismaService } from '../../core/database/prisma.service';
+import { AuditService } from '../../core/audit/audit.service';
+import { OutboxService } from '../../core/outbox/outbox.service';
+import { AuthenticatedPrincipal } from '../../core/security/auth.types';
+import { ConflictAppError, ForbiddenAppError, NotFoundAppError } from '../../core/errors/app-error';
 import { EncountersRepository } from '../encounters/encounters.repository';
 
 type Context = { requestId?: string; ip?: string; userAgent?: string };
@@ -33,6 +29,21 @@ export class MedicalRecordsService {
   }
   private requireRole(p: AuthenticatedPrincipal, roles: string[]) {
     if (!this.hasRole(p, roles)) throw new ForbiddenAppError('AUTH_FORBIDDEN');
+  }
+  /** SECURITY FIX: flagLateResult/reviewDocument/flagDocument below had no
+   * role check at all (every other write in this file requires DOCTOR or
+   * medical_administrator) — a `patient` principal, who can see their own
+   * encounter via `visible()`, could flip a signed record to
+   * `addendum_required` or toggle a clinical document's review/flag state.
+   * This is the minimal, unambiguous fix: exclude `patient` specifically,
+   * matching this file's established pattern that patients never get
+   * clinical-governance write actions. The exact staff-role subset (e.g.
+   * nurse vs. care_coordinator vs. doctor-only) needs a product decision;
+   * flagged as follow-up rather than guessed. */
+  private requireStaffRole(p: AuthenticatedPrincipal) {
+    if (!p.memberships.some((m) => m.role !== 'patient')) {
+      throw new ForbiddenAppError('AUTH_FORBIDDEN', 'This action requires a staff role.');
+    }
   }
   private async visible(p: AuthenticatedPrincipal, encounterId: string) {
     const e = await this.encounters.findVisibleById(p, encounterId);
@@ -341,6 +352,7 @@ export class MedicalRecordsService {
     description: string,
     c: Context,
   ) {
+    this.requireStaffRole(p);
     const { record, encounter: e } = await this.recordVisible(p, recordId);
     if (!['signed', 'amended'].includes(record.status))
       await this.prisma.medicalRecord.update({
@@ -363,6 +375,7 @@ export class MedicalRecordsService {
     };
   }
   async reviewDocument(p: AuthenticatedPrincipal, id: string, c: Context) {
+    this.requireStaffRole(p);
     const doc = await this.prisma.clinicalDocument.findUnique({ where: { id } });
     if (!doc) throw new NotFoundAppError('Document not found.');
     const e = await this.visible(p, doc.encounterId);
@@ -383,6 +396,7 @@ export class MedicalRecordsService {
     return { data: row };
   }
   async flagDocument(p: AuthenticatedPrincipal, id: string, reason: string, c: Context) {
+    this.requireStaffRole(p);
     const doc = await this.prisma.clinicalDocument.findUnique({ where: { id } });
     if (!doc) throw new NotFoundAppError('Document not found.');
     const e = await this.visible(p, doc.encounterId);

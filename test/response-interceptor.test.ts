@@ -3,8 +3,8 @@ import { describe, it } from 'node:test';
 import { CallHandler, ExecutionContext } from '@nestjs/common';
 import { SSE_METADATA } from '@nestjs/common/constants';
 import { firstValueFrom, of } from 'rxjs';
-import '../src/common/http/request-id.middleware';
-import { ResponseInterceptor } from '../src/common/http/response.interceptor';
+import '../src/core/http/request-id.middleware';
+import { ResponseInterceptor } from '../src/core/http/response.interceptor';
 
 describe('ResponseInterceptor', () => {
   it('does not wrap Server-Sent Events in the JSON API envelope', async () => {
