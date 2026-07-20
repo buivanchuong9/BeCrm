@@ -5,8 +5,8 @@ Backend production chạy bằng `docker-compose.prod.yml`:
 - API container: `dermahealth-api`
 - API trên host: `127.0.0.1:43000`
 - PostgreSQL và Redis chỉ nằm trong Docker network
-- Swagger UI release hiện tại: `/api/docs/2.2.1`
-- OpenAPI JSON release hiện tại: `/api/docs/2.2.1/openapi.json`
+- Swagger UI release hiện tại: `/api/docs/2.5.0`
+- OpenAPI JSON release hiện tại: `/api/docs/2.5.0/openapi.json`
 - Swagger UI tương thích ngược: `/api/docs` (302 no-store tới release hiện tại)
 
 Swagger runtime được sinh từ source code khi API khởi động, không đọc trực tiếp
@@ -114,6 +114,28 @@ unset ACCESS_PRIVATE_KEY ACCESS_PUBLIC_KEY
 Nếu frontend nằm trên domain khác, sửa `FRONTEND_ORIGINS` thành origin thật của
 frontend. Không đặt `SEED_DEMO_PASSWORD` khi `NODE_ENV=production`.
 
+Đổi mật khẩu cho một Owner hiện hữu bằng biến môi trường dùng một lần. Lệnh
+này xác nhận tài khoản có membership `super_administrator`, băm mật khẩu bằng
+Argon2id + `PASSWORD_PEPPER`, thu hồi mọi refresh session và ghi audit event:
+
+```sh
+read -r -p "Super-admin email: " SUPER_ADMIN_EMAIL
+read -r -s -p "New password: " SUPER_ADMIN_PASSWORD
+export SUPER_ADMIN_EMAIL SUPER_ADMIN_PASSWORD
+
+docker compose \
+  --env-file .env.production \
+  -f docker-compose.prod.yml \
+  run --rm \
+  -e SUPER_ADMIN_EMAIL \
+  -e SUPER_ADMIN_PASSWORD \
+  api npm run admin:set-password
+
+unset SUPER_ADMIN_EMAIL SUPER_ADMIN_PASSWORD
+```
+
+Không ghi mật khẩu vào `.env.production`, shell history, Compose hoặc Git.
+
 Kiểm tra các secret bắt buộc mà không in giá trị:
 
 ```sh
@@ -206,12 +228,12 @@ docker compose \
   logs --tail=200 api
 
 curl -i http://127.0.0.1:43000/health/live
-curl -s http://127.0.0.1:43000/api/docs/2.2.1/openapi.json | jq '.info.version'
+curl -s http://127.0.0.1:43000/api/docs/2.5.0/openapi.json | jq '.info.version'
 
-curl -sSI http://127.0.0.1:43000/api/docs/2.2.1/swagger-ui-init.js \
+curl -sSI http://127.0.0.1:43000/api/docs/2.5.0/swagger-ui-init.js \
   | grep -iE 'cache-control|pragma|expires'
 
-curl -sSI http://127.0.0.1:43000/api/docs/2.2.1/openapi.json \
+curl -sSI http://127.0.0.1:43000/api/docs/2.5.0/openapi.json \
   | grep -iE 'cache-control|pragma|expires'
 
 docker inspect \
@@ -236,13 +258,13 @@ sudo systemctl reload nginx
 Swagger production:
 
 ```text
-https://dermahealth.fitdnu.id.vn/api/docs/2.2.1
+https://dermahealth.fitdnu.id.vn/api/docs/2.5.0
 ```
 
 OpenAPI JSON production:
 
 ```text
-https://dermahealth.fitdnu.id.vn/api/docs/2.2.1/openapi.json
+https://dermahealth.fitdnu.id.vn/api/docs/2.5.0/openapi.json
 ```
 
 ## 7. Xóa database và dựng lại hoàn toàn

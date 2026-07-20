@@ -1,4 +1,5 @@
 import { INestApplication, ValidationPipe, VersioningType } from '@nestjs/common';
+import type { CustomOrigin } from '@nestjs/common/interfaces/external/cors-options.interface';
 import { ConfigService } from '@nestjs/config';
 import { json, urlencoded } from 'express';
 import { ValidationError } from 'class-validator';
@@ -31,12 +32,13 @@ export function configureApp(app: INestApplication): void {
   app.use(cookieParser());
   const configuredOrigins = config.get('frontendOrigins', { infer: true });
   const allowDevelopmentLocalhost = !config.get('isProduction', { infer: true });
+  const corsOrigin: CustomOrigin = (origin, callback) =>
+    callback(
+      null,
+      !origin || isAllowedOrigin(origin, configuredOrigins, allowDevelopmentLocalhost),
+    );
   app.enableCors({
-    origin: (origin, callback) =>
-      callback(
-        null,
-        !origin || isAllowedOrigin(origin, configuredOrigins, allowDevelopmentLocalhost),
-      ),
+    origin: corsOrigin,
     credentials: true,
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: [

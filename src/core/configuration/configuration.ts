@@ -6,7 +6,21 @@ function packageVersion(): string {
   // Avoid a static JSON import outside src/: it changes TypeScript's inferred
   // rootDir and moves the production entrypoint from dist/main.js to
   // dist/src/main.js. The runtime image always copies package.json to /app.
-  const path = join(__dirname, '../../package.json');
+  //
+  // BUG FIX (production incident): this used to be
+  // `join(__dirname, '../../package.json')`, which depended on this file's
+  // exact nesting depth under dist/ (it was correct back when this file
+  // lived at src/config/configuration.ts, two levels deep). The backend
+  // refactor moved it to src/core/configuration/configuration.ts, one level
+  // deeper, silently turning `../../` into `dist/package.json` instead of
+  // the real `/app/package.json` -- ENOENT on every boot in the built Docker
+  // image, invisible in this repo's tests because every test provides a
+  // fake ConfigService and never exercises the real buildConfiguration()
+  // path. process.cwd() is not tied to this file's location at all: `npm
+  // run <script>` and a container's WORKDIR both put it at the app root
+  // (where package.json actually lives), so this survives the file being
+  // moved again.
+  const path = join(process.cwd(), 'package.json');
   const parsed = JSON.parse(readFileSync(path, 'utf8')) as { version: string };
   return parsed.version;
 }

@@ -73,6 +73,15 @@ services:
         condition: service_healthy
     env_file:
       - .env
+    environment:
+      # Host-published ports in .env are for processes running directly on the
+      # developer machine. Containers must use Compose service DNS and the
+      # services' internal ports instead.
+      DATABASE_URL: postgresql://app:dev@postgres:5432/dermahealth?schema=public
+      REDIS_URL: redis://redis:6379
+      S3_ENDPOINT: http://minio:9000
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
     ports:
       - '3000:3000'
     command: sh -c "npm run db:migrate && npm run db:seed && npm run start:dev"

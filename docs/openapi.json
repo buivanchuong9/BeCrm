@@ -3,7 +3,7 @@
   "paths": {
     "/api/v1/auth/registrations": {
       "post": {
-        "operationId": "AuthController_register",
+        "operationId": "AuthController_register_v1",
         "parameters": [],
         "requestBody": {
           "required": true,
@@ -184,7 +184,7 @@
     },
     "/api/v1/auth/invitations/activation": {
       "post": {
-        "operationId": "AuthController_activateInvitation",
+        "operationId": "AuthController_activateInvitation_v1",
         "parameters": [],
         "requestBody": {
           "required": true,
@@ -328,7 +328,7 @@
     },
     "/api/v1/auth/sessions": {
       "post": {
-        "operationId": "AuthController_createSession",
+        "operationId": "AuthController_createSession_v1",
         "parameters": [],
         "requestBody": {
           "required": true,
@@ -504,7 +504,7 @@
         ]
       },
       "delete": {
-        "operationId": "AuthController_endAllSessions",
+        "operationId": "AuthController_endAllSessions_v1",
         "parameters": [],
         "requestBody": {
           "required": true,
@@ -648,7 +648,7 @@
     },
     "/api/v1/auth/login": {
       "post": {
-        "operationId": "AuthController_login",
+        "operationId": "AuthController_login_v1",
         "parameters": [],
         "requestBody": {
           "required": true,
@@ -826,7 +826,7 @@
     },
     "/api/v1/auth/session-refreshes": {
       "post": {
-        "operationId": "AuthController_createSessionRefresh",
+        "operationId": "AuthController_createSessionRefresh_v1",
         "parameters": [],
         "responses": {
           "200": {
@@ -994,7 +994,7 @@
     },
     "/api/v1/auth/refresh": {
       "post": {
-        "operationId": "AuthController_refresh",
+        "operationId": "AuthController_refresh_v1",
         "parameters": [],
         "responses": {
           "200": {
@@ -1162,7 +1162,7 @@
     },
     "/api/v1/auth/me": {
       "get": {
-        "operationId": "AuthController_me",
+        "operationId": "AuthController_me_v1",
         "parameters": [],
         "responses": {
           "200": {
@@ -1304,7 +1304,7 @@
     },
     "/api/v1/auth/sessions/current": {
       "delete": {
-        "operationId": "AuthController_endCurrentSession",
+        "operationId": "AuthController_endCurrentSession_v1",
         "parameters": [],
         "responses": {
           "204": {
@@ -1438,7 +1438,7 @@
     },
     "/api/v1/auth/logout": {
       "post": {
-        "operationId": "AuthController_logout",
+        "operationId": "AuthController_logout_v1",
         "parameters": [],
         "responses": {
           "204": {
@@ -1572,7 +1572,7 @@
     },
     "/api/v1/auth/forgot-password": {
       "post": {
-        "operationId": "AuthController_forgotPassword",
+        "operationId": "AuthController_forgotPassword_v1",
         "parameters": [],
         "requestBody": {
           "required": true,
@@ -1724,7 +1724,7 @@
     },
     "/api/v1/auth/reset-password": {
       "post": {
-        "operationId": "AuthController_resetPassword",
+        "operationId": "AuthController_resetPassword_v1",
         "parameters": [],
         "requestBody": {
           "required": true,
@@ -1868,7 +1868,7 @@
     },
     "/api/v1/me": {
       "get": {
-        "operationId": "MeController_getProfile",
+        "operationId": "MeController_getProfile_v1",
         "parameters": [],
         "responses": {
           "200": {
@@ -2034,7 +2034,7 @@
         ]
       },
       "patch": {
-        "operationId": "MeController_updateProfile",
+        "operationId": "MeController_updateProfile_v1",
         "parameters": [],
         "requestBody": {
           "required": true,
@@ -2212,7 +2212,7 @@
     },
     "/api/v1/me/preferences": {
       "get": {
-        "operationId": "MeController_getPreferences",
+        "operationId": "MeController_getPreferences_v1",
         "parameters": [],
         "responses": {
           "200": {
@@ -2378,7 +2378,7 @@
         ]
       },
       "put": {
-        "operationId": "MeController_putPreferences",
+        "operationId": "MeController_putPreferences_v1",
         "parameters": [],
         "requestBody": {
           "required": true,
@@ -2556,7 +2556,7 @@
     },
     "/api/v1/me/mfa": {
       "post": {
-        "operationId": "MeController_beginMfaEnrollment",
+        "operationId": "MeController_beginMfaEnrollment_v1",
         "parameters": [],
         "responses": {
           "200": {
@@ -2722,7 +2722,7 @@
         ]
       },
       "delete": {
-        "operationId": "MeController_disableMfa",
+        "operationId": "MeController_disableMfa_v1",
         "parameters": [],
         "requestBody": {
           "required": true,
@@ -2866,7 +2866,7 @@
     },
     "/api/v1/me/mfa/confirmations": {
       "post": {
-        "operationId": "MeController_confirmMfaEnrollment",
+        "operationId": "MeController_confirmMfaEnrollment_v1",
         "parameters": [],
         "requestBody": {
           "required": true,
@@ -3010,7 +3010,7 @@
     },
     "/api/v1/users/invitations": {
       "get": {
-        "operationId": "UsersController_listPendingInvitations",
+        "operationId": "UsersController_listPendingInvitations_v1",
         "parameters": [
           {
             "name": "organizationId",
@@ -3190,7 +3190,7 @@
     },
     "/api/v1/users/invitations/{invitationId}": {
       "delete": {
-        "operationId": "UsersController_revokeInvitation",
+        "operationId": "UsersController_revokeInvitation_v1",
         "parameters": [
           {
             "name": "invitationId",
@@ -3333,7 +3333,7 @@
     },
     "/api/v1/users": {
       "get": {
-        "operationId": "UsersController_list",
+        "operationId": "UsersController_list_v1",
         "parameters": [],
         "responses": {
           "200": {
@@ -3504,7 +3504,7 @@
     },
     "/api/v1/users/{userId}": {
       "get": {
-        "operationId": "UsersController_detail",
+        "operationId": "UsersController_detail_v1",
         "parameters": [
           {
             "name": "userId",
@@ -3679,7 +3679,7 @@
         ]
       },
       "patch": {
-        "operationId": "UsersController_update",
+        "operationId": "UsersController_update_v1",
         "parameters": [
           {
             "name": "userId",
@@ -3866,7 +3866,7 @@
     },
     "/api/v1/users/{userId}/preferences": {
       "get": {
-        "operationId": "UsersController_getPreferences",
+        "operationId": "UsersController_getPreferences_v1",
         "parameters": [
           {
             "name": "userId",
@@ -4015,7 +4015,7 @@
         "x-success-schema": "generic-fallback"
       },
       "put": {
-        "operationId": "UsersController_putPreferences",
+        "operationId": "UsersController_putPreferences_v1",
         "parameters": [
           {
             "name": "userId",
@@ -4176,7 +4176,7 @@
     },
     "/api/v1/patients": {
       "get": {
-        "operationId": "PatientsController_list",
+        "operationId": "PatientsController_list_v1",
         "parameters": [],
         "responses": {
           "200": {
@@ -4347,7 +4347,7 @@
     },
     "/api/v1/patients/me": {
       "get": {
-        "operationId": "PatientsController_self",
+        "operationId": "PatientsController_self_v1",
         "parameters": [],
         "responses": {
           "200": {
@@ -4515,7 +4515,7 @@
     },
     "/api/v1/patients/{patientId}": {
       "get": {
-        "operationId": "PatientsController_detail",
+        "operationId": "PatientsController_detail_v1",
         "parameters": [
           {
             "name": "patientId",
@@ -4690,7 +4690,7 @@
         ]
       },
       "patch": {
-        "operationId": "PatientsController_update",
+        "operationId": "PatientsController_update_v1",
         "parameters": [
           {
             "name": "patientId",
@@ -4877,7 +4877,7 @@
     },
     "/api/v1/patients/{patientId}/consents": {
       "get": {
-        "operationId": "ConsentsController_list",
+        "operationId": "ConsentsController_list_v1",
         "parameters": [
           {
             "name": "patientId",
@@ -5057,7 +5057,7 @@
     },
     "/api/v1/patients/{patientId}/consent-grants": {
       "post": {
-        "operationId": "ConsentsController_grant",
+        "operationId": "ConsentsController_grant_v1",
         "parameters": [
           {
             "name": "patientId",
@@ -5244,7 +5244,7 @@
     },
     "/api/v1/patients/{patientId}/consent-withdrawals": {
       "post": {
-        "operationId": "ConsentsController_withdraw",
+        "operationId": "ConsentsController_withdraw_v1",
         "parameters": [
           {
             "name": "patientId",
@@ -5431,7 +5431,7 @@
     },
     "/api/v1/patients/{patientId}/consents/{type}": {
       "put": {
-        "operationId": "ConsentsController_setConsent",
+        "operationId": "ConsentsController_setConsent_v1",
         "parameters": [
           {
             "name": "patientId",
@@ -5600,7 +5600,7 @@
     },
     "/api/v1/organizations": {
       "get": {
-        "operationId": "OrganizationsController_list",
+        "operationId": "OrganizationsController_list_v1",
         "parameters": [],
         "responses": {
           "200": {
@@ -5771,7 +5771,7 @@
     },
     "/api/v1/clinic-locations": {
       "get": {
-        "operationId": "ClinicLocationsController_list",
+        "operationId": "ClinicLocationsController_list_v1",
         "parameters": [],
         "responses": {
           "200": {
@@ -5942,7 +5942,7 @@
     },
     "/api/v1/departments": {
       "get": {
-        "operationId": "DepartmentsController_list",
+        "operationId": "DepartmentsController_list_v1",
         "parameters": [],
         "responses": {
           "200": {
@@ -6113,7 +6113,7 @@
     },
     "/api/v1/practitioners": {
       "get": {
-        "operationId": "PractitionersController_list",
+        "operationId": "PractitionersController_list_v1",
         "parameters": [],
         "responses": {
           "200": {
@@ -6284,7 +6284,7 @@
     },
     "/api/v1/practitioners/{practitionerId}/availability": {
       "get": {
-        "operationId": "PractitionersController_availability",
+        "operationId": "PractitionersController_availability_v1",
         "parameters": [
           {
             "name": "practitionerId",
@@ -6461,7 +6461,7 @@
     },
     "/api/v1/doctors": {
       "get": {
-        "operationId": "DoctorsController_list",
+        "operationId": "DoctorsController_list_v1",
         "parameters": [],
         "responses": {
           "200": {
@@ -6603,7 +6603,7 @@
     },
     "/api/v1/doctors/{doctorId}/availability": {
       "get": {
-        "operationId": "DoctorsController_availability",
+        "operationId": "DoctorsController_availability_v1",
         "parameters": [
           {
             "name": "doctorId",
@@ -6754,7 +6754,7 @@
     },
     "/api/v1/encounters": {
       "get": {
-        "operationId": "EncountersController_list",
+        "operationId": "EncountersController_list_v1",
         "parameters": [],
         "responses": {
           "200": {
@@ -6923,7 +6923,7 @@
         ]
       },
       "post": {
-        "operationId": "EncountersController_create",
+        "operationId": "EncountersController_create_v1",
         "parameters": [],
         "requestBody": {
           "required": true,
@@ -7101,7 +7101,7 @@
     },
     "/api/v1/encounters/active": {
       "get": {
-        "operationId": "EncountersController_active",
+        "operationId": "EncountersController_active_v1",
         "parameters": [],
         "responses": {
           "200": {
@@ -7269,7 +7269,7 @@
     },
     "/api/v1/encounters/{encounterId}": {
       "get": {
-        "operationId": "EncountersController_detail",
+        "operationId": "EncountersController_detail_v1",
         "parameters": [
           {
             "name": "encounterId",
@@ -7446,7 +7446,7 @@
     },
     "/api/v1/encounters/{encounterId}/events": {
       "get": {
-        "operationId": "EncountersController_events",
+        "operationId": "EncountersController_events_v1",
         "parameters": [
           {
             "name": "encounterId",
@@ -7626,7 +7626,7 @@
     },
     "/api/v1/encounters/{encounterId}/transitions": {
       "post": {
-        "operationId": "EncountersController_transition",
+        "operationId": "EncountersController_transition_v1",
         "parameters": [
           {
             "name": "encounterId",
@@ -7813,7 +7813,7 @@
     },
     "/api/v1/encounters/{encounterId}/closures": {
       "post": {
-        "operationId": "EncountersController_close",
+        "operationId": "EncountersController_close_v1",
         "parameters": [
           {
             "name": "encounterId",
@@ -8000,7 +8000,7 @@
     },
     "/api/v1/encounters/{encounterId}/transition": {
       "post": {
-        "operationId": "EncountersController_transitionAlias",
+        "operationId": "EncountersController_transitionAlias_v1",
         "parameters": [
           {
             "name": "encounterId",
@@ -8161,7 +8161,7 @@
     },
     "/api/v1/encounters/{encounterId}/close": {
       "post": {
-        "operationId": "EncountersController_closeAlias",
+        "operationId": "EncountersController_closeAlias_v1",
         "parameters": [
           {
             "name": "encounterId",
@@ -8322,7 +8322,7 @@
     },
     "/api/v1/appointments": {
       "get": {
-        "operationId": "AppointmentsController_list",
+        "operationId": "AppointmentsController_list_v1",
         "parameters": [],
         "responses": {
           "200": {
@@ -8491,7 +8491,7 @@
         ]
       },
       "post": {
-        "operationId": "AppointmentsController_book",
+        "operationId": "AppointmentsController_book_v1",
         "parameters": [],
         "requestBody": {
           "required": true,
@@ -8669,7 +8669,7 @@
     },
     "/api/v1/appointments/{appointmentId}": {
       "get": {
-        "operationId": "AppointmentsController_detail",
+        "operationId": "AppointmentsController_detail_v1",
         "parameters": [
           {
             "name": "appointmentId",
@@ -8846,7 +8846,7 @@
     },
     "/api/v1/appointments/{appointmentId}/cancellations": {
       "post": {
-        "operationId": "AppointmentsController_cancel",
+        "operationId": "AppointmentsController_cancel_v1",
         "parameters": [
           {
             "name": "appointmentId",
@@ -9033,7 +9033,7 @@
     },
     "/api/v1/appointments/{appointmentId}/reschedules": {
       "post": {
-        "operationId": "AppointmentsController_reschedule",
+        "operationId": "AppointmentsController_reschedule_v1",
         "parameters": [
           {
             "name": "appointmentId",
@@ -9220,7 +9220,7 @@
     },
     "/api/v1/appointments/{appointmentId}/missed-markings": {
       "post": {
-        "operationId": "AppointmentsController_markMissed",
+        "operationId": "AppointmentsController_markMissed_v1",
         "parameters": [
           {
             "name": "appointmentId",
@@ -9407,7 +9407,7 @@
     },
     "/api/v1/appointments/{appointmentId}/check-in-tokens": {
       "post": {
-        "operationId": "AppointmentsController_issueCheckInToken",
+        "operationId": "AppointmentsController_issueCheckInToken_v1",
         "parameters": [
           {
             "name": "appointmentId",
@@ -9584,7 +9584,7 @@
     },
     "/api/v1/appointments/{appointmentId}/check-in-tokens/revocations": {
       "post": {
-        "operationId": "AppointmentsController_revokeCheckInToken",
+        "operationId": "AppointmentsController_revokeCheckInToken_v1",
         "parameters": [
           {
             "name": "appointmentId",
@@ -9771,7 +9771,7 @@
     },
     "/api/v1/appointments/{appointmentId}/status": {
       "patch": {
-        "operationId": "AppointmentsController_setStatus",
+        "operationId": "AppointmentsController_setStatus_v1",
         "parameters": [
           {
             "name": "appointmentId",
@@ -9932,7 +9932,7 @@
     },
     "/api/v1/appointments/{appointmentId}/check-in-token": {
       "post": {
-        "operationId": "AppointmentsController_issueCheckInTokenAlias",
+        "operationId": "AppointmentsController_issueCheckInTokenAlias_v1",
         "parameters": [
           {
             "name": "appointmentId",
@@ -10083,7 +10083,7 @@
     },
     "/api/v1/appointments/{appointmentId}/check-in-token/revoke": {
       "post": {
-        "operationId": "AppointmentsController_revokeCheckInTokenAlias",
+        "operationId": "AppointmentsController_revokeCheckInTokenAlias_v1",
         "parameters": [
           {
             "name": "appointmentId",
@@ -10244,7 +10244,7 @@
     },
     "/api/v1/queue-tickets": {
       "get": {
-        "operationId": "QueueTicketsController_list",
+        "operationId": "QueueTicketsController_list_v1",
         "parameters": [],
         "responses": {
           "200": {
@@ -10415,7 +10415,7 @@
     },
     "/api/v1/queue-tickets/calls": {
       "post": {
-        "operationId": "QueueTicketsController_callNext",
+        "operationId": "QueueTicketsController_callNext_v1",
         "parameters": [],
         "requestBody": {
           "required": true,
@@ -10593,7 +10593,7 @@
     },
     "/api/v1/queue-tickets/{ticketId}/acknowledgements": {
       "post": {
-        "operationId": "QueueTicketsController_acknowledge",
+        "operationId": "QueueTicketsController_acknowledge_v1",
         "parameters": [
           {
             "name": "ticketId",
@@ -10780,7 +10780,7 @@
     },
     "/api/v1/queue-tickets/{ticketId}/service-starts": {
       "post": {
-        "operationId": "QueueTicketsController_startService",
+        "operationId": "QueueTicketsController_startService_v1",
         "parameters": [
           {
             "name": "ticketId",
@@ -10967,7 +10967,7 @@
     },
     "/api/v1/queue-tickets/{ticketId}/skips": {
       "post": {
-        "operationId": "QueueTicketsController_skip",
+        "operationId": "QueueTicketsController_skip_v1",
         "parameters": [
           {
             "name": "ticketId",
@@ -11154,7 +11154,7 @@
     },
     "/api/v1/queue-tickets/{ticketId}/completions": {
       "post": {
-        "operationId": "QueueTicketsController_complete",
+        "operationId": "QueueTicketsController_complete_v1",
         "parameters": [
           {
             "name": "ticketId",
@@ -11341,7 +11341,7 @@
     },
     "/api/v1/queue-stations": {
       "get": {
-        "operationId": "QueueStationsController_list",
+        "operationId": "QueueStationsController_list_v1",
         "parameters": [
           {
             "name": "clinicLocationId",
@@ -11521,7 +11521,7 @@
     },
     "/api/v1/reception/summary": {
       "get": {
-        "operationId": "ReceptionController_summary",
+        "operationId": "ReceptionController_summary_v1",
         "parameters": [
           {
             "name": "clinicLocationId",
@@ -11698,7 +11698,7 @@
     },
     "/api/v1/check-ins": {
       "post": {
-        "operationId": "CheckInController_checkIn",
+        "operationId": "CheckInController_checkIn_v1",
         "parameters": [],
         "requestBody": {
           "required": true,
@@ -11876,7 +11876,7 @@
     },
     "/api/v1/check-in": {
       "post": {
-        "operationId": "CheckInAliasController_checkIn",
+        "operationId": "CheckInAliasController_checkIn_v1",
         "parameters": [],
         "requestBody": {
           "required": true,
@@ -12028,7 +12028,7 @@
     },
     "/api/v1/queue": {
       "get": {
-        "operationId": "QueueContractController_list",
+        "operationId": "QueueContractController_list_v1",
         "parameters": [],
         "responses": {
           "200": {
@@ -12170,7 +12170,7 @@
     },
     "/api/v1/queue/stream": {
       "get": {
-        "operationId": "QueueContractController_stream",
+        "operationId": "QueueContractController_stream_v1",
         "parameters": [],
         "responses": {
           "200": {
@@ -12312,7 +12312,7 @@
     },
     "/api/v1/queue/stations": {
       "get": {
-        "operationId": "QueueContractController_stations",
+        "operationId": "QueueContractController_stations_v1",
         "parameters": [
           {
             "name": "clinicLocationId",
@@ -12463,7 +12463,7 @@
     },
     "/api/v1/queue/call-next": {
       "post": {
-        "operationId": "QueueContractController_call",
+        "operationId": "QueueContractController_call_v1",
         "parameters": [],
         "requestBody": {
           "required": true,
@@ -12615,7 +12615,7 @@
     },
     "/api/v1/queue/{id}/acknowledge": {
       "post": {
-        "operationId": "QueueContractController_acknowledge",
+        "operationId": "QueueContractController_acknowledge_v1",
         "parameters": [
           {
             "name": "id",
@@ -12776,7 +12776,7 @@
     },
     "/api/v1/queue/{id}/start-service": {
       "post": {
-        "operationId": "QueueContractController_start",
+        "operationId": "QueueContractController_start_v1",
         "parameters": [
           {
             "name": "id",
@@ -12937,7 +12937,7 @@
     },
     "/api/v1/queue/{id}/skip": {
       "post": {
-        "operationId": "QueueContractController_skip",
+        "operationId": "QueueContractController_skip_v1",
         "parameters": [
           {
             "name": "id",
@@ -13098,7 +13098,7 @@
     },
     "/api/v1/queue/{id}/complete": {
       "post": {
-        "operationId": "QueueContractController_complete",
+        "operationId": "QueueContractController_complete_v1",
         "parameters": [
           {
             "name": "id",
@@ -13259,7 +13259,7 @@
     },
     "/api/v1/kiosk-devices": {
       "post": {
-        "operationId": "KioskDevicesController_register",
+        "operationId": "KioskDevicesController_register_v1",
         "parameters": [],
         "requestBody": {
           "required": true,
@@ -13435,7 +13435,7 @@
         ]
       },
       "get": {
-        "operationId": "KioskDevicesController_list",
+        "operationId": "KioskDevicesController_list_v1",
         "parameters": [],
         "responses": {
           "200": {
@@ -13606,7 +13606,7 @@
     },
     "/api/v1/kiosk-devices/{deviceId}/deactivations": {
       "post": {
-        "operationId": "KioskDevicesController_deactivate",
+        "operationId": "KioskDevicesController_deactivate_v1",
         "parameters": [
           {
             "name": "deviceId",
@@ -13783,7 +13783,7 @@
     },
     "/api/v1/kiosk-devices/{deviceId}/credential-rotations": {
       "post": {
-        "operationId": "KioskDevicesController_rotateSecret",
+        "operationId": "KioskDevicesController_rotateSecret_v1",
         "parameters": [
           {
             "name": "deviceId",
@@ -13960,7 +13960,7 @@
     },
     "/api/v1/encounters/{encounterId}/intake": {
       "post": {
-        "operationId": "EncounterAiAssessmentController_submitIntake",
+        "operationId": "EncounterAiAssessmentController_submitIntake_v1",
         "parameters": [
           {
             "name": "encounterId",
@@ -14147,7 +14147,7 @@
     },
     "/api/v1/encounters/{encounterId}/ai-assessments": {
       "get": {
-        "operationId": "EncounterAiAssessmentController_list",
+        "operationId": "EncounterAiAssessmentController_list_v1",
         "parameters": [
           {
             "name": "encounterId",
@@ -14327,7 +14327,7 @@
     },
     "/api/v1/encounters/{encounterId}/ai-assessments/reassessments": {
       "post": {
-        "operationId": "EncounterAiAssessmentController_reassess",
+        "operationId": "EncounterAiAssessmentController_reassess_v1",
         "parameters": [
           {
             "name": "encounterId",
@@ -14514,7 +14514,7 @@
     },
     "/api/v1/encounters/{encounterId}/ai-assessments/reassess": {
       "post": {
-        "operationId": "EncounterAiAssessmentController_reassessAlias",
+        "operationId": "EncounterAiAssessmentController_reassessAlias_v1",
         "parameters": [
           {
             "name": "encounterId",
@@ -14675,7 +14675,7 @@
     },
     "/api/v1/ai-assessments/{assessmentId}": {
       "get": {
-        "operationId": "AiAssessmentDetailController_detail",
+        "operationId": "AiAssessmentDetailController_detail_v1",
         "parameters": [
           {
             "name": "assessmentId",
@@ -14852,7 +14852,7 @@
     },
     "/api/v1/encounters/{encounterId}/ai-assessments/{aiAssessmentId}/reviews": {
       "post": {
-        "operationId": "EncounterDoctorDecisionController_reviewAssessment",
+        "operationId": "EncounterDoctorDecisionController_reviewAssessment_v1",
         "parameters": [
           {
             "name": "encounterId",
@@ -15047,7 +15047,7 @@
     },
     "/api/v1/encounters/{encounterId}/ai-assessments/{aiAssessmentId}/review": {
       "post": {
-        "operationId": "EncounterDoctorDecisionController_reviewAssessmentAlias",
+        "operationId": "EncounterDoctorDecisionController_reviewAssessmentAlias_v1",
         "parameters": [
           {
             "name": "encounterId",
@@ -15216,7 +15216,7 @@
     },
     "/api/v1/encounters/{encounterId}/reviews": {
       "get": {
-        "operationId": "EncounterDoctorDecisionController_listReviews",
+        "operationId": "EncounterDoctorDecisionController_listReviews_v1",
         "parameters": [
           {
             "name": "encounterId",
@@ -15396,7 +15396,7 @@
     },
     "/api/v1/encounters/{encounterId}/diagnoses": {
       "post": {
-        "operationId": "EncounterDoctorDecisionController_recordDiagnosis",
+        "operationId": "EncounterDoctorDecisionController_recordDiagnosis_v1",
         "parameters": [
           {
             "name": "encounterId",
@@ -15581,7 +15581,7 @@
         ]
       },
       "get": {
-        "operationId": "EncounterDoctorDecisionController_listDiagnoses",
+        "operationId": "EncounterDoctorDecisionController_listDiagnoses_v1",
         "parameters": [
           {
             "name": "encounterId",
@@ -15761,7 +15761,7 @@
     },
     "/api/v1/encounters/{encounterId}/clinical-plan": {
       "post": {
-        "operationId": "EncounterDoctorDecisionController_approveClinicalPlan",
+        "operationId": "EncounterDoctorDecisionController_approveClinicalPlan_v1",
         "parameters": [
           {
             "name": "encounterId",
@@ -15946,7 +15946,7 @@
         ]
       },
       "get": {
-        "operationId": "EncounterDoctorDecisionController_getClinicalPlan",
+        "operationId": "EncounterDoctorDecisionController_getClinicalPlan_v1",
         "parameters": [
           {
             "name": "encounterId",
@@ -16123,7 +16123,7 @@
     },
     "/api/v1/diagnoses/{diagnosisId}/revisions": {
       "post": {
-        "operationId": "DiagnosesController_reviseDiagnosis",
+        "operationId": "DiagnosesController_reviseDiagnosis_v1",
         "parameters": [
           {
             "name": "diagnosisId",
@@ -16310,7 +16310,7 @@
     },
     "/api/v1/diagnoses/{diagnosisId}/revise": {
       "post": {
-        "operationId": "DiagnosesController_reviseDiagnosisAlias",
+        "operationId": "DiagnosesController_reviseDiagnosisAlias_v1",
         "parameters": [
           {
             "name": "diagnosisId",
@@ -16471,7 +16471,7 @@
     },
     "/api/v1/encounters/{encounterId}/clinical-orders": {
       "post": {
-        "operationId": "EncounterClinicalOrdersController_create",
+        "operationId": "EncounterClinicalOrdersController_create_v1",
         "parameters": [
           {
             "name": "encounterId",
@@ -16656,7 +16656,7 @@
         ]
       },
       "get": {
-        "operationId": "EncounterClinicalOrdersController_list",
+        "operationId": "EncounterClinicalOrdersController_list_v1",
         "parameters": [
           {
             "name": "encounterId",
@@ -16836,7 +16836,7 @@
     },
     "/api/v1/clinical-orders/{orderId}/invalid-sample": {
       "patch": {
-        "operationId": "ClinicalOrdersController_markInvalidSample",
+        "operationId": "ClinicalOrdersController_markInvalidSample_v1",
         "parameters": [
           {
             "name": "orderId",
@@ -17023,7 +17023,7 @@
     },
     "/api/v1/clinical-orders/{orderId}/result": {
       "post": {
-        "operationId": "ClinicalOrdersController_submitResult",
+        "operationId": "ClinicalOrdersController_submitResult_v1",
         "parameters": [
           {
             "name": "orderId",
@@ -17208,7 +17208,7 @@
         ]
       },
       "get": {
-        "operationId": "ClinicalOrdersController_getResult",
+        "operationId": "ClinicalOrdersController_getResult_v1",
         "parameters": [
           {
             "name": "orderId",
@@ -17385,7 +17385,7 @@
     },
     "/api/v1/workflow-templates": {
       "get": {
-        "operationId": "WorkflowTemplatesController_list",
+        "operationId": "WorkflowTemplatesController_list_v1",
         "parameters": [],
         "responses": {
           "200": {
@@ -17519,10 +17519,13 @@
             }
           }
         },
+        "tags": [
+          "WorkflowTemplates"
+        ],
         "x-success-schema": "generic-fallback"
       },
       "post": {
-        "operationId": "WorkflowTemplatesController_create",
+        "operationId": "WorkflowTemplatesController_create_v1",
         "parameters": [],
         "requestBody": {
           "required": true,
@@ -17666,12 +17669,15 @@
             }
           }
         },
+        "tags": [
+          "WorkflowTemplates"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/workflow-templates/recommend": {
       "get": {
-        "operationId": "WorkflowTemplatesController_recommend",
+        "operationId": "WorkflowTemplatesController_recommend_v1",
         "parameters": [],
         "responses": {
           "200": {
@@ -17805,12 +17811,15 @@
             }
           }
         },
+        "tags": [
+          "WorkflowTemplates"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/workflow-templates/{templateId}": {
       "patch": {
-        "operationId": "WorkflowTemplatesController_update",
+        "operationId": "WorkflowTemplatesController_update_v1",
         "parameters": [
           {
             "name": "templateId",
@@ -17963,12 +17972,15 @@
             }
           }
         },
+        "tags": [
+          "WorkflowTemplates"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/workflow-templates/{templateId}/versions": {
       "get": {
-        "operationId": "WorkflowTemplatesController_versions",
+        "operationId": "WorkflowTemplatesController_versions_v1",
         "parameters": [
           {
             "name": "templateId",
@@ -18111,10 +18123,13 @@
             }
           }
         },
+        "tags": [
+          "WorkflowTemplates"
+        ],
         "x-success-schema": "generic-fallback"
       },
       "post": {
-        "operationId": "WorkflowTemplatesController_createVersion",
+        "operationId": "WorkflowTemplatesController_createVersion_v1",
         "parameters": [
           {
             "name": "templateId",
@@ -18257,12 +18272,15 @@
             }
           }
         },
+        "tags": [
+          "WorkflowTemplates"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/workflow-template-versions/{versionId}": {
       "get": {
-        "operationId": "WorkflowTemplateVersionsController_detail",
+        "operationId": "WorkflowTemplateVersionsController_detail_v1",
         "parameters": [
           {
             "name": "versionId",
@@ -18405,12 +18423,15 @@
             }
           }
         },
+        "tags": [
+          "WorkflowTemplateVersions"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/workflow-template-versions/{versionId}/steps": {
       "put": {
-        "operationId": "WorkflowTemplateVersionsController_replaceSteps",
+        "operationId": "WorkflowTemplateVersionsController_replaceSteps_v1",
         "parameters": [
           {
             "name": "versionId",
@@ -18563,10 +18584,13 @@
             }
           }
         },
+        "tags": [
+          "WorkflowTemplateVersions"
+        ],
         "x-success-schema": "generic-fallback"
       },
       "post": {
-        "operationId": "WorkflowTemplateVersionsController_addStep",
+        "operationId": "WorkflowTemplateVersionsController_addStep_v1",
         "parameters": [
           {
             "name": "versionId",
@@ -18719,12 +18743,15 @@
             }
           }
         },
+        "tags": [
+          "WorkflowTemplateVersions"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/workflow-template-versions/{versionId}/steps/{code}": {
       "patch": {
-        "operationId": "WorkflowTemplateVersionsController_updateStep",
+        "operationId": "WorkflowTemplateVersionsController_updateStep_v1",
         "parameters": [
           {
             "name": "versionId",
@@ -18885,10 +18912,13 @@
             }
           }
         },
+        "tags": [
+          "WorkflowTemplateVersions"
+        ],
         "x-success-schema": "generic-fallback"
       },
       "delete": {
-        "operationId": "WorkflowTemplateVersionsController_deleteStep",
+        "operationId": "WorkflowTemplateVersionsController_deleteStep_v1",
         "parameters": [
           {
             "name": "versionId",
@@ -19039,12 +19069,15 @@
             }
           }
         },
+        "tags": [
+          "WorkflowTemplateVersions"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/workflow-template-versions/{versionId}/steps/reorder": {
       "post": {
-        "operationId": "WorkflowTemplateVersionsController_reorder",
+        "operationId": "WorkflowTemplateVersionsController_reorder_v1",
         "parameters": [
           {
             "name": "versionId",
@@ -19197,12 +19230,15 @@
             }
           }
         },
+        "tags": [
+          "WorkflowTemplateVersions"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/workflow-template-versions/{versionId}/edges": {
       "post": {
-        "operationId": "WorkflowTemplateVersionsController_addEdge",
+        "operationId": "WorkflowTemplateVersionsController_addEdge_v1",
         "parameters": [
           {
             "name": "versionId",
@@ -19355,10 +19391,13 @@
             }
           }
         },
+        "tags": [
+          "WorkflowTemplateVersions"
+        ],
         "x-success-schema": "generic-fallback"
       },
       "delete": {
-        "operationId": "WorkflowTemplateVersionsController_deleteEdge",
+        "operationId": "WorkflowTemplateVersionsController_deleteEdge_v1",
         "parameters": [
           {
             "name": "versionId",
@@ -19511,12 +19550,15 @@
             }
           }
         },
+        "tags": [
+          "WorkflowTemplateVersions"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/workflow-template-versions/{versionId}/node-positions": {
       "put": {
-        "operationId": "WorkflowTemplateVersionsController_positions",
+        "operationId": "WorkflowTemplateVersionsController_positions_v1",
         "parameters": [
           {
             "name": "versionId",
@@ -19669,12 +19711,15 @@
             }
           }
         },
+        "tags": [
+          "WorkflowTemplateVersions"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/workflow-template-versions/{versionId}/publish": {
       "post": {
-        "operationId": "WorkflowTemplateVersionsController_publish",
+        "operationId": "WorkflowTemplateVersionsController_publish_v1",
         "parameters": [
           {
             "name": "versionId",
@@ -19827,12 +19872,15 @@
             }
           }
         },
+        "tags": [
+          "WorkflowTemplateVersions"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/workflow-template-versions/{versionId}/archive": {
       "post": {
-        "operationId": "WorkflowTemplateVersionsController_archive",
+        "operationId": "WorkflowTemplateVersionsController_archive_v1",
         "parameters": [
           {
             "name": "versionId",
@@ -19985,12 +20033,15 @@
             }
           }
         },
+        "tags": [
+          "WorkflowTemplateVersions"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/encounters/{encounterId}/workflow/activate": {
       "post": {
-        "operationId": "EncounterWorkflowController_activate",
+        "operationId": "EncounterWorkflowController_activate_v1",
         "parameters": [
           {
             "name": "encounterId",
@@ -20143,12 +20194,15 @@
             }
           }
         },
+        "tags": [
+          "EncounterWorkflow"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/workflow-instances": {
       "get": {
-        "operationId": "WorkflowInstancesController_list",
+        "operationId": "WorkflowInstancesController_list_v1",
         "parameters": [],
         "responses": {
           "200": {
@@ -20282,12 +20336,15 @@
             }
           }
         },
+        "tags": [
+          "WorkflowInstances"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/workflow-instances/{instanceId}": {
       "get": {
-        "operationId": "WorkflowInstancesController_detail",
+        "operationId": "WorkflowInstancesController_detail_v1",
         "parameters": [
           {
             "name": "instanceId",
@@ -20430,12 +20487,15 @@
             }
           }
         },
+        "tags": [
+          "WorkflowInstances"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/workflow-instances/{instanceId}/identity-verify": {
       "get": {
-        "operationId": "WorkflowInstancesController_verify",
+        "operationId": "WorkflowInstancesController_verify_v1",
         "parameters": [
           {
             "name": "instanceId",
@@ -20578,12 +20638,15 @@
             }
           }
         },
+        "tags": [
+          "WorkflowInstances"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/workflow-instances/{instanceId}/suspend": {
       "post": {
-        "operationId": "WorkflowInstancesController_suspend",
+        "operationId": "WorkflowInstancesController_suspend_v1",
         "parameters": [
           {
             "name": "instanceId",
@@ -20736,12 +20799,15 @@
             }
           }
         },
+        "tags": [
+          "WorkflowInstances"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/workflow-instances/{instanceId}/resume": {
       "post": {
-        "operationId": "WorkflowInstancesController_resume",
+        "operationId": "WorkflowInstancesController_resume_v1",
         "parameters": [
           {
             "name": "instanceId",
@@ -20894,12 +20960,15 @@
             }
           }
         },
+        "tags": [
+          "WorkflowInstances"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/workflow-instances/{instanceId}/cancel": {
       "post": {
-        "operationId": "WorkflowInstancesController_cancel",
+        "operationId": "WorkflowInstancesController_cancel_v1",
         "parameters": [
           {
             "name": "instanceId",
@@ -21052,12 +21121,15 @@
             }
           }
         },
+        "tags": [
+          "WorkflowInstances"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/workflow-instances/{instanceId}/complete": {
       "post": {
-        "operationId": "WorkflowInstancesController_complete",
+        "operationId": "WorkflowInstancesController_complete_v1",
         "parameters": [
           {
             "name": "instanceId",
@@ -21210,12 +21282,15 @@
             }
           }
         },
+        "tags": [
+          "WorkflowInstances"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/workflow-tasks": {
       "get": {
-        "operationId": "WorkflowTasksController_list",
+        "operationId": "WorkflowTasksController_list_v1",
         "parameters": [],
         "responses": {
           "200": {
@@ -21349,12 +21424,15 @@
             }
           }
         },
+        "tags": [
+          "WorkflowTasks"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/workflow-tasks/{taskId}/accept": {
       "post": {
-        "operationId": "WorkflowTasksController_accept",
+        "operationId": "WorkflowTasksController_accept_v1",
         "parameters": [
           {
             "name": "taskId",
@@ -21507,12 +21585,15 @@
             }
           }
         },
+        "tags": [
+          "WorkflowTasks"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/workflow-tasks/{taskId}/start": {
       "post": {
-        "operationId": "WorkflowTasksController_start",
+        "operationId": "WorkflowTasksController_start_v1",
         "parameters": [
           {
             "name": "taskId",
@@ -21665,12 +21746,15 @@
             }
           }
         },
+        "tags": [
+          "WorkflowTasks"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/workflow-tasks/{taskId}/complete": {
       "post": {
-        "operationId": "WorkflowTasksController_complete",
+        "operationId": "WorkflowTasksController_complete_v1",
         "parameters": [
           {
             "name": "taskId",
@@ -21823,12 +21907,15 @@
             }
           }
         },
+        "tags": [
+          "WorkflowTasks"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/workflow-tasks/{taskId}/redo": {
       "post": {
-        "operationId": "WorkflowTasksController_redo",
+        "operationId": "WorkflowTasksController_redo_v1",
         "parameters": [
           {
             "name": "taskId",
@@ -21981,12 +22068,15 @@
             }
           }
         },
+        "tags": [
+          "WorkflowTasks"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/workflow-tasks/{taskId}/reject": {
       "post": {
-        "operationId": "WorkflowTasksController_reject",
+        "operationId": "WorkflowTasksController_reject_v1",
         "parameters": [
           {
             "name": "taskId",
@@ -22139,12 +22229,15 @@
             }
           }
         },
+        "tags": [
+          "WorkflowTasks"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/workflow-tasks/{taskId}/escalate": {
       "post": {
-        "operationId": "WorkflowTasksController_escalate",
+        "operationId": "WorkflowTasksController_escalate_v1",
         "parameters": [
           {
             "name": "taskId",
@@ -22297,12 +22390,15 @@
             }
           }
         },
+        "tags": [
+          "WorkflowTasks"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/workflow-tasks/{taskId}/skip": {
       "post": {
-        "operationId": "WorkflowTasksController_skip",
+        "operationId": "WorkflowTasksController_skip_v1",
         "parameters": [
           {
             "name": "taskId",
@@ -22455,12 +22551,15 @@
             }
           }
         },
+        "tags": [
+          "WorkflowTasks"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/workflow-tasks/{taskId}/reassign": {
       "post": {
-        "operationId": "WorkflowTasksController_reassign",
+        "operationId": "WorkflowTasksController_reassign_v1",
         "parameters": [
           {
             "name": "taskId",
@@ -22613,12 +22712,15 @@
             }
           }
         },
+        "tags": [
+          "WorkflowTasks"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/encounters/{encounterId}/medical-record": {
       "get": {
-        "operationId": "MedicalRecordsController_get",
+        "operationId": "MedicalRecordsController_get_v1",
         "parameters": [
           {
             "name": "encounterId",
@@ -22761,12 +22863,15 @@
             }
           }
         },
+        "tags": [
+          "MedicalRecords"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/encounters/{encounterId}/prescriptions": {
       "post": {
-        "operationId": "MedicalRecordsController_prescribe",
+        "operationId": "MedicalRecordsController_prescribe_v1",
         "parameters": [
           {
             "name": "encounterId",
@@ -22919,10 +23024,13 @@
             }
           }
         },
+        "tags": [
+          "MedicalRecords"
+        ],
         "x-success-schema": "generic-fallback"
       },
       "get": {
-        "operationId": "MedicalRecordsController_prescriptions",
+        "operationId": "MedicalRecordsController_prescriptions_v1",
         "parameters": [
           {
             "name": "encounterId",
@@ -23065,12 +23173,15 @@
             }
           }
         },
+        "tags": [
+          "MedicalRecords"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/encounters/{encounterId}/documents": {
       "post": {
-        "operationId": "MedicalRecordsController_document",
+        "operationId": "MedicalRecordsController_document_v1",
         "parameters": [
           {
             "name": "encounterId",
@@ -23223,10 +23334,13 @@
             }
           }
         },
+        "tags": [
+          "MedicalRecords"
+        ],
         "x-success-schema": "generic-fallback"
       },
       "get": {
-        "operationId": "MedicalRecordsController_documents",
+        "operationId": "MedicalRecordsController_documents_v1",
         "parameters": [
           {
             "name": "encounterId",
@@ -23369,12 +23483,15 @@
             }
           }
         },
+        "tags": [
+          "MedicalRecords"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/encounters/{encounterId}/medical-record/diagnosis": {
       "patch": {
-        "operationId": "MedicalRecordsController_diagnosis",
+        "operationId": "MedicalRecordsController_diagnosis_v1",
         "parameters": [
           {
             "name": "encounterId",
@@ -23527,12 +23644,15 @@
             }
           }
         },
+        "tags": [
+          "MedicalRecords"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/encounters/{encounterId}/medical-record/discharge-followup": {
       "patch": {
-        "operationId": "MedicalRecordsController_discharge",
+        "operationId": "MedicalRecordsController_discharge_v1",
         "parameters": [
           {
             "name": "encounterId",
@@ -23685,12 +23805,15 @@
             }
           }
         },
+        "tags": [
+          "MedicalRecords"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/medical-records/{recordId}/completion-check": {
       "get": {
-        "operationId": "RecordActionsController_check",
+        "operationId": "RecordActionsController_check_v1",
         "parameters": [
           {
             "name": "recordId",
@@ -23833,12 +23956,15 @@
             }
           }
         },
+        "tags": [
+          "RecordActions"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/medical-records/{recordId}/sign": {
       "post": {
-        "operationId": "RecordActionsController_sign",
+        "operationId": "RecordActionsController_sign_v1",
         "parameters": [
           {
             "name": "recordId",
@@ -23981,12 +24107,15 @@
             }
           }
         },
+        "tags": [
+          "RecordActions"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/medical-records/{recordId}/addendum": {
       "post": {
-        "operationId": "RecordActionsController_addendum",
+        "operationId": "RecordActionsController_addendum_v1",
         "parameters": [
           {
             "name": "recordId",
@@ -24139,12 +24268,15 @@
             }
           }
         },
+        "tags": [
+          "RecordActions"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/medical-records/{recordId}/reopen": {
       "post": {
-        "operationId": "RecordActionsController_reopen",
+        "operationId": "RecordActionsController_reopen_v1",
         "parameters": [
           {
             "name": "recordId",
@@ -24297,12 +24429,15 @@
             }
           }
         },
+        "tags": [
+          "RecordActions"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/medical-records/{recordId}/flag-late-result": {
       "post": {
-        "operationId": "RecordActionsController_late",
+        "operationId": "RecordActionsController_late_v1",
         "parameters": [
           {
             "name": "recordId",
@@ -24455,12 +24590,15 @@
             }
           }
         },
+        "tags": [
+          "RecordActions"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/documents/{documentId}/review": {
       "post": {
-        "operationId": "DocumentsController_review",
+        "operationId": "DocumentsController_review_v1",
         "parameters": [
           {
             "name": "documentId",
@@ -24603,12 +24741,15 @@
             }
           }
         },
+        "tags": [
+          "Documents"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/documents/{documentId}/flag-incorrect-link": {
       "post": {
-        "operationId": "DocumentsController_flag",
+        "operationId": "DocumentsController_flag_v1",
         "parameters": [
           {
             "name": "documentId",
@@ -24761,160 +24902,15 @@
             }
           }
         },
-        "x-success-schema": "generic-fallback"
-      }
-    },
-    "/api/v1/patients/{patientId}/care-plan": {
-      "get": {
-        "operationId": "PatientOperationsController_carePlan",
-        "parameters": [
-          {
-            "name": "patientId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
+        "tags": [
+          "Documents"
         ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GenericSuccessEnvelope"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "405": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "415": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          }
-        },
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/patients/{patientId}/alerts": {
       "post": {
-        "operationId": "PatientOperationsController_createAlert",
+        "operationId": "PatientOperationsController_createAlert_v1",
         "parameters": [
           {
             "name": "patientId",
@@ -25067,10 +25063,13 @@
             }
           }
         },
+        "tags": [
+          "PatientOperations"
+        ],
         "x-success-schema": "generic-fallback"
       },
       "get": {
-        "operationId": "PatientOperationsController_alerts",
+        "operationId": "PatientOperationsController_alerts_v1",
         "parameters": [
           {
             "name": "patientId",
@@ -25213,12 +25212,15 @@
             }
           }
         },
+        "tags": [
+          "PatientOperations"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/patients/{patientId}/encounter-requests": {
       "post": {
-        "operationId": "PatientOperationsController_encounterRequest",
+        "operationId": "PatientOperationsController_encounterRequest_v1",
         "parameters": [
           {
             "name": "patientId",
@@ -25371,12 +25373,15 @@
             }
           }
         },
+        "tags": [
+          "PatientOperations"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/patients/{patientId}/medication-reminders": {
       "get": {
-        "operationId": "PatientOperationsController_reminders",
+        "operationId": "PatientOperationsController_reminders_v1",
         "parameters": [
           {
             "name": "patientId",
@@ -25519,10 +25524,13 @@
             }
           }
         },
+        "tags": [
+          "PatientOperations"
+        ],
         "x-success-schema": "generic-fallback"
       },
       "post": {
-        "operationId": "PatientOperationsController_addReminder",
+        "operationId": "PatientOperationsController_addReminder_v1",
         "parameters": [
           {
             "name": "patientId",
@@ -25675,12 +25683,15 @@
             }
           }
         },
+        "tags": [
+          "PatientOperations"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/patients/{patientId}/progress-photos": {
       "post": {
-        "operationId": "PatientOperationsController_progressPhoto",
+        "operationId": "PatientOperationsController_progressPhoto_v1",
         "parameters": [
           {
             "name": "patientId",
@@ -25833,12 +25844,15 @@
             }
           }
         },
+        "tags": [
+          "PatientOperations"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/patients/{patientId}/health-summary": {
       "get": {
-        "operationId": "PatientOperationsController_healthSummary",
+        "operationId": "PatientOperationsController_healthSummary_v1",
         "parameters": [
           {
             "name": "patientId",
@@ -25981,12 +25995,15 @@
             }
           }
         },
+        "tags": [
+          "PatientOperations"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/patients/{patientId}/health-score-history": {
       "get": {
-        "operationId": "PatientOperationsController_healthHistory",
+        "operationId": "PatientOperationsController_healthHistory_v1",
         "parameters": [
           {
             "name": "patientId",
@@ -26129,12 +26146,15 @@
             }
           }
         },
+        "tags": [
+          "PatientOperations"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/patients/{patientId}/reports/overview": {
       "get": {
-        "operationId": "PatientOperationsController_overview",
+        "operationId": "PatientOperationsController_overview_v1",
         "parameters": [
           {
             "name": "patientId",
@@ -26277,12 +26297,15 @@
             }
           }
         },
+        "tags": [
+          "PatientOperations"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/patients/{patientId}/reports/treatment-history": {
       "get": {
-        "operationId": "PatientOperationsController_treatment",
+        "operationId": "PatientOperationsController_treatment_v1",
         "parameters": [
           {
             "name": "patientId",
@@ -26425,12 +26448,15 @@
             }
           }
         },
+        "tags": [
+          "PatientOperations"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/patients/{patientId}/reports/medicine-history": {
       "get": {
-        "operationId": "PatientOperationsController_medicine",
+        "operationId": "PatientOperationsController_medicine_v1",
         "parameters": [
           {
             "name": "patientId",
@@ -26573,12 +26599,15 @@
             }
           }
         },
+        "tags": [
+          "PatientOperations"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/patients/{patientId}/reports/ai-summary": {
       "get": {
-        "operationId": "PatientOperationsController_ai",
+        "operationId": "PatientOperationsController_ai_v1",
         "parameters": [
           {
             "name": "patientId",
@@ -26721,12 +26750,15 @@
             }
           }
         },
+        "tags": [
+          "PatientOperations"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/patients/{patientId}/reports/export": {
       "get": {
-        "operationId": "PatientOperationsController_export",
+        "operationId": "PatientOperationsController_export_v1",
         "parameters": [
           {
             "name": "patientId",
@@ -26869,12 +26901,15 @@
             }
           }
         },
+        "tags": [
+          "PatientOperations"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/prescriptions/{id}/refill-request": {
       "post": {
-        "operationId": "PrescriptionOperationsController_refill",
+        "operationId": "PrescriptionOperationsController_refill_v1",
         "parameters": [
           {
             "name": "id",
@@ -27027,770 +27062,15 @@
             }
           }
         },
-        "x-success-schema": "generic-fallback"
-      }
-    },
-    "/api/v1/care-plans/{carePlanId}/activities": {
-      "get": {
-        "operationId": "CarePlansController_activities",
-        "parameters": [
-          {
-            "name": "carePlanId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
+        "tags": [
+          "PrescriptionOperations"
         ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GenericSuccessEnvelope"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "405": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "415": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "x-success-schema": "generic-fallback"
-      },
-      "post": {
-        "operationId": "CarePlansController_create",
-        "parameters": [
-          {
-            "name": "carePlanId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ActivityRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GenericSuccessEnvelope"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "405": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "415": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "x-success-schema": "generic-fallback"
-      }
-    },
-    "/api/v1/care-plans/{carePlanId}/run-automation": {
-      "post": {
-        "operationId": "CarePlansController_automation",
-        "parameters": [
-          {
-            "name": "carePlanId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GenericSuccessEnvelope"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "405": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "415": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "x-success-schema": "generic-fallback"
-      }
-    },
-    "/api/v1/activities/{activityId}/advance": {
-      "post": {
-        "operationId": "ActivitiesController_advance",
-        "parameters": [
-          {
-            "name": "activityId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TransitionRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GenericSuccessEnvelope"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "405": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "415": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "x-success-schema": "generic-fallback"
-      }
-    },
-    "/api/v1/activities/{activityId}/confirm": {
-      "post": {
-        "operationId": "ActivitiesController_confirm",
-        "parameters": [
-          {
-            "name": "activityId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GenericSuccessEnvelope"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "405": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "415": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          }
-        },
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/alerts": {
       "get": {
-        "operationId": "AlertsController_list",
+        "operationId": "AlertsController_list_v1",
         "parameters": [
           {
             "name": "status",
@@ -27933,12 +27213,15 @@
             }
           }
         },
+        "tags": [
+          "Alerts"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/alerts/{alertId}/close": {
       "post": {
-        "operationId": "AlertsController_close",
+        "operationId": "AlertsController_close_v1",
         "parameters": [
           {
             "name": "alertId",
@@ -28081,12 +27364,15 @@
             }
           }
         },
+        "tags": [
+          "Alerts"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/encounter-requests": {
       "get": {
-        "operationId": "EncounterRequestsController_list",
+        "operationId": "EncounterRequestsController_list_v1",
         "parameters": [
           {
             "name": "status",
@@ -28229,12 +27515,15 @@
             }
           }
         },
+        "tags": [
+          "EncounterRequests"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/encounter-requests/{requestId}/decide": {
       "post": {
-        "operationId": "EncounterRequestsController_decide",
+        "operationId": "EncounterRequestsController_decide_v1",
         "parameters": [
           {
             "name": "requestId",
@@ -28387,612 +27676,15 @@
             }
           }
         },
-        "x-success-schema": "generic-fallback"
-      }
-    },
-    "/api/v1/notifications": {
-      "get": {
-        "operationId": "NotificationsController_list",
-        "parameters": [
-          {
-            "name": "userId",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "scope",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
+        "tags": [
+          "EncounterRequests"
         ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GenericSuccessEnvelope"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "405": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "415": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "x-success-schema": "generic-fallback"
-      }
-    },
-    "/api/v1/notifications/unread-count": {
-      "get": {
-        "operationId": "NotificationsController_unread",
-        "parameters": [
-          {
-            "name": "userId",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GenericSuccessEnvelope"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "405": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "415": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "x-success-schema": "generic-fallback"
-      }
-    },
-    "/api/v1/notifications/{notificationId}/read": {
-      "post": {
-        "operationId": "NotificationsController_read",
-        "parameters": [
-          {
-            "name": "notificationId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GenericSuccessEnvelope"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "405": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "415": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "x-success-schema": "generic-fallback"
-      }
-    },
-    "/api/v1/notifications/{notificationId}/retry": {
-      "post": {
-        "operationId": "NotificationsController_retry",
-        "parameters": [
-          {
-            "name": "notificationId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GenericSuccessEnvelope"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "405": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "415": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Standard API error response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          }
-        },
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/audit": {
       "get": {
-        "operationId": "AuditController_list",
+        "operationId": "AuditController_list_v1",
         "parameters": [],
         "responses": {
           "200": {
@@ -29126,12 +27818,15 @@
             }
           }
         },
+        "tags": [
+          "Audit"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/audit/encounters/{id}": {
       "get": {
-        "operationId": "AuditController_encounter",
+        "operationId": "AuditController_encounter_v1",
         "parameters": [
           {
             "name": "id",
@@ -29274,12 +27969,15 @@
             }
           }
         },
+        "tags": [
+          "Audit"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/audit/patients/{id}": {
       "get": {
-        "operationId": "AuditController_patient",
+        "operationId": "AuditController_patient_v1",
         "parameters": [
           {
             "name": "id",
@@ -29422,12 +28120,15 @@
             }
           }
         },
+        "tags": [
+          "Audit"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/audit/client-events": {
       "post": {
-        "operationId": "AuditController_client",
+        "operationId": "AuditController_client_v1",
         "parameters": [],
         "requestBody": {
           "required": true,
@@ -29571,12 +28272,15 @@
             }
           }
         },
+        "tags": [
+          "Audit"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/integrations/connections": {
       "get": {
-        "operationId": "IntegrationsController_connections",
+        "operationId": "IntegrationsController_connections_v1",
         "parameters": [],
         "responses": {
           "200": {
@@ -29710,12 +28414,15 @@
             }
           }
         },
+        "tags": [
+          "Integrations"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/integrations/connections/{id}/messages": {
       "get": {
-        "operationId": "IntegrationsController_messages",
+        "operationId": "IntegrationsController_messages_v1",
         "parameters": [
           {
             "name": "id",
@@ -29858,12 +28565,15 @@
             }
           }
         },
+        "tags": [
+          "Integrations"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/integrations/connections/{id}/retry": {
       "post": {
-        "operationId": "IntegrationsController_retry",
+        "operationId": "IntegrationsController_retry_v1",
         "parameters": [
           {
             "name": "id",
@@ -30006,12 +28716,15 @@
             }
           }
         },
+        "tags": [
+          "Integrations"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/integrations/connections/{id}/reconcile": {
       "post": {
-        "operationId": "IntegrationsController_reconcile",
+        "operationId": "IntegrationsController_reconcile_v1",
         "parameters": [
           {
             "name": "id",
@@ -30154,12 +28867,15 @@
             }
           }
         },
+        "tags": [
+          "Integrations"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/dashboard/operational-kpis": {
       "get": {
-        "operationId": "DashboardController_kpis",
+        "operationId": "DashboardController_kpis_v1",
         "parameters": [],
         "responses": {
           "200": {
@@ -30293,12 +29009,15 @@
             }
           }
         },
+        "tags": [
+          "Dashboard"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/uploads/presign": {
       "post": {
-        "operationId": "UploadsController_presign",
+        "operationId": "UploadsController_presign_v1",
         "parameters": [],
         "requestBody": {
           "required": true,
@@ -30442,12 +29161,15 @@
             }
           }
         },
+        "tags": [
+          "Uploads"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/uploads/{fileId}/confirm": {
       "post": {
-        "operationId": "UploadsController_confirm",
+        "operationId": "UploadsController_confirm_v1",
         "parameters": [
           {
             "name": "fileId",
@@ -30600,12 +29322,15 @@
             }
           }
         },
+        "tags": [
+          "Uploads"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/support/tickets": {
       "post": {
-        "operationId": "SupportController_create",
+        "operationId": "SupportController_create_v1",
         "parameters": [],
         "requestBody": {
           "required": true,
@@ -30749,12 +29474,15 @@
             }
           }
         },
+        "tags": [
+          "Support"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/medication-reminders/{id}/taken": {
       "patch": {
-        "operationId": "MedicationRemindersController_taken",
+        "operationId": "MedicationRemindersController_taken_v1",
         "parameters": [
           {
             "name": "id",
@@ -30897,12 +29625,15 @@
             }
           }
         },
+        "tags": [
+          "MedicationReminders"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/users/{id}/deletion-request": {
       "post": {
-        "operationId": "UserOperationsController_deletion",
+        "operationId": "UserOperationsController_deletion_v1",
         "parameters": [
           {
             "name": "id",
@@ -31055,12 +29786,15 @@
             }
           }
         },
+        "tags": [
+          "UserOperations"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/owner/feature-flags": {
       "get": {
-        "operationId": "FeatureFlagsController_list",
+        "operationId": "FeatureFlagsController_list_v1",
         "parameters": [],
         "responses": {
           "200": {
@@ -31202,7 +29936,7 @@
     },
     "/api/v1/owner/feature-flags/{key}/organizations/{organizationId}": {
       "put": {
-        "operationId": "FeatureFlagsController_setOverride",
+        "operationId": "FeatureFlagsController_setOverride_v1",
         "parameters": [
           {
             "name": "key",
@@ -31369,7 +30103,7 @@
         "x-success-schema": "generic-fallback"
       },
       "delete": {
-        "operationId": "FeatureFlagsController_clearOverride",
+        "operationId": "FeatureFlagsController_clearOverride_v1",
         "parameters": [
           {
             "name": "key",
@@ -31520,7 +30254,7 @@
     },
     "/api/v1/owner/role-permissions": {
       "get": {
-        "operationId": "RolePermissionsController_list",
+        "operationId": "RolePermissionsController_list_v1",
         "parameters": [],
         "responses": {
           "200": {
@@ -31660,7 +30394,7 @@
         "x-success-schema": "generic-fallback"
       },
       "post": {
-        "operationId": "RolePermissionsController_grant",
+        "operationId": "RolePermissionsController_grant_v1",
         "parameters": [],
         "requestBody": {
           "required": true,
@@ -31812,7 +30546,7 @@
     },
     "/api/v1/owner/role-permissions/catalog": {
       "get": {
-        "operationId": "RolePermissionsController_listCatalog",
+        "operationId": "RolePermissionsController_listCatalog_v1",
         "parameters": [],
         "responses": {
           "200": {
@@ -31954,7 +30688,7 @@
     },
     "/api/v1/owner/role-permissions/{role}/{permissionCode}": {
       "delete": {
-        "operationId": "RolePermissionsController_revoke",
+        "operationId": "RolePermissionsController_revoke_v1",
         "parameters": [
           {
             "name": "role",
@@ -32105,7 +30839,7 @@
     },
     "/api/v1/owner/break-glass": {
       "post": {
-        "operationId": "BreakGlassController_request",
+        "operationId": "BreakGlassController_request_v1",
         "parameters": [],
         "requestBody": {
           "required": true,
@@ -32255,7 +30989,7 @@
         "x-success-schema": "generic-fallback"
       },
       "get": {
-        "operationId": "BreakGlassController_listAll",
+        "operationId": "BreakGlassController_listAll_v1",
         "parameters": [],
         "responses": {
           "200": {
@@ -32397,7 +31131,7 @@
     },
     "/api/v1/owner/break-glass/{grantId}/end": {
       "post": {
-        "operationId": "BreakGlassController_end",
+        "operationId": "BreakGlassController_end_v1",
         "parameters": [
           {
             "name": "grantId",
@@ -32548,7 +31282,7 @@
     },
     "/api/v1/owner/break-glass/mine": {
       "get": {
-        "operationId": "BreakGlassController_listMine",
+        "operationId": "BreakGlassController_listMine_v1",
         "parameters": [],
         "responses": {
           "200": {
@@ -32690,7 +31424,7 @@
     },
     "/api/v1/owner/dangerous-actions": {
       "post": {
-        "operationId": "DangerousActionsController_propose",
+        "operationId": "DangerousActionsController_propose_v1",
         "parameters": [],
         "requestBody": {
           "required": true,
@@ -32840,7 +31574,7 @@
         "x-success-schema": "generic-fallback"
       },
       "get": {
-        "operationId": "DangerousActionsController_list",
+        "operationId": "DangerousActionsController_list_v1",
         "parameters": [],
         "responses": {
           "200": {
@@ -32982,7 +31716,7 @@
     },
     "/api/v1/owner/dangerous-actions/{requestId}/approvals": {
       "post": {
-        "operationId": "DangerousActionsController_decide",
+        "operationId": "DangerousActionsController_decide_v1",
         "parameters": [
           {
             "name": "requestId",
@@ -33141,6 +31875,1808 @@
         "x-success-schema": "generic-fallback"
       }
     },
+    "/api/v1/notifications": {
+      "get": {
+        "operationId": "NotificationsController_list_v1",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "scope",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/NotificationResponseDto"
+                          }
+                        },
+                        "meta": {
+                          "type": "object"
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      },
+                      "required": [
+                        "success",
+                        "data",
+                        "meta",
+                        "requestId"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/notifications/unread-count": {
+      "get": {
+        "operationId": "NotificationsController_unread_v1",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "data": {
+                          "$ref": "#/components/schemas/UnreadNotificationCountResponseDto"
+                        },
+                        "meta": {
+                          "type": "object"
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      },
+                      "required": [
+                        "success",
+                        "data",
+                        "meta",
+                        "requestId"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/notifications/{notificationId}/read": {
+      "post": {
+        "operationId": "NotificationsController_read_v1",
+        "parameters": [
+          {
+            "name": "notificationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "data": {
+                          "$ref": "#/components/schemas/NotificationResponseDto"
+                        },
+                        "meta": {
+                          "type": "object"
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      },
+                      "required": [
+                        "success",
+                        "data",
+                        "meta",
+                        "requestId"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/notifications/{notificationId}/retry": {
+      "post": {
+        "operationId": "NotificationsController_retry_v1",
+        "parameters": [
+          {
+            "name": "notificationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "data": {
+                          "$ref": "#/components/schemas/NotificationResponseDto"
+                        },
+                        "meta": {
+                          "type": "object"
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      },
+                      "required": [
+                        "success",
+                        "data",
+                        "meta",
+                        "requestId"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/patients/{patientId}/care-plan": {
+      "get": {
+        "operationId": "PatientCarePlanController_carePlan_v1",
+        "parameters": [
+          {
+            "name": "patientId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "data": {
+                          "$ref": "#/components/schemas/CarePlanResponseDto"
+                        },
+                        "meta": {
+                          "type": "object"
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      },
+                      "required": [
+                        "success",
+                        "data",
+                        "meta",
+                        "requestId"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "care-plans"
+        ]
+      }
+    },
+    "/api/v1/care-plans/{carePlanId}/activities": {
+      "get": {
+        "operationId": "CarePlansController_activities_v1",
+        "parameters": [
+          {
+            "name": "carePlanId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/FollowUpActivityResponseDto"
+                          }
+                        },
+                        "meta": {
+                          "type": "object"
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      },
+                      "required": [
+                        "success",
+                        "data",
+                        "meta",
+                        "requestId"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "care-plans"
+        ]
+      },
+      "post": {
+        "operationId": "CarePlansController_create_v1",
+        "parameters": [
+          {
+            "name": "carePlanId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateFollowUpActivityRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "data": {
+                          "$ref": "#/components/schemas/FollowUpActivityResponseDto"
+                        },
+                        "meta": {
+                          "type": "object"
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      },
+                      "required": [
+                        "success",
+                        "data",
+                        "meta",
+                        "requestId"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "care-plans"
+        ]
+      }
+    },
+    "/api/v1/care-plans/{carePlanId}/run-automation": {
+      "post": {
+        "operationId": "CarePlansController_automation_v1",
+        "parameters": [
+          {
+            "name": "carePlanId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "data": {
+                          "$ref": "#/components/schemas/RunCarePlanAutomationResultDto"
+                        },
+                        "meta": {
+                          "type": "object"
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      },
+                      "required": [
+                        "success",
+                        "data",
+                        "meta",
+                        "requestId"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "care-plans"
+        ]
+      }
+    },
+    "/api/v1/activities/{activityId}/advance": {
+      "post": {
+        "operationId": "ActivitiesController_advance_v1",
+        "parameters": [
+          {
+            "name": "activityId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdvanceFollowUpActivityRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "data": {
+                          "$ref": "#/components/schemas/FollowUpActivityResponseDto"
+                        },
+                        "meta": {
+                          "type": "object"
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      },
+                      "required": [
+                        "success",
+                        "data",
+                        "meta",
+                        "requestId"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "care-plans"
+        ]
+      }
+    },
+    "/api/v1/activities/{activityId}/confirm": {
+      "post": {
+        "operationId": "ActivitiesController_confirm_v1",
+        "parameters": [
+          {
+            "name": "activityId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "data": {
+                          "$ref": "#/components/schemas/FollowUpActivityResponseDto"
+                        },
+                        "meta": {
+                          "type": "object"
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      },
+                      "required": [
+                        "success",
+                        "data",
+                        "meta",
+                        "requestId"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "care-plans"
+        ]
+      }
+    },
     "/health/live": {
       "get": {
         "operationId": "HealthController_live",
@@ -33277,6 +33813,9 @@
             }
           }
         },
+        "tags": [
+          "Health"
+        ],
         "x-success-schema": "generic-fallback"
       }
     },
@@ -33416,6 +33955,9 @@
             }
           }
         },
+        "tags": [
+          "Health"
+        ],
         "x-success-schema": "generic-fallback"
       }
     }
@@ -33423,7 +33965,7 @@
   "info": {
     "title": "DermaHealth Backend API",
     "description": "Clinic workflow backend: identity, scheduling, clinical, workflow, EMR, CRM.",
-    "version": "2.2.1",
+    "version": "2.5.0",
     "contact": {}
   },
   "tags": [],
@@ -34156,6 +34698,7 @@
           },
           "primaryDoctor": {
             "nullable": true,
+            "type": "object",
             "allOf": [
               {
                 "$ref": "#/components/schemas/ReferenceResponseDto"
@@ -34273,6 +34816,7 @@
           },
           "primaryDoctor": {
             "nullable": true,
+            "type": "object",
             "allOf": [
               {
                 "$ref": "#/components/schemas/ReferenceResponseDto"
@@ -36830,14 +37374,6 @@
         "type": "object",
         "properties": {}
       },
-      "ActivityRequest": {
-        "type": "object",
-        "properties": {}
-      },
-      "TransitionRequest": {
-        "type": "object",
-        "properties": {}
-      },
       "DecisionRequest": {
         "type": "object",
         "properties": {}
@@ -36877,7 +37413,22 @@
         "type": "object",
         "properties": {
           "role": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "super_administrator",
+              "patient",
+              "doctor",
+              "nurse",
+              "receptionist",
+              "lab_technician",
+              "imaging_technician",
+              "pharmacist",
+              "care_coordinator",
+              "customer_care_employee",
+              "medical_administrator",
+              "system_administrator",
+              "clinical_process_designer"
+            ]
           },
           "permissionCode": {
             "type": "string"
@@ -36960,6 +37511,226 @@
           "decision",
           "mfaCode"
         ]
+      },
+      "NotificationResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "event": {
+            "type": "string"
+          },
+          "recipientId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "recipientRole": {
+            "type": "string"
+          },
+          "channel": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "relatedPatientId": {
+            "type": "object",
+            "format": "uuid",
+            "nullable": true
+          },
+          "relatedEncounterId": {
+            "type": "object",
+            "format": "uuid",
+            "nullable": true
+          },
+          "relatedWorkflowTaskId": {
+            "type": "object",
+            "format": "uuid",
+            "nullable": true
+          },
+          "deliveredAt": {
+            "type": "object",
+            "format": "date-time",
+            "nullable": true
+          },
+          "failureReason": {
+            "type": "object",
+            "nullable": true
+          },
+          "retryCount": {
+            "type": "number"
+          },
+          "read": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "event",
+          "recipientId",
+          "recipientRole",
+          "channel",
+          "status",
+          "message",
+          "relatedPatientId",
+          "relatedEncounterId",
+          "relatedWorkflowTaskId",
+          "deliveredAt",
+          "failureReason",
+          "retryCount",
+          "read",
+          "createdAt"
+        ]
+      },
+      "UnreadNotificationCountResponseDto": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "count"
+        ]
+      },
+      "CarePlanResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "patientId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "encounterId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "patientId",
+          "encounterId",
+          "status",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "FollowUpActivityResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "carePlanId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "type": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "dueDate": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "priority": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "automationMode": {
+            "type": "object",
+            "nullable": true
+          },
+          "automationAction": {
+            "type": "object",
+            "nullable": true
+          },
+          "lastAutomatedAt": {
+            "type": "object",
+            "format": "date-time",
+            "nullable": true
+          },
+          "automationRunCount": {
+            "type": "number"
+          },
+          "version": {
+            "type": "number"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "carePlanId",
+          "type",
+          "title",
+          "description",
+          "dueDate",
+          "priority",
+          "status",
+          "automationMode",
+          "automationAction",
+          "lastAutomatedAt",
+          "automationRunCount",
+          "version",
+          "createdAt"
+        ]
+      },
+      "CreateFollowUpActivityRequest": {
+        "type": "object",
+        "properties": {}
+      },
+      "RunCarePlanAutomationResultDto": {
+        "type": "object",
+        "properties": {
+          "processed": {
+            "type": "number"
+          },
+          "notifications": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "processed",
+          "notifications"
+        ]
+      },
+      "AdvanceFollowUpActivityRequest": {
+        "type": "object",
+        "properties": {}
       },
       "ApiErrorResponse": {
         "type": "object",
