@@ -129,6 +129,30 @@ docker compose \
   run --rm api npm run admin:check-owners
 ```
 
+Nếu và chỉ nếu lần triển khai đầu tiên báo `missing user` cho cả 4 Owner, chạy
+bootstrap một lần. Lệnh này từ chối chạy nếu database đã có bất kỳ membership
+`super_administrator` active nào, tạo cả 4 tài khoản trong một transaction và
+ghi audit event cho từng tài khoản. Không chạy development seed trên production:
+
+```sh
+read -r -s -p "Initial Owner password: " SUPER_ADMIN_PASSWORD
+export SUPER_ADMIN_PASSWORD
+export OWNER_BOOTSTRAP_CONFIRM=CREATE_INITIAL_PLATFORM_OWNERS
+
+docker compose \
+  --env-file .env.production \
+  -f docker-compose.prod.yml \
+  run --rm \
+  -e SUPER_ADMIN_PASSWORD \
+  -e OWNER_BOOTSTRAP_CONFIRM \
+  api npm run admin:bootstrap-owners
+
+unset SUPER_ADMIN_PASSWORD OWNER_BOOTSTRAP_CONFIRM
+```
+
+Mật khẩu bootstrap chỉ là credential ban đầu. Sau khi kiểm tra đăng nhập, đặt
+mật khẩu riêng cho từng Owner bằng quy trình `admin:set-password` bên dưới.
+
 Đổi mật khẩu cho một Owner hiện hữu bằng biến môi trường dùng một lần. Lệnh
 này xác nhận tài khoản có membership `super_administrator`, băm mật khẩu bằng
 Argon2id + `PASSWORD_PEPPER`, thu hồi mọi refresh session và ghi audit event:
