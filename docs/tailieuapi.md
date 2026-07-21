@@ -310,12 +310,12 @@ FE hiện tại (`Login.tsx`) **không gọi API nào** — nút "Đăng nhập"
 
 | Method | Endpoint | Mô tả | Request | Response |
 |---|---|---|---|---|
-| POST | `/auth/login` | Đăng nhập bằng email/mật khẩu | `{email, password}` | `{accessToken, refreshToken, expiresIn, user: User}` |
-| POST | `/auth/refresh` | Cấp lại access token | `{refreshToken}` | `{accessToken, expiresIn}` |
-| POST | `/auth/logout` | Thu hồi refresh token hiện tại | — | `204` |
+| POST | `/auth/sessions` | Đăng nhập bằng email/mật khẩu, tạo phiên mới | `{email, password, rememberMe?}` | `{accessToken, accessTokenExpiresAt, user}`; refresh token nằm trong HttpOnly cookie |
+| POST | `/auth/session-refreshes` | Xoay refresh cookie và cấp lại access token | HttpOnly refresh cookie | `{accessToken, accessTokenExpiresAt, user}` |
+| DELETE | `/auth/sessions/current` | Thu hồi phiên hiện tại | HttpOnly refresh cookie | `204` |
 | POST | `/auth/forgot-password` | Gửi email reset | `{email}` | `202` |
 | POST | `/auth/reset-password` | Đặt lại mật khẩu bằng token | `{token, newPassword}` | `204` |
-| GET | `/auth/me` | Lấy thông tin user đang đăng nhập + role | — | `User` |
+| GET | `/me` | Lấy thông tin user đang đăng nhập + role | — | `User` |
 | GET | `/users` | Danh sách user, dùng cho các picker (bác sĩ phụ trách, gán task...) | Query: `role`, `department`, `q` | `User[]` phân trang |
 | GET | `/users/:id` | Chi tiết 1 user | — | `User` |
 | PATCH | `/users/:id` | Cập nhật hồ sơ cá nhân (Profile.tsx có nút "Chỉnh sửa hồ sơ" nhưng chưa nối handler) | `{name?, department?, specialty?}` | `User` |

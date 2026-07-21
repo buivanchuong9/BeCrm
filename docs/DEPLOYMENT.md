@@ -114,6 +114,21 @@ unset ACCESS_PRIVATE_KEY ACCESS_PUBLIC_KEY
 Nếu frontend nằm trên domain khác, sửa `FRONTEND_ORIGINS` thành origin thật của
 frontend. Không đặt `SEED_DEMO_PASSWORD` khi `NODE_ENV=production`.
 
+`PASSWORD_PEPPER` phải được giữ nguyên suốt vòng đời database. Nếu sinh lại
+pepper trong khi tái sử dụng volume PostgreSQL cũ, toàn bộ mật khẩu hiện hữu sẽ
+không còn kiểm tra được; cần khôi phục pepper cũ hoặc đặt lại mật khẩu cho từng
+tài khoản bằng quy trình bên dưới.
+
+Kiểm tra read-only trạng thái của đủ 4 Owner production (không in password hash
+hay secret):
+
+```sh
+docker compose \
+  --env-file .env.production \
+  -f docker-compose.prod.yml \
+  run --rm api npm run admin:check-owners
+```
+
 Đổi mật khẩu cho một Owner hiện hữu bằng biến môi trường dùng một lần. Lệnh
 này xác nhận tài khoản có membership `super_administrator`, băm mật khẩu bằng
 Argon2id + `PASSWORD_PEPPER`, thu hồi mọi refresh session và ghi audit event:
@@ -135,6 +150,18 @@ unset SUPER_ADMIN_EMAIL SUPER_ADMIN_PASSWORD
 ```
 
 Không ghi mật khẩu vào `.env.production`, shell history, Compose hoặc Git.
+Chạy quy trình trên riêng cho cả 4 email Owner; mỗi người phải dùng mật khẩu
+riêng:
+
+- `buivanchuong@dermahealth.vn`
+- `nguyenmanhcuong@dermahealth.vn`
+- `daovanduong@dermahealth.vn`
+- `phamthihongchuc@dermahealth.vn`
+
+Sau khi đặt xong, chạy lại `npm run admin:check-owners`. Nếu công cụ báo
+`missing user` hoặc `missing active super_administrator membership`, không chạy
+development seed trên production; phải provision tài khoản/membership qua quy
+trình Owner được phê duyệt.
 
 Kiểm tra các secret bắt buộc mà không in giá trị:
 

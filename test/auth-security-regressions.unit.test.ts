@@ -1,10 +1,39 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
 import { AuthService } from '../src/modules/identity/auth.service';
 import { StaffInvitationsService } from '../src/modules/identity/staff-invitations.service';
+import { CreateSessionRequest } from '../src/modules/identity/dto/create-session.dto';
 
 const USER_ID = '11111111-1111-4111-8111-111111111111';
 const ORG_ID = '22222222-2222-4222-8222-222222222222';
+
+describe('CreateSessionRequest — frontend compatibility', () => {
+  it('defaults an omitted rememberMe field to false', async () => {
+    const request = plainToInstance(CreateSessionRequest, {
+      email: 'owner@dermahealth.vn',
+      password: 'a-valid-password',
+    });
+
+    assert.equal(request.rememberMe, false);
+    assert.deepEqual(await validate(request), []);
+  });
+
+  it('still rejects a non-boolean rememberMe field', async () => {
+    const request = plainToInstance(CreateSessionRequest, {
+      email: 'owner@dermahealth.vn',
+      password: 'a-valid-password',
+      rememberMe: 'false',
+    });
+
+    const errors = await validate(request);
+    assert.equal(
+      errors.some((error) => error.property === 'rememberMe'),
+      true,
+    );
+  });
+});
 
 function baseUser() {
   return {

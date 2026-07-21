@@ -26,6 +26,7 @@
     "db:migrate": "prisma migrate deploy",
     "db:migrate:dev": "prisma migrate dev",
     "db:seed": "ts-node -r tsconfig-paths/register prisma/seed/index.ts",
+    "admin:check-owners": "ts-node -r tsconfig-paths/register scripts/check-super-admins.ts",
     "admin:set-password": "ts-node -r tsconfig-paths/register scripts/set-super-admin-password.ts",
     "openapi:generate": "ts-node -r tsconfig-paths/register scripts/generate-openapi.ts"
   },

@@ -10,7 +10,7 @@ import {
   Patch,
   Req,
 } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiProperty, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { Request } from 'express';
 import { IsString, Length } from 'class-validator';
@@ -28,6 +28,12 @@ import { UpsertUserPreferenceRequest } from './dto/upsert-preferences.dto';
 import { MfaService } from './mfa/mfa.service';
 
 class MfaCodeRequest {
+  @ApiProperty({
+    description: 'Current 6-digit TOTP code from the account authenticator.',
+    example: '123456',
+    minLength: 6,
+    maxLength: 6,
+  })
   @IsString()
   @Length(6, 6)
   code!: string;

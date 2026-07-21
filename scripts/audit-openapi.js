@@ -25,7 +25,9 @@ function visit(value, location) {
 }
 
 if (document.info.version !== packageJson.version) {
-  failures.push(`OpenAPI version ${document.info.version} != package version ${packageJson.version}`);
+  failures.push(
+    `OpenAPI version ${document.info.version} != package version ${packageJson.version}`,
+  );
 }
 
 for (const [path, pathItem] of Object.entries(document.paths)) {
@@ -33,9 +35,13 @@ for (const [path, pathItem] of Object.entries(document.paths)) {
     const operation = pathItem[method];
     if (!operation) continue;
     operationCount += 1;
-    if (!operation.operationId) failures.push(`${method.toUpperCase()} ${path}: missing operationId`);
+    if (!operation.operationId)
+      failures.push(`${method.toUpperCase()} ${path}: missing operationId`);
     const previous = operationIds.get(operation.operationId);
-    if (previous) failures.push(`duplicate operationId ${operation.operationId}: ${previous}, ${method.toUpperCase()} ${path}`);
+    if (previous)
+      failures.push(
+        `duplicate operationId ${operation.operationId}: ${previous}, ${method.toUpperCase()} ${path}`,
+      );
     operationIds.set(operation.operationId, `${method.toUpperCase()} ${path}`);
 
     const declaredPathParams = new Set(
@@ -68,6 +74,48 @@ if (!registrationOperation?.responses?.['201']?.content?.['application/json']?.s
   failures.push('registration 201 response schema is missing');
 }
 
+const login = document.components?.schemas?.CreateSessionRequest;
+if (
+  login?.properties?.rememberMe?.type !== 'boolean' ||
+  login.properties.rememberMe.default !== false ||
+  login.required?.includes('rememberMe')
+) {
+  failures.push('CreateSessionRequest.rememberMe must be documented as optional with a default');
+}
+
+for (const legacyPath of [
+  '/api/v1/auth/login',
+  '/api/v1/auth/refresh',
+  '/api/v1/auth/logout',
+  '/api/v1/auth/me',
+]) {
+  if (document.paths?.[legacyPath])
+    failures.push(`legacy duplicate route still exposed: ${legacyPath}`);
+}
+
+for (const canonicalPath of [
+  '/api/v1/auth/sessions',
+  '/api/v1/auth/session-refreshes',
+  '/api/v1/auth/sessions/current',
+  '/api/v1/me',
+]) {
+  if (!document.paths?.[canonicalPath])
+    failures.push(`canonical auth route is missing: ${canonicalPath}`);
+}
+
+for (const [schemaName, expectedProperties] of Object.entries({
+  ForgotPasswordRequest: ['email'],
+  ResetPasswordRequest: ['token', 'newPassword'],
+  MfaCodeRequest: ['code'],
+})) {
+  const schema = document.components?.schemas?.[schemaName];
+  for (const property of expectedProperties) {
+    if (!schema?.properties?.[property]) {
+      failures.push(`${schemaName} must document request property ${property}`);
+    }
+  }
+}
+
 visit(document, 'openapi');
 
 console.log(
@@ -76,7 +124,8 @@ console.log(
       version: document.info.version,
       paths: Object.keys(document.paths).length,
       operations: operationCount,
-      duplicateOperationIds: failures.filter((item) => item.startsWith('duplicate operationId')).length,
+      duplicateOperationIds: failures.filter((item) => item.startsWith('duplicate operationId'))
+        .length,
       unresolvedReferences: failures.filter((item) => item.includes('unresolved ref')).length,
       genericSuccessSchemas: genericSuccessCount,
       failures,

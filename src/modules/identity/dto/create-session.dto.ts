@@ -12,9 +12,10 @@ export class CreateSessionRequest {
   @MinLength(1)
   password!: string;
 
-  @ApiProperty({ default: false })
+  @ApiProperty({ type: Boolean, required: false, default: false })
+  @IsOptional()
   @IsBoolean()
-  rememberMe!: boolean;
+  rememberMe: boolean = false;
 
   @ApiProperty({ required: false, description: 'Reserved for MFA rollout; not yet enforced.' })
   @IsOptional()

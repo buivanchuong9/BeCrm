@@ -1,15 +1,5 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  HttpCode,
-  HttpStatus,
-  Post,
-  Req,
-  Res,
-} from '@nestjs/common';
-import { ApiNoContentResponse, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Delete, HttpCode, HttpStatus, Post, Req, Res } from '@nestjs/common';
+import { ApiNoContentResponse, ApiProperty, ApiTags } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { Request, Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
@@ -38,9 +28,8 @@ import { SessionResponseDto } from './dto/responses/current-user-response.dto';
 import { PasswordService } from './password.service';
 import { UsersRepository } from './users.repository';
 import { toCurrentUserResponse } from './user-response.mapper';
-import { CurrentUser } from '../../core/security/current-user.decorator';
 import { AuthenticatedPrincipal } from '../../core/security/auth.types';
-import { IsEmail, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsString, MaxLength, MinLength } from 'class-validator';
 import { PasswordResetService } from './password-reset.service';
 import {
   PatientRegistrationResponseDto,
@@ -48,11 +37,20 @@ import {
 } from './dto/responses/registration-response.dto';
 
 class ForgotPasswordRequest {
-  @IsEmail() email!: string;
+  @ApiProperty({ example: 'user@dermahealth.vn', format: 'email' })
+  @IsEmail()
+  email!: string;
 }
 class ResetPasswordRequest {
-  @IsString() token!: string;
-  @IsString() @MinLength(12) newPassword!: string;
+  @ApiProperty({ description: 'One-time token from the password reset link.' })
+  @IsString()
+  token!: string;
+
+  @ApiProperty({ minLength: 12, maxLength: 128 })
+  @IsString()
+  @MinLength(12)
+  @MaxLength(128)
+  newPassword!: string;
 }
 
 const REFRESH_COOKIE_NAME = 'refresh_token';
@@ -216,19 +214,6 @@ export class AuthController {
   }
 
   @Public()
-  @Throttle({ default: { limit: 5, ttl: 60_000 } })
-  @ApiCreatedEnvelope(SessionResponseDto)
-  @Post('login')
-  @HttpCode(HttpStatus.CREATED)
-  login(
-    @Body() dto: CreateSessionRequest,
-    @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    return this.createSession(dto, req, res);
-  }
-
-  @Public()
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @ApiOkEnvelope(SessionResponseDto)
   @Post('session-refreshes')
@@ -248,22 +233,6 @@ export class AuthController {
   }
 
   @Public()
-  @Throttle({ default: { limit: 20, ttl: 60_000 } })
-  @ApiOkEnvelope(SessionResponseDto)
-  @Post('refresh')
-  @HttpCode(HttpStatus.OK)
-  refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    return this.createSessionRefresh(req, res);
-  }
-
-  @Get('me')
-  async me(@CurrentUser() principal: AuthenticatedPrincipal) {
-    const user = await this.users.findByIdWithMemberships(principal.userId);
-    if (!user) throw new UnauthorizedAppError('AUTH_SESSION_EXPIRED', 'User no longer exists.');
-    return { data: toCurrentUserResponse(user, this.users.toMembershipScopes(user)) };
-  }
-
-  @Public()
   @ApiNoContentResponse()
   @Delete('sessions/current')
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -276,14 +245,6 @@ export class AuthController {
       await this.authService.logout(rawToken, false, req.requestId);
     }
     res.clearCookie(REFRESH_COOKIE_NAME, { path: REFRESH_COOKIE_PATH });
-  }
-
-  @Public()
-  @ApiNoContentResponse()
-  @Post('logout')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  logout(@Req() req: Request, @Res({ passthrough: true }) res: Response): Promise<void> {
-    return this.endCurrentSession(req, res);
   }
 
   @Public()
