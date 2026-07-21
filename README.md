@@ -29,7 +29,7 @@
 	<a href="#chạy-local-bằng-docker"><img src="https://img.shields.io/badge/Start-Local%20in%2060s-16A34A?style=for-the-badge&logo=rocket&logoColor=white" alt="Start local" /></a>
 	<a href="#deploy-production-thủ-công-dễ-kiểm-soát"><img src="https://img.shields.io/badge/Deploy-Production-F97316?style=for-the-badge&logo=dockers&logoColor=white" alt="Deploy production" /></a>
 	<a href="docs/DEPLOYMENT.md"><img src="https://img.shields.io/badge/Guide-Ubuntu%20Runbook-2563EB?style=for-the-badge&logo=readthedocs&logoColor=white" alt="Deployment guide" /></a>
-	<a href="http://localhost:3000/api/docs/2.5.0"><img src="https://img.shields.io/badge/API-Swagger-0EA5E9?style=for-the-badge&logo=swagger&logoColor=white" alt="Swagger" /></a>
+	<a href="http://localhost:3000/api/docs"><img src="https://img.shields.io/badge/API-Swagger-0EA5E9?style=for-the-badge&logo=swagger&logoColor=white" alt="Swagger" /></a>
 </p>
 
 <p align="center">
@@ -56,7 +56,7 @@ Luồng chính là Docker-first từ local lên production.
 
 ```sh
 docker compose up -d --build
-open http://localhost:3000/api/docs/2.5.0
+open http://localhost:3000/api/docs
 ```
 
 Muốn dừng toàn bộ stack:
@@ -105,9 +105,9 @@ docker compose up -d --build
 Các dịch vụ chính:
 
 - API: http://localhost:3000
-- Swagger UI (release 2.5.0): http://localhost:3000/api/docs/2.5.0
-- OpenAPI JSON: http://localhost:3000/api/docs/2.5.0/openapi.json
-- Legacy Swagger URL (temporary redirect): http://localhost:3000/api/docs
+- Swagger UI (stable URL): http://localhost:3000/api/docs
+- OpenAPI JSON (stable URL): http://localhost:3000/api/docs/openapi.json
+- Versioned URL (optional): http://localhost:3000/api/docs/2.5.1
 - PostgreSQL: localhost:5442
 - Redis: localhost:6389
 - MinIO: localhost:9000 (console 9001)
@@ -173,11 +173,10 @@ Error response luôn có dạng
 `{ "success": false, "code": "...", "message": "...", "errors": {}, "requestId": "..." }`.
 Request registration mới dùng `displayName`; alias `name` chỉ được giữ tạm thời để tương thích ngược.
 
-Phiên bản tài liệu mặc định lấy từ `version` trong `package.json`. Khi phát hành
-release mới (ví dụ `3.0.0`), bump package version trong commit release; sau
-`git pull` và rebuild, Swagger tự xuất hiện tại `/api/docs/3.0.0`. Biến tùy chọn
-`OPENAPI_VERSION` chỉ dùng khi cần override và không nên đặt cố định trên
-production nếu muốn version tự đi theo code.
+Phiên bản tài liệu mặc định lấy từ `version` trong `package.json`. Sau mỗi lần
+bump version, pull và rebuild, link cố định `/api/docs` tự hiển thị release mới;
+không cần đổi bookmark. URL `/api/docs/<version>` chỉ dùng khi cần đối chiếu.
+Version không có biến môi trường override, tránh production bị kẹt ở badge cũ.
 
 ```sh
 npm version 3.0.0 --no-git-tag-version
@@ -189,8 +188,8 @@ npm version 3.0.0 --no-git-tag-version
 docker compose --env-file .env.production -f docker-compose.prod.yml ps
 docker compose --env-file .env.production -f docker-compose.prod.yml logs --tail=200 api
 curl -i http://127.0.0.1:43000/health/live
-curl -i http://127.0.0.1:43000/api/docs/2.5.0
-curl -s http://127.0.0.1:43000/api/docs/2.5.0/openapi.json | jq '.info.version'
+curl -i http://127.0.0.1:43000/api/docs
+curl -s http://127.0.0.1:43000/api/docs/openapi.json | jq '.info.version'
 ```
 
 ## Tài liệu liên quan

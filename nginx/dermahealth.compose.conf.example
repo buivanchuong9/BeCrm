@@ -10,8 +10,8 @@
 # 43000, which only matters for the host-nginx variant.
 #
 # DermaHealth API surface (see src/bootstrap.ts / src/main.ts): global prefix
-# /api (business routes under /api/v1/...), release-versioned Swagger UI at
-# /api/docs/<release> with /api/docs kept for compatibility, health checks
+# /api (business routes under /api/v1/...), stable Swagger UI at /api/docs
+# (plus optional /api/docs/<release>), health checks
 # unprefixed at /health/live and /health/ready. There is no /authenticator,
 # /adminapi, /bpmapi, /notification, or /sale route — this backend is a single
 # NestJS modular monolith, not the legacy multi-service CareFollow backend.

@@ -9,10 +9,6 @@ export const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'staging', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().default(3000),
   API_BASE_PATH: z.string().min(1).default('/api/v1'),
-  OPENAPI_VERSION: z
-    .string()
-    .regex(/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/, 'Must be a semantic version')
-    .optional(),
 
   FRONTEND_ORIGINS: z.string().min(1),
   APP_PUBLIC_URL: z.string().url(),

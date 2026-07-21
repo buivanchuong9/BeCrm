@@ -5,20 +5,20 @@ Backend production chạy bằng `docker-compose.prod.yml`:
 - API container: `dermahealth-api`
 - API trên host: `127.0.0.1:43000`
 - PostgreSQL và Redis chỉ nằm trong Docker network
-- Swagger UI release hiện tại: `/api/docs/2.5.0`
-- OpenAPI JSON release hiện tại: `/api/docs/2.5.0/openapi.json`
-- Swagger UI tương thích ngược: `/api/docs` (302 no-store tới release hiện tại)
+- Swagger UI cố định: `/api/docs`
+- OpenAPI JSON cố định: `/api/docs/openapi.json`
+- URL theo release (tùy chọn): `/api/docs/2.5.1`
 
 Swagger runtime được sinh từ source code khi API khởi động, không đọc trực tiếp
 `docs/openapi.json`. Mọi response HTML, JavaScript, CSS và OpenAPI JSON dưới
 `/api/docs` đều trả `Cache-Control: no-store` cùng các header chống cache tương
 ứng.
 
-Version mặc định lấy từ `version` trong `package.json`. Không đặt
-`OPENAPI_VERSION` trong `.env.production` nếu muốn mỗi release mới tự tạo URL
-docs mới sau `git pull` và rebuild. Ví dụ khi package được bump lên `3.0.0`, URL
-mới tự động là `/api/docs/3.0.0` và `/api/docs/3.0.0/openapi.json`; business API
-vẫn giữ nguyên dưới `/api/v1`.
+Version chỉ lấy từ `version` trong `package.json`, không có biến môi trường
+override nên không thể bị kẹt ở badge cũ. Sau `git pull` và rebuild, link
+`/api/docs` luôn giữ nguyên và trực tiếp phục vụ bản mới nhất;
+`/api/docs/<version>` chỉ là URL tùy chọn. Business API vẫn giữ nguyên dưới
+`/api/v1`.
 
 ## 1. Chuẩn bị server một lần
 
@@ -238,8 +238,8 @@ Khi chuẩn bị release `3.0.0`, cập nhật version trong source trước khi
 npm version 3.0.0 --no-git-tag-version
 ```
 
-Sau khi server pull và rebuild API, docs mới tự nằm tại `/api/docs/3.0.0` và
-`/api/docs/3.0.0/openapi.json`. Không đổi business route `/api/v1`.
+Sau khi server pull và rebuild API, `/api/docs` và `/api/docs/openapi.json` tự
+hiển thị version mới. Không cần thay link và không đổi business route `/api/v1`.
 
 ## 5. Kiểm tra sau deploy
 
@@ -255,12 +255,12 @@ docker compose \
   logs --tail=200 api
 
 curl -i http://127.0.0.1:43000/health/live
-curl -s http://127.0.0.1:43000/api/docs/2.5.0/openapi.json | jq '.info.version'
+curl -s http://127.0.0.1:43000/api/docs/openapi.json | jq '.info.version'
 
-curl -sSI http://127.0.0.1:43000/api/docs/2.5.0/swagger-ui-init.js \
+curl -sSI http://127.0.0.1:43000/api/docs/swagger-ui-init.js \
   | grep -iE 'cache-control|pragma|expires'
 
-curl -sSI http://127.0.0.1:43000/api/docs/2.5.0/openapi.json \
+curl -sSI http://127.0.0.1:43000/api/docs/openapi.json \
   | grep -iE 'cache-control|pragma|expires'
 
 docker inspect \
@@ -285,13 +285,13 @@ sudo systemctl reload nginx
 Swagger production:
 
 ```text
-https://dermahealth.fitdnu.id.vn/api/docs/2.5.0
+https://dermahealth.fitdnu.id.vn/api/docs
 ```
 
 OpenAPI JSON production:
 
 ```text
-https://dermahealth.fitdnu.id.vn/api/docs/2.5.0/openapi.json
+https://dermahealth.fitdnu.id.vn/api/docs/openapi.json
 ```
 
 ## 7. Xóa database và dựng lại hoàn toàn

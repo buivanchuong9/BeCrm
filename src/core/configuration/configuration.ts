@@ -31,7 +31,7 @@ export function buildConfiguration(env: EnvConfig) {
     isProduction: env.NODE_ENV === 'production',
     port: env.PORT,
     apiBasePath: env.API_BASE_PATH,
-    documentation: { version: env.OPENAPI_VERSION ?? packageVersion() },
+    documentation: { version: packageVersion() },
     frontendOrigins: env.FRONTEND_ORIGINS.split(',').map((origin) => origin.trim()),
     appPublicUrl: env.APP_PUBLIC_URL,
     requestBodyLimit: env.REQUEST_BODY_LIMIT,

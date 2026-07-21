@@ -69,9 +69,12 @@ describe('buildConfiguration — packageVersion resolution (production incident 
     assert.equal(config.documentation.version, expected);
   });
 
-  it('OPENAPI_VERSION override still takes precedence (does not touch the filesystem)', () => {
+  it('uses package.json as the only version source even if a stale override is supplied', () => {
+    const expected = (
+      JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf8')) as { version: string }
+    ).version;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const config = buildConfiguration({ ...baseEnv, OPENAPI_VERSION: '9.9.9' } as any);
-    assert.equal(config.documentation.version, '9.9.9');
+    assert.equal(config.documentation.version, expected);
   });
 });

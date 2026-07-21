@@ -33343,7 +33343,7 @@
   "info": {
     "title": "DermaHealth Backend API",
     "description": "Clinic workflow backend: identity, scheduling, clinical, workflow, EMR, CRM.",
-    "version": "2.5.0",
+    "version": "2.5.1",
     "contact": {}
   },
   "tags": [],
