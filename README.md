@@ -124,10 +124,6 @@ docker compose down
 ```sh
 npm run build
 npm run typecheck
-npm run test
-npm run test:integration
-npm run test:e2e
-npm run test:security
 npm run openapi:generate
 ```
 
