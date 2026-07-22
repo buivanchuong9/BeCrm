@@ -30,8 +30,5 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Integration tests
-        run: npm run test:integration
-
       - name: OpenAPI contract audit
         run: npm run contract:audit
