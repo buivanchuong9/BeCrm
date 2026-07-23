@@ -384,16 +384,19 @@ export class OperationsService {
         select: { id: true },
       })
     ).map((x) => x.id);
+    const encounterIds = (
+      await this.prisma.medicalEncounter.findMany({ where: encounterWhere, select: { id: true } })
+    ).map((row) => row.id);
     const openTasks = await this.prisma.workflowTask.findMany({
-      where: { status: { notIn: ['completed', 'skipped'] } },
+      where: {
+        status: { notIn: ['completed', 'skipped', 'cancelled'] },
+        ...(this.roles(p).has('super_administrator') ? {} : { encounterId: { in: encounterIds } }),
+      },
       select: { createdAt: true, slaMinutes: true },
     });
     const overdueSlaTasks = openTasks.filter(
       (task) => task.createdAt.getTime() + task.slaMinutes * 60_000 < Date.now(),
     ).length;
-    const encounterIds = (
-      await this.prisma.medicalEncounter.findMany({ where: encounterWhere, select: { id: true } })
-    ).map((row) => row.id);
     const [
       activeEncounters,
       awaitingDoctorReview,
@@ -416,7 +419,19 @@ export class OperationsService {
       this.prisma.clinicalAlert.count({
         where: { patientId: { in: patientIds }, status: { not: 'resolved' } },
       }),
-      this.prisma.notification.count({ where: { status: 'failed' } }),
+      this.prisma.notification.count({
+        where: {
+          status: 'failed',
+          ...(this.roles(p).has('super_administrator')
+            ? {}
+            : {
+                OR: [
+                  { relatedPatientId: { in: patientIds } },
+                  { relatedEncounterId: { in: encounterIds } },
+                ],
+              }),
+        },
+      }),
       this.prisma.integrationConnection.count({ where: { status: { not: 'healthy' } } }),
     ]);
     return {

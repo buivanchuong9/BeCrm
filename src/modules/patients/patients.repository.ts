@@ -129,12 +129,32 @@ export class PatientsRepository {
     return { rows, total };
   }
 
-  /** Active (non-terminal) appointment/encounter/care-plan counts feed
-   * PatientDetailResponse; those modules don't exist yet (T06/T08/T15), so
-   * these are hardcoded to zero/null for now — never fabricated non-zero
-   * values. Revisit once the owning modules ship. */
-  detailProjectionPlaceholders() {
-    return { activeAppointmentCount: 0, activeEncounterId: null, activeCarePlanId: null };
+  /** Builds the patient-detail projection exclusively from persisted runtime
+   * records. Empty databases naturally return 0/null; no synthetic values are
+   * injected into the response. */
+  async detailProjection(patientId: string) {
+    const [activeAppointmentCount, activeEncounter, activeCarePlan] =
+      await this.prisma.$transaction([
+        this.prisma.appointment.count({
+          where: { patientId, status: 'upcoming' },
+        }),
+        this.prisma.medicalEncounter.findFirst({
+          where: { patientId, status: { notIn: ['closed', 'follow_up_linked'] } },
+          orderBy: { updatedAt: 'desc' },
+          select: { id: true },
+        }),
+        this.prisma.crmCarePlan.findFirst({
+          where: { patientId, status: { notIn: ['completed', 'cancelled'] } },
+          orderBy: { updatedAt: 'desc' },
+          select: { id: true },
+        }),
+      ]);
+
+    return {
+      activeAppointmentCount,
+      activeEncounterId: activeEncounter?.id ?? null,
+      activeCarePlanId: activeCarePlan?.id ?? null,
+    };
   }
 
   /** Upserts the 'primary_doctor' care-team row atomically with a

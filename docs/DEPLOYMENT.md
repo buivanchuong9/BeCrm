@@ -112,15 +112,16 @@ unset ACCESS_PRIVATE_KEY ACCESS_PUBLIC_KEY
 ```
 
 Nếu frontend nằm trên domain khác, sửa `FRONTEND_ORIGINS` thành origin thật của
-frontend. Không đặt `SEED_DEMO_PASSWORD` khi `NODE_ENV=production`.
+frontend. Lệnh `db:seed` chỉ khởi tạo metadata nền tảng (permission và feature
+flag), không tạo organization, user, bệnh nhân hay dữ liệu lâm sàng mẫu.
 
 `PASSWORD_PEPPER` phải được giữ nguyên suốt vòng đời database. Nếu sinh lại
 pepper trong khi tái sử dụng volume PostgreSQL cũ, toàn bộ mật khẩu hiện hữu sẽ
 không còn kiểm tra được; cần khôi phục pepper cũ hoặc đặt lại mật khẩu cho từng
 tài khoản bằng quy trình bên dưới.
 
-Kiểm tra read-only trạng thái của đủ 4 Owner production (không in password hash
-hay secret):
+Kiểm tra read-only trạng thái các Owner production đang lưu trong database
+(không in password hash hay secret):
 
 ```sh
 docker compose \
@@ -129,15 +130,20 @@ docker compose \
   run --rm api npm run admin:check-owners
 ```
 
-Nếu và chỉ nếu lần triển khai đầu tiên báo `missing user` cho cả 4 Owner, chạy
-bootstrap một lần. Lệnh này từ chối chạy nếu database đã có bất kỳ membership
-`super_administrator` active nào, tạo cả 4 tài khoản trong một transaction và
-ghi audit event cho từng tài khoản. Không chạy development seed trên production:
+Nếu và chỉ nếu lần triển khai đầu tiên chưa có Owner, chạy bootstrap một lần.
+Danh sách Owner và organization phải là dữ liệu thật do người vận hành truyền
+vào; code không chứa sẵn tài khoản hay tenant mẫu. Lệnh từ chối chạy nếu database
+đã có bất kỳ membership `super_administrator` active nào và ghi audit event cho
+từng tài khoản:
 
 ```sh
 read -r -s -p "Initial Owner password: " SUPER_ADMIN_PASSWORD
 export SUPER_ADMIN_PASSWORD
 export OWNER_BOOTSTRAP_CONFIRM=CREATE_INITIAL_PLATFORM_OWNERS
+export OWNER_BOOTSTRAP_ORGANIZATION_CODE=my-clinic
+export OWNER_BOOTSTRAP_ORGANIZATION_NAME='My Clinic'
+export OWNER_BOOTSTRAP_ORGANIZATION_TIMEZONE=Asia/Ho_Chi_Minh
+export INITIAL_PLATFORM_OWNERS_JSON='[{"email":"owner@example.com","displayName":"Platform Owner"}]'
 
 docker compose \
   --env-file .env.production \
@@ -145,9 +151,15 @@ docker compose \
   run --rm \
   -e SUPER_ADMIN_PASSWORD \
   -e OWNER_BOOTSTRAP_CONFIRM \
+  -e OWNER_BOOTSTRAP_ORGANIZATION_CODE \
+  -e OWNER_BOOTSTRAP_ORGANIZATION_NAME \
+  -e OWNER_BOOTSTRAP_ORGANIZATION_TIMEZONE \
+  -e INITIAL_PLATFORM_OWNERS_JSON \
   api npm run admin:bootstrap-owners
 
-unset SUPER_ADMIN_PASSWORD OWNER_BOOTSTRAP_CONFIRM
+unset SUPER_ADMIN_PASSWORD OWNER_BOOTSTRAP_CONFIRM INITIAL_PLATFORM_OWNERS_JSON
+unset OWNER_BOOTSTRAP_ORGANIZATION_CODE OWNER_BOOTSTRAP_ORGANIZATION_NAME
+unset OWNER_BOOTSTRAP_ORGANIZATION_TIMEZONE
 ```
 
 Mật khẩu bootstrap chỉ là credential ban đầu. Sau khi kiểm tra đăng nhập, đặt

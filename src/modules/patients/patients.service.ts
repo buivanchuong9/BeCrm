@@ -74,8 +74,10 @@ export class PatientsService {
       throw new NotFoundAppError('Patient not found.');
     }
 
-    const consentRows = await this.consents.listByPatientId(patientId);
-    const placeholders = this.patients.detailProjectionPlaceholders();
+    const [consentRows, detailProjection] = await Promise.all([
+      this.consents.listByPatientId(patientId),
+      this.patients.detailProjection(patientId),
+    ]);
 
     await this.audit.write({
       actorId: principal.userId,
@@ -92,7 +94,7 @@ export class PatientsService {
 
     return {
       data: toPatientDetailResponse(patient, {
-        ...placeholders,
+        ...detailProjection,
         consentSummary: consentRows.map((c) => ({
           type: c.type,
           granted: c.granted,

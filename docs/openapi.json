@@ -33683,7 +33683,7 @@
         "properties": {
           "email": {
             "type": "string",
-            "example": "nguyenvana@example.test"
+            "format": "email"
           },
           "password": {
             "type": "string",

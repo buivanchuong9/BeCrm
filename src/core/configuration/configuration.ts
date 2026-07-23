@@ -69,7 +69,6 @@ export function buildConfiguration(env: EnvConfig) {
     sms: { provider: env.SMS_PROVIDER, apiKey: env.SMS_API_KEY },
     ai: { provider: env.AI_PROVIDER, modelVersion: env.AI_MODEL_VERSION, apiKey: env.AI_API_KEY },
     logLevel: env.LOG_LEVEL,
-    seedDemoPassword: env.SEED_DEMO_PASSWORD,
   };
 }
 

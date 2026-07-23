@@ -6,7 +6,7 @@ export interface FeatureFlagDefinition {
 
 /**
  * Static catalog of platform feature flags — the "Feature Flag" box of the
- * Role + Permission + Resource Scope + Feature Flag decision. Seeded once;
+ * Role + Permission + Resource Scope + Feature Flag decision. Initialized once;
  * an Owner changes behavior at runtime via `FeatureFlagOverride`
  * (per-organization), never by editing this file per clinic.
  */

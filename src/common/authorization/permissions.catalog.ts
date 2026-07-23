@@ -6,8 +6,8 @@ import { UserRole } from '@prisma/client';
  * Resource Scope and Feature Flag — is evaluated per-request by
  * PolicyEngine, never baked into this table).
  *
- * The matrix is code, not data, on purpose: it is seeded into `RolePermission`
- * (see prisma/seed/permissions.seed.ts) so an Owner can extend/revoke a
+ * The matrix is code, not tenant/clinical data: it is initialized into
+ * `RolePermission` (see prisma/seed/index.ts) so an Owner can extend/revoke a
  * mapping at runtime via `POST/DELETE /owner/role-permissions`, but the
  * *default* shape of what each role can do is a reviewed code change, not a
  * runtime toggle a single click can silently widen.

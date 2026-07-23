@@ -3,7 +3,7 @@ import { IsBoolean, IsEmail, IsOptional, IsString, MinLength } from 'class-valid
 
 /** Matches docs/api.md section 26 `CreateSessionRequest` exactly. */
 export class CreateSessionRequest {
-  @ApiProperty({ example: 'nguyenvana@example.test' })
+  @ApiProperty({ format: 'email' })
   @IsEmail()
   email!: string;
 

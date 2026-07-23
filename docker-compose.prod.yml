@@ -6,9 +6,9 @@
 #   docker compose -f docker-compose.prod.yml up -d --build
 #   docker compose -f docker-compose.prod.yml run --rm api npm run db:migrate
 #
-# Seeding is intentionally NOT run here — prisma/seed/index.ts refuses to run
-# when NODE_ENV=production (spec requirement; dev credentials must never be
-# seeded into a production database).
+# Platform metadata initialization is intentionally not run automatically here.
+# `npm run db:seed` is safe to invoke explicitly: it creates permission/feature
+# metadata only and never inserts tenant, account or clinical records.
 #
 # MinIO/Mailpit are dev-only stand-ins and are deliberately not included here
 # — point S3_*/SMTP_* in .env.production at real object storage and a real

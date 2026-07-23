@@ -58,8 +58,6 @@ export const envSchema = z.object({
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
   SENTRY_DSN: z.string().optional(),
   OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional(),
-
-  SEED_DEMO_PASSWORD: z.string().optional(),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;
@@ -71,9 +69,6 @@ export function validateEnv(raw: Record<string, unknown>): EnvConfig {
       .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
       .join('; ');
     throw new Error(`Invalid environment configuration: ${issues}`);
-  }
-  if (parsed.data.NODE_ENV === 'production' && parsed.data.SEED_DEMO_PASSWORD) {
-    throw new Error('SEED_DEMO_PASSWORD must not be set when NODE_ENV=production');
   }
   const origins = parsed.data.FRONTEND_ORIGINS.split(',').map((origin) => origin.trim());
   for (const origin of origins) {

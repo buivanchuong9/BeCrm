@@ -3,16 +3,9 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-const EXPECTED_OWNERS = [
-  'buivanchuong@dermahealth.vn',
-  'nguyenmanhcuong@dermahealth.vn',
-  'daovanduong@dermahealth.vn',
-  'phamthihongchuc@dermahealth.vn',
-] as const;
-
 async function main() {
   const users = await prisma.user.findMany({
-    where: { email: { in: [...EXPECTED_OWNERS] } },
+    where: { memberships: { some: { role: 'super_administrator', status: 'active' } } },
     select: {
       email: true,
       status: true,
@@ -25,28 +18,21 @@ async function main() {
       },
     },
   });
-  const byEmail = new Map(users.map((user) => [user.email, user]));
-  let healthy = true;
+  let healthy = users.length > 0;
+  if (users.length === 0) console.log('ERROR no active super administrator account exists');
 
-  for (const email of EXPECTED_OWNERS) {
-    const user = byEmail.get(email);
+  for (const user of users) {
     const issues: string[] = [];
-    if (!user) {
-      issues.push('missing user');
-    } else {
-      if (user.status !== 'active') issues.push(`status=${user.status}`);
-      if (!user.passwordHash) issues.push('password not configured');
-      if (user.memberships.length === 0)
-        issues.push('missing active super_administrator membership');
-      if (user.lockedUntil && user.lockedUntil.getTime() > Date.now()) {
-        issues.push(`locked until ${user.lockedUntil.toISOString()}`);
-      }
+    if (user.status !== 'active') issues.push(`status=${user.status}`);
+    if (!user.passwordHash) issues.push('password not configured');
+    if (user.lockedUntil && user.lockedUntil.getTime() > Date.now()) {
+      issues.push(`locked until ${user.lockedUntil.toISOString()}`);
     }
 
     if (issues.length > 0) healthy = false;
-    const suffix = user ? `; failedLoginCount=${user.failedLoginCount}` : '';
+    const suffix = `; failedLoginCount=${user.failedLoginCount}`;
     console.log(
-      `${issues.length === 0 ? 'OK' : 'ERROR'} ${email}${suffix}${issues.length ? `; ${issues.join('; ')}` : ''}`,
+      `${issues.length === 0 ? 'OK' : 'ERROR'} ${user.email}${suffix}${issues.length ? `; ${issues.join('; ')}` : ''}`,
     );
   }
 

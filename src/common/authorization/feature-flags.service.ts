@@ -12,7 +12,7 @@ export class FeatureFlagsService {
 
   /** Resolution order: per-organization override, else the flag's
    * platform-wide default. Unknown keys resolve to `false` (fail closed) —
-   * callers gating a feature that was never seeded should not silently open
+   * callers gating a feature that was never initialized should not silently open
    * it. */
   async isEnabled(key: string, organizationId: string | null): Promise<boolean> {
     if (organizationId) {

@@ -12,7 +12,7 @@ export interface RequestContext {
 }
 
 /**
- * Runtime editor for the "Role + Permission" matrix (default shape seeded
+ * Runtime editor for the "Role + Permission" matrix (default shape initialized
  * from permissions.catalog.ts — see that file's doc comment for why the
  * *default* matrix is a code change, while individual grants/revokes are a
  * runtime Owner action). Every mutation invalidates PolicyEngineService's

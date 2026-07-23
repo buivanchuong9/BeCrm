@@ -20,7 +20,7 @@ import { FeatureFlagsService } from '../../common/authorization/feature-flags.se
 import { SetFeatureFlagOverrideRequest } from './dto/owner-governance.dto';
 
 /** Owner surface for the "Feature Flag" box of the authorization decision.
- * Global defaults are seeded (see feature-flags.catalog.ts); an Owner only
+ * Global defaults are initialized (see feature-flags.catalog.ts); an Owner only
  * ever edits per-organization overrides here, never the platform default. */
 @ApiTags('owner-feature-flags')
 @Controller({ path: 'owner/feature-flags', version: '1' })
