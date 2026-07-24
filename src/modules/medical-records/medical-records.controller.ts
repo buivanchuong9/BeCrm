@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Req } from '@nestjs/common';
 import { Request } from 'express';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsArray,
   IsInt,
@@ -8,9 +8,12 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Length,
   Min,
   ValidateNested,
 } from 'class-validator';
+
+const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
 import { CurrentUser } from '../../core/security/current-user.decorator';
 import { AuthenticatedPrincipal } from '../../core/security/auth.types';
 import { RequireIdempotencyKey } from '../../core/idempotency/idempotency-key.decorator';
@@ -47,13 +50,13 @@ class DocumentDto {
   @IsOptional() @IsUUID() clinicalOrderId?: string;
 }
 class ReasonDto {
-  @IsString() reason!: string;
+  @Transform(trim) @IsString() @Length(3, 1000) reason!: string;
 }
 class TextDto {
-  @IsString() text!: string;
+  @Transform(trim) @IsString() @Length(1, 5000) text!: string;
 }
 class LateResultDto {
-  @IsString() description!: string;
+  @Transform(trim) @IsString() @Length(3, 2000) description!: string;
 }
 
 @Controller({ path: 'encounters', version: '1' })

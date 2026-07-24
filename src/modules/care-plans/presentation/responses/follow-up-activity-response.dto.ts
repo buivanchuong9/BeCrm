@@ -6,7 +6,7 @@ export class FollowUpActivityResponseDto {
   @ApiProperty() type!: string;
   @ApiProperty() title!: string;
   @ApiProperty() description!: string;
-  @ApiProperty({ format: 'date-time' }) dueDate!: string;
+  @ApiProperty({ format: 'date' }) dueDate!: string;
   @ApiProperty() priority!: string;
   @ApiProperty() status!: string;
   @ApiProperty({ nullable: true }) automationMode!: string | null;

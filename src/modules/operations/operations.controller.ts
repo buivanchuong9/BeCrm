@@ -11,14 +11,22 @@ import {
   Res,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+import { Type } from 'class-transformer';
 import {
+  ArrayMinSize,
+  IsArray,
   IsDateString,
   IsIn,
+  IsInt,
   IsObject,
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
+  Max,
   MaxLength,
+  Min,
+  ValidateNested,
 } from 'class-validator';
 import { AuthenticatedPrincipal } from '../../core/security/auth.types';
 import { CurrentUser } from '../../core/security/current-user.decorator';
@@ -65,9 +73,17 @@ class DecisionRequest {
   @IsOptional() @IsString() department?: string;
 }
 class ClientEventRequest {
-  @IsOptional() @IsString() action?: string;
-  @IsString() message!: string;
-  @IsOptional() @IsString() stack?: string;
+  @IsString() action!: string;
+  @IsOptional() @IsString() entityType?: string;
+  @IsOptional() @IsUUID() entityId?: string;
+  @IsOptional() @IsUUID() patientId?: string;
+  @IsOptional() @IsUUID() encounterId?: string;
+  @IsOptional() @IsObject() previousState?: Record<string, unknown> | null;
+  @IsOptional() @IsObject() newState?: Record<string, unknown> | null;
+  @IsString() reason!: string;
+  @IsOptional() @IsString() sourceModule?: string;
+  @IsIn(['info', 'warning', 'critical']) severity!: 'info' | 'warning' | 'critical';
+  @IsOptional() @IsDateString() occurredAt?: string;
 }
 class PresignRequest {
   @IsString() fileName!: string;
@@ -81,10 +97,27 @@ class SupportRequest {
   @IsString() topic!: string;
   @IsString() @MaxLength(4000) message!: string;
 }
+class MedicationScheduleDto {
+  @IsString() timezone!: string;
+  @IsDateString() startDate!: string;
+  @IsOptional() @IsDateString() endDate?: string;
+  @IsArray()
+  @ArrayMinSize(1)
+  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, { each: true })
+  times!: string[];
+  @IsOptional()
+  @IsArray()
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  @Max(7, { each: true })
+  daysOfWeek?: number[];
+}
 class ReminderRequest {
   @IsOptional() @IsUUID() prescriptionId?: string;
   @IsString() medicationName!: string;
-  @IsObject() schedule!: object;
+  @ValidateNested()
+  @Type(() => MedicationScheduleDto)
+  schedule!: MedicationScheduleDto;
 }
 class PhotoRequest {
   @IsUUID() fileId!: string;
@@ -101,7 +134,9 @@ class RefillRequest {
 @Controller({ path: 'patients', version: '1' })
 export class PatientOperationsController {
   constructor(private readonly service: OperationsService) {}
-  @Post(':patientId/alerts') createAlert(
+  @RequireIdempotencyKey({ clinical: true })
+  @Post(':patientId/alerts')
+  createAlert(
     @CurrentUser() p: AuthenticatedPrincipal,
     @Param('patientId', ParseUUIDPipe) id: string,
     @Body() d: AlertRequest,
@@ -218,7 +253,9 @@ export class EncounterRequestsController {
   @Get() list(@CurrentUser() p: AuthenticatedPrincipal, @Query('status') status?: string) {
     return this.service.encounterRequests(p, status);
   }
-  @Post(':requestId/decide') decide(
+  @RequireIdempotencyKey({ clinical: true })
+  @Post(':requestId/decide')
+  decide(
     @CurrentUser() p: AuthenticatedPrincipal,
     @Param('requestId', ParseUUIDPipe) id: string,
     @Body() d: DecisionRequest,

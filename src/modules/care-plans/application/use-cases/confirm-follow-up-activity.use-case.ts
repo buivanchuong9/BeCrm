@@ -12,8 +12,11 @@ import { toFollowUpActivityResponse } from '../mappers/follow-up-activity.mapper
 
 type RequestContext = { requestId?: string; ip?: string; userAgent?: string };
 
-/** `POST /activities/{activityId}/confirm`. Role gate preserved verbatim
- * (patient only, plus the implicit super_administrator bypass). */
+/** `POST /follow-up-activities/{activityId}/confirmations` (contract section
+ * 3.4). Role gate preserved verbatim (patient only, plus the implicit
+ * super_administrator bypass). Already-completed activities return 200 with
+ * the current entity rather than conflicting, since a retry (e.g. without a
+ * matching Idempotency-Key) must stay safe to repeat. */
 @Injectable()
 export class ConfirmFollowUpActivityUseCase {
   constructor(
@@ -28,6 +31,9 @@ export class ConfirmFollowUpActivityUseCase {
     if (!activity) throw new NotFoundAppError('Activity not found.');
     const plan = await this.access.resolveCarePlan(principal, activity.carePlanId);
 
+    if (activity.status === 'completed') {
+      return { data: toFollowUpActivityResponse(activity) };
+    }
     assertConfirmable(activity.status);
     const updated = await this.carePlans.updateActivityStatus(
       activityId,

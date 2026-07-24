@@ -6,6 +6,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import {
   ActivitiesController,
   CarePlansController,
+  FollowUpActivityConfirmationsController,
   PatientCarePlanController,
 } from './presentation/controllers/care-plans.controller';
 import { CarePlansRepository } from './infrastructure/repositories/care-plans.repository';
@@ -19,7 +20,12 @@ import { RunCarePlanAutomationUseCase } from './application/use-cases/run-care-p
 
 @Module({
   imports: [AuditModule, PatientsModule, EncountersModule, NotificationsModule],
-  controllers: [PatientCarePlanController, CarePlansController, ActivitiesController],
+  controllers: [
+    PatientCarePlanController,
+    CarePlansController,
+    ActivitiesController,
+    FollowUpActivityConfirmationsController,
+  ],
   providers: [
     CarePlansRepository,
     CarePlanAccessService,

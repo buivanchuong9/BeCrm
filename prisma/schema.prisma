@@ -286,6 +286,7 @@ model AuditEvent {
   resourceType     String   @map("resource_type")
   resourceId       String?  @map("resource_id") @db.Uuid
   patientId        String?  @map("patient_id") @db.Uuid
+  encounterId      String?  @map("encounter_id") @db.Uuid
   organizationId   String?  @map("organization_id") @db.Uuid
   clinicLocationId String?  @map("clinic_location_id") @db.Uuid
   requestId        String?  @map("request_id") @db.Uuid
@@ -293,6 +294,8 @@ model AuditEvent {
   userAgent        String?  @map("user_agent")
   result           String
   reason           String?
+  severity         String?
+  sourceModule     String?  @map("source_module")
   changedFields    Json?    @map("changed_fields")
   beforeRedacted   Json?    @map("before_redacted")
   afterRedacted    Json?    @map("after_redacted")
@@ -301,6 +304,7 @@ model AuditEvent {
 
   @@index([organizationId, occurredAt])
   @@index([patientId, occurredAt])
+  @@index([encounterId, occurredAt])
   @@index([actorId, occurredAt])
   @@index([resourceType, resourceId])
   @@map("audit_events")

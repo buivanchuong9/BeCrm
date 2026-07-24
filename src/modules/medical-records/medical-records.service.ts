@@ -95,6 +95,14 @@ export class MedicalRecordsService {
     };
   }
 
+  private async fullRecord(recordId: string) {
+    const record = await this.prisma.medicalRecord.findUniqueOrThrow({ where: { id: recordId } });
+    const addenda = await this.prisma.medicalRecordAddendum.findMany({
+      where: { recordId },
+      orderBy: { addedAt: 'asc' },
+    });
+    return this.shape(record, addenda);
+  }
   async ensureDraft(p: AuthenticatedPrincipal, encounterId: string) {
     await this.visible(p, encounterId);
     const record = await this.prisma.medicalRecord.upsert({
@@ -267,15 +275,30 @@ export class MedicalRecordsService {
   }
   async completionCheck(p: AuthenticatedPrincipal, recordId: string) {
     const { record } = await this.recordVisible(p, recordId);
-    const missing: string[] = [];
-    if (!record.diagnosisId) missing.push('diagnosis');
-    else if (
+    const missing: Array<{ code: string; message: string }> = [];
+    if (!record.diagnosisId) {
+      missing.push({
+        code: 'DIAGNOSIS_NOT_CONFIRMED',
+        message: 'Chẩn đoán chưa được xác nhận',
+      });
+    } else if (
       !(await this.prisma.doctorDiagnosis.findFirst({
         where: { id: record.diagnosisId, status: { in: ['confirmed', 'revised'] } },
       }))
-    )
-      missing.push('confirmedDiagnosis');
-    return { data: { ok: missing.length === 0, missing } };
+    ) {
+      missing.push({
+        code: 'DIAGNOSIS_NOT_CONFIRMED',
+        message: 'Chẩn đoán chưa được xác nhận',
+      });
+    }
+    return {
+      data: {
+        ok: missing.length === 0,
+        missing,
+        checkedAt: new Date().toISOString(),
+        recordVersion: record.version,
+      },
+    };
   }
   async sign(p: AuthenticatedPrincipal, recordId: string, c: Context) {
     this.requireRole(p, DOCTOR);
@@ -286,7 +309,7 @@ export class MedicalRecordsService {
     if (!check.data.ok)
       throw new ConflictAppError(
         'MEDICAL_RECORD_COMPLETION_REQUIRED',
-        `Missing: ${check.data.missing.join(', ')}`,
+        check.data.missing.map((m) => m.message).join(', '),
       );
     const signed = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.medicalRecord.update({
@@ -319,8 +342,8 @@ export class MedicalRecordsService {
     const { record, encounter: e } = await this.recordVisible(p, recordId);
     if (!['signed', 'amended'].includes(record.status))
       throw new ConflictAppError('INVALID_STATE_TRANSITION', 'Addenda require a signed record.');
-    const added = await this.prisma.$transaction(async (tx) => {
-      const row = await tx.medicalRecordAddendum.create({
+    await this.prisma.$transaction(async (tx) => {
+      await tx.medicalRecordAddendum.create({
         data: { recordId, text, addedBy: p.userId },
       });
       await tx.medicalRecord.update({
@@ -328,23 +351,21 @@ export class MedicalRecordsService {
         data: { status: 'amended', version: { increment: 1 } },
       });
       await this.log(tx, p, e, 'medical_record.addendum_added', recordId, c);
-      return row;
     });
-    return { data: added };
+    return { data: await this.fullRecord(recordId) };
   }
   async reopen(p: AuthenticatedPrincipal, recordId: string, reason: string, c: Context) {
     // No `super_administrator` bypass — same reasoning as DOCTOR above.
     this.requireRole(p, ['medical_administrator']);
     const { record, encounter: e } = await this.recordVisible(p, recordId);
-    const updated = await this.prisma.$transaction(async (tx) => {
-      const row = await tx.medicalRecord.update({
+    await this.prisma.$transaction(async (tx) => {
+      await tx.medicalRecord.update({
         where: { id: record.id },
         data: { status: 'reopened', reopenedReason: reason, version: { increment: 1 } },
       });
       await this.log(tx, p, e, 'medical_record.reopened', recordId, c, reason);
-      return row;
     });
-    return { data: this.shape(updated) };
+    return { data: await this.fullRecord(recordId) };
   }
   async flagLateResult(
     p: AuthenticatedPrincipal,
@@ -370,9 +391,7 @@ export class MedicalRecordsService {
       reason: description,
       requestId: c.requestId ?? null,
     });
-    return {
-      data: { flagged: true, recordUnchanged: ['signed', 'amended'].includes(record.status) },
-    };
+    return { data: await this.fullRecord(recordId) };
   }
   async reviewDocument(p: AuthenticatedPrincipal, id: string, c: Context) {
     this.requireStaffRole(p);

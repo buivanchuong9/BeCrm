@@ -86,28 +86,34 @@ export class OperationsService {
       where: { patientId },
       orderBy: { updatedAt: 'desc' },
     });
-    const row = await this.prisma.clinicalAlert.create({
-      data: {
-        patientId,
-        carePlanId: plan?.id,
-        encounterId: plan?.encounterId,
-        trigger,
-        severity: rule[0],
-        responsibleActor: rule[1],
-        responseDeadlineHours: rule[2],
-        requiresLinkedEncounter: rule[3],
-        note,
-      },
-    });
-    if (rule[3])
-      await this.prisma.encounterCreationRequest.create({
+    const row = await this.prisma.$transaction(async (tx) => {
+      const alert = await tx.clinicalAlert.create({
         data: {
           patientId,
-          sourceAlertId: row.id,
+          carePlanId: plan?.id,
+          encounterId: plan?.encounterId,
+          trigger,
+          severity: rule[0],
+          responsibleActor: rule[1],
+          responseDeadlineHours: rule[2],
+          requiresLinkedEncounter: rule[3],
+          note,
+        },
+      });
+      if (!rule[3]) return alert;
+      await tx.encounterCreationRequest.create({
+        data: {
+          patientId,
+          sourceAlertId: alert.id,
           requestedByRole: p.memberships[0]?.role ?? 'system_administrator',
           reason: `Automatic request for ${trigger}`,
         },
       });
+      return tx.clinicalAlert.update({
+        where: { id: alert.id },
+        data: { status: 'encounter_requested', version: { increment: 1 } },
+      });
+    });
     await this.log(p, 'clinical_alert.created', 'clinical_alert', row.id, c, patientId);
     return { data: row };
   }
@@ -303,20 +309,42 @@ export class OperationsService {
   }
   async clientEvent(
     p: AuthenticatedPrincipal,
-    dto: { action?: string; message: string; stack?: string },
+    dto: {
+      action: string;
+      entityType?: string;
+      entityId?: string;
+      patientId?: string;
+      encounterId?: string;
+      previousState?: Record<string, unknown> | null;
+      newState?: Record<string, unknown> | null;
+      reason: string;
+      sourceModule?: string;
+      severity: 'info' | 'warning' | 'critical';
+      occurredAt?: string;
+    },
     c: RequestContext,
   ) {
-    await this.audit.write({
+    const row = await this.audit.write({
       actorId: p.userId,
-      action: dto.action ?? 'UNHANDLED_CLIENT_ERROR',
-      resourceType: 'client',
-      result: 'error',
-      reason: `${dto.message}${dto.stack ? `\n${dto.stack}` : ''}`.slice(0, 4000),
+      action: dto.action,
+      resourceType: dto.entityType ?? 'client',
+      resourceId: dto.entityId ?? null,
+      patientId: dto.patientId ?? null,
+      encounterId: dto.encounterId ?? null,
+      organizationId: p.memberships[0]?.organizationId ?? null,
+      result: 'success',
+      reason: dto.reason,
+      severity: dto.severity,
+      sourceModule: dto.sourceModule ?? null,
+      occurredAt: dto.occurredAt ? new Date(dto.occurredAt) : null,
+      beforeRedacted: (dto.previousState as Prisma.InputJsonValue) ?? null,
+      afterRedacted: (dto.newState as Prisma.InputJsonValue) ?? null,
+      breakGlass: dto.action.toUpperCase().startsWith('BREAK_GLASS'),
       requestId: c.requestId ?? null,
       ip: c.ip ?? null,
       userAgent: c.userAgent ?? null,
     });
-    return { data: { accepted: true } };
+    return { data: row };
   }
 
   connections(p: AuthenticatedPrincipal) {
@@ -546,7 +574,7 @@ export class OperationsService {
     const existing = await this.prisma.prescriptionRefillRequest.findFirst({
       where: { prescriptionId, patientId: encounter.patientId, status: 'requested' },
     });
-    if (existing) return { data: existing };
+    if (existing) return { data: { ...existing, decidedBy: null, decidedAt: null } };
     const row = await this.prisma.prescriptionRefillRequest.create({
       data: { prescriptionId, patientId: encounter.patientId, requestedBy: p.userId, reason },
     });
@@ -558,7 +586,7 @@ export class OperationsService {
       c,
       encounter.patientId,
     );
-    return { data: row };
+    return { data: { ...row, decidedBy: null, decidedAt: null } };
   }
   async addProgressPhoto(
     p: AuthenticatedPrincipal,
@@ -579,7 +607,7 @@ export class OperationsService {
       data: { patientId, fileId: dto.fileId, takenAt: new Date(dto.takenAt), note: dto.note },
     });
     await this.log(p, 'progress_photo.created', 'progress_photo', row.id, c, patientId);
-    return { data: row };
+    return { data: { ...row, fileName: upload.fileName, status: 'uploaded' as const } };
   }
   async healthSummary(p: AuthenticatedPrincipal, patientId: string) {
     await this.patient(p, patientId);

@@ -60,10 +60,30 @@ export class CarePlansRepository {
     });
   }
 
-  markActivitiesAutomated(ids: string[]) {
-    return this.prisma.followUpActivity.updateMany({
-      where: { id: { in: ids } },
-      data: { lastAutomatedAt: new Date(), automationRunCount: { increment: 1 } },
-    });
+  /** Applies the automation run's status transition (due -> completed,
+   * scheduled unchanged) plus automation bookkeeping, then returns the
+   * updated rows for the response payload. */
+  async applyAutomationRun(dueIds: string[], scheduledIds: string[]) {
+    const now = new Date();
+    if (dueIds.length) {
+      await this.prisma.followUpActivity.updateMany({
+        where: { id: { in: dueIds } },
+        data: {
+          status: 'completed',
+          lastAutomatedAt: now,
+          automationRunCount: { increment: 1 },
+          version: { increment: 1 },
+        },
+      });
+    }
+    if (scheduledIds.length) {
+      await this.prisma.followUpActivity.updateMany({
+        where: { id: { in: scheduledIds } },
+        data: { lastAutomatedAt: now, automationRunCount: { increment: 1 } },
+      });
+    }
+    const ids = [...dueIds, ...scheduledIds];
+    if (!ids.length) return [];
+    return this.prisma.followUpActivity.findMany({ where: { id: { in: ids } } });
   }
 }

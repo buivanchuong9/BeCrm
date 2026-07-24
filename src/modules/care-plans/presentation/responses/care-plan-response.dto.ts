@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { FollowUpActivityResponseDto } from './follow-up-activity-response.dto';
 
 export class CarePlanResponseDto {
   @ApiProperty({ format: 'uuid' }) id!: string;
@@ -12,4 +13,7 @@ export class CarePlanResponseDto {
 export class RunCarePlanAutomationResultDto {
   @ApiProperty() processed!: number;
   @ApiProperty() notifications!: number;
+  @ApiProperty({ format: 'date-time' }) runAt!: string;
+  @ApiProperty({ type: () => [FollowUpActivityResponseDto] })
+  activities!: FollowUpActivityResponseDto[];
 }

@@ -1,8 +1,8 @@
 import { ConflictAppError } from '../../../../core/errors/app-error';
 
 /** Activity types eligible for automated reminder generation
- * (`POST /care-plans/{id}/run-automation`) — verbatim from the pre-extraction
- * operations.service.ts constant. */
+ * (`POST /patients/{id}/care-automation-runs`) — verbatim from the
+ * pre-extraction operations.service.ts constant. */
 export const AUTOMATED_ACTIVITY_TYPES = new Set([
   'medication_reminder',
   'lifestyle_guidance',
@@ -29,8 +29,8 @@ export function assertAdvanceTransitionAllowed(fromStatus: string, toStatus: str
   }
 }
 
-/** `POST /activities/{id}/confirm` eligibility — only a scheduled or due
- * activity may be confirmed by the patient. */
+/** `POST /follow-up-activities/{id}/confirmations` eligibility — only a
+ * scheduled or due activity may be confirmed by the patient. */
 export function assertConfirmable(status: string): void {
   if (!['scheduled', 'due'].includes(status)) {
     throw new ConflictAppError(

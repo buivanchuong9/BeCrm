@@ -10,7 +10,7 @@ export function toFollowUpActivityResponse(
     type: activity.type,
     title: activity.title,
     description: activity.description,
-    dueDate: activity.dueDate.toISOString(),
+    dueDate: activity.dueDate.toISOString().slice(0, 10),
     priority: activity.priority,
     status: activity.status,
     automationMode: activity.automationMode,

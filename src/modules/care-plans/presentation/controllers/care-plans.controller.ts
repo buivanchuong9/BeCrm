@@ -3,6 +3,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { CurrentUser } from '../../../../core/security/current-user.decorator';
 import { AuthenticatedPrincipal } from '../../../../core/security/auth.types';
+import { RequireIdempotencyKey } from '../../../../core/idempotency/idempotency-key.decorator';
 import {
   ApiCreatedEnvelope,
   ApiOkEnvelope,
@@ -37,7 +38,10 @@ const requestContext = (req: Request) => ({
 @ApiTags('care-plans')
 @Controller({ path: 'patients', version: '1' })
 export class PatientCarePlanController {
-  constructor(private readonly getOrCreateCarePlan: GetOrCreateCarePlanUseCase) {}
+  constructor(
+    private readonly getOrCreateCarePlan: GetOrCreateCarePlanUseCase,
+    private readonly runAutomation: RunCarePlanAutomationUseCase,
+  ) {}
 
   @ApiOkEnvelope(CarePlanResponseDto)
   @Get(':patientId/care-plan')
@@ -47,6 +51,17 @@ export class PatientCarePlanController {
   ) {
     return this.getOrCreateCarePlan.execute(principal, patientId);
   }
+
+  @RequireIdempotencyKey()
+  @ApiCreatedEnvelope(RunCarePlanAutomationResultDto)
+  @Post(':patientId/care-automation-runs')
+  automation(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Param('patientId', ParseUUIDPipe) patientId: string,
+    @Req() req: Request,
+  ) {
+    return this.runAutomation.execute(principal, patientId, requestContext(req));
+  }
 }
 
 @ApiTags('care-plans')
@@ -55,7 +70,6 @@ export class CarePlansController {
   constructor(
     private readonly listActivities: ListFollowUpActivitiesUseCase,
     private readonly createActivity: CreateFollowUpActivityUseCase,
-    private readonly runAutomation: RunCarePlanAutomationUseCase,
   ) {}
 
   @ApiOkListEnvelope(FollowUpActivityResponseDto)
@@ -77,25 +91,12 @@ export class CarePlansController {
   ) {
     return this.createActivity.execute(principal, carePlanId, dto, requestContext(req));
   }
-
-  @ApiCreatedEnvelope(RunCarePlanAutomationResultDto)
-  @Post(':carePlanId/run-automation')
-  automation(
-    @CurrentUser() principal: AuthenticatedPrincipal,
-    @Param('carePlanId', ParseUUIDPipe) carePlanId: string,
-    @Req() req: Request,
-  ) {
-    return this.runAutomation.execute(principal, carePlanId, requestContext(req));
-  }
 }
 
 @ApiTags('care-plans')
 @Controller({ path: 'activities', version: '1' })
 export class ActivitiesController {
-  constructor(
-    private readonly advanceActivity: AdvanceFollowUpActivityUseCase,
-    private readonly confirmActivity: ConfirmFollowUpActivityUseCase,
-  ) {}
+  constructor(private readonly advanceActivity: AdvanceFollowUpActivityUseCase) {}
 
   @ApiCreatedEnvelope(FollowUpActivityResponseDto)
   @Post(':activityId/advance')
@@ -107,9 +108,16 @@ export class ActivitiesController {
   ) {
     return this.advanceActivity.execute(principal, activityId, dto.toStatus, requestContext(req));
   }
+}
 
+@ApiTags('care-plans')
+@Controller({ path: 'follow-up-activities', version: '1' })
+export class FollowUpActivityConfirmationsController {
+  constructor(private readonly confirmActivity: ConfirmFollowUpActivityUseCase) {}
+
+  @RequireIdempotencyKey()
   @ApiCreatedEnvelope(FollowUpActivityResponseDto)
-  @Post(':activityId/confirm')
+  @Post(':activityId/confirmations')
   confirm(
     @CurrentUser() principal: AuthenticatedPrincipal,
     @Param('activityId', ParseUUIDPipe) activityId: string,

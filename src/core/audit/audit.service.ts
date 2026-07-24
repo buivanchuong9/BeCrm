@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { AuditEvent, Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 
 export interface AuditWriteInput {
@@ -10,6 +10,7 @@ export interface AuditWriteInput {
   resourceType: string;
   resourceId?: string | null;
   patientId?: string | null;
+  encounterId?: string | null;
   organizationId?: string | null;
   clinicLocationId?: string | null;
   requestId?: string | null;
@@ -17,6 +18,11 @@ export interface AuditWriteInput {
   userAgent?: string | null;
   result: 'success' | 'denied' | 'error';
   reason?: string | null;
+  severity?: 'info' | 'warning' | 'critical' | null;
+  sourceModule?: string | null;
+  /** Client-reported event time (e.g. a client-events submission that lagged
+   * behind the actual UI action). Defaults to the DB's `now()` when omitted. */
+  occurredAt?: Date | null;
   changedFields?: string[] | null;
   beforeRedacted?: Prisma.InputJsonValue | null;
   afterRedacted?: Prisma.InputJsonValue | null;
@@ -32,6 +38,10 @@ export interface AuditWriteInput {
  * quiet. */
 const NEVER_SUPPRESSED_PREFIXES = [
   'break_glass.',
+  // Client-reported events (POST /audit/client-events) use an uppercase,
+  // dot-free action naming convention (e.g. BREAK_GLASS_ACCESS_GRANTED) —
+  // covered separately from the internal 'break_glass.' actions above.
+  'BREAK_GLASS_',
   'dangerous_action.',
   'auth.mfa_',
   'feature_flag.',
@@ -67,12 +77,12 @@ export class AuditService {
     return !!this.suspensionCache.until && this.suspensionCache.until.getTime() > now;
   }
 
-  async write(input: AuditWriteInput, tx?: Prisma.TransactionClient): Promise<void> {
+  async write(input: AuditWriteInput, tx?: Prisma.TransactionClient): Promise<AuditEvent | null> {
     if (!this.isNeverSuppressed(input.action) && (await this.isSuspended())) {
-      return;
+      return null;
     }
     const client = tx ?? this.prisma;
-    await client.auditEvent.create({
+    return client.auditEvent.create({
       data: {
         actorId: input.actorId,
         actorRoleSnap: input.actorRoleSnapshot ?? null,
@@ -81,6 +91,7 @@ export class AuditService {
         resourceType: input.resourceType,
         resourceId: input.resourceId ?? null,
         patientId: input.patientId ?? null,
+        encounterId: input.encounterId ?? null,
         organizationId: input.organizationId ?? null,
         clinicLocationId: input.clinicLocationId ?? null,
         requestId: input.requestId ?? null,
@@ -88,6 +99,9 @@ export class AuditService {
         userAgent: input.userAgent ?? null,
         result: input.result,
         reason: input.reason ?? null,
+        severity: input.severity ?? null,
+        sourceModule: input.sourceModule ?? null,
+        ...(input.occurredAt ? { occurredAt: input.occurredAt } : {}),
         changedFields: input.changedFields ?? Prisma.JsonNull,
         beforeRedacted: input.beforeRedacted ?? Prisma.JsonNull,
         afterRedacted: input.afterRedacted ?? Prisma.JsonNull,
