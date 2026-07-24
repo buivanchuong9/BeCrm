@@ -17,6 +17,7 @@ import { PasswordResetService } from './password-reset.service';
 import { AuditModule } from '../../core/audit/audit.module';
 import { MfaService } from './mfa/mfa.service';
 import { StaffInvitationsService } from './staff-invitations.service';
+import { UserMembershipsService } from './user-memberships.service';
 
 @Module({
   imports: [PassportModule, JwtModule.register({}), PatientsModule, AuditModule],
@@ -33,6 +34,7 @@ import { StaffInvitationsService } from './staff-invitations.service';
     JwtStrategy,
     MfaService,
     StaffInvitationsService,
+    UserMembershipsService,
   ],
   exports: [UsersRepository, MfaService, StaffInvitationsService],
 })

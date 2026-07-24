@@ -8,6 +8,7 @@ import {
   Param,
   ParseUUIDPipe,
   Patch,
+  Post,
   Put,
   Query,
   Req,
@@ -33,6 +34,8 @@ import { UpdateCurrentUserRequest } from './dto/update-current-user.dto';
 import { UpsertUserPreferenceRequest } from './dto/upsert-preferences.dto';
 import { UserPreferencesRepository } from './user-preferences.repository';
 import { StaffInvitationsService } from './staff-invitations.service';
+import { AssignUserRoleRequest } from './dto/assign-user-role.dto';
+import { UserMembershipsService } from './user-memberships.service';
 
 class ListUsersQuery {
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) page = 1;
@@ -57,6 +60,7 @@ export class UsersController {
     private readonly users: UsersRepository,
     private readonly preferences: UserPreferencesRepository,
     private readonly invitations: StaffInvitationsService,
+    private readonly memberships: UserMembershipsService,
   ) {}
 
   @ApiOkListEnvelope(UserResponseDto)
@@ -75,6 +79,22 @@ export class UsersController {
     }
     const rows = await this.invitations.listPending(organizationId);
     return { data: rows };
+  }
+
+  @RequirePermission(PERMISSIONS.USER_ROLE_ASSIGN)
+  @Post(':userId/memberships')
+  async assignRole(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @Body() dto: AssignUserRoleRequest,
+    @Req() req: Request,
+  ) {
+    const membership = await this.memberships.assign(principal, userId, dto, {
+      requestId: req.requestId,
+      ip: req.ip,
+      userAgent: req.header('user-agent'),
+    });
+    return { data: membership };
   }
 
   @HttpCode(HttpStatus.NO_CONTENT)
