@@ -21,6 +21,10 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/prisma ./prisma
 COPY --from=build /app/scripts ./scripts
+# prisma/seed is excluded from the Nest build (tsconfig.build.json) and runs
+# via ts-node against the TS sources directly, so `npm run db:seed` needs
+# src/ present at runtime too, not just dist/.
+COPY --from=build /app/src ./src
 COPY --from=build /app/tsconfig.json ./tsconfig.json
 COPY package.json ./
 EXPOSE 3000
