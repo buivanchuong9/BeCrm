@@ -40,7 +40,7 @@ const STATUS_VALUES = [
 ] as const;
 
 class ListQueueTicketsQuery {
-  @IsUUID() clinicLocationId!: string;
+  @IsOptional() @IsUUID() clinicLocationId?: string;
   @IsOptional() @IsString() department?: string;
   @IsOptional() @IsIn(STATUS_VALUES) status?: QueueTicketStatus;
   @IsOptional() @IsString() serviceStation?: string;

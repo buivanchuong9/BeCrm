@@ -54,12 +54,15 @@ export class QueueTicketsService {
   async list(
     principal: AuthenticatedPrincipal,
     query: {
-      clinicLocationId: string;
+      clinicLocationId?: string;
       department?: string;
       status?: QueueTicketStatus;
       serviceStation?: string;
     },
   ) {
+    if (!query.clinicLocationId) {
+      return { data: [], meta: {} };
+    }
     const clinicLocation = await this.prisma.clinicLocation.findUnique({
       where: { id: query.clinicLocationId },
     });

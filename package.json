@@ -22,6 +22,7 @@
     "db:migrate": "prisma migrate deploy",
     "db:migrate:dev": "prisma migrate dev",
     "db:seed": "ts-node -r tsconfig-paths/register prisma/seed/index.ts",
+    "db:seed:demo": "ts-node -r tsconfig-paths/register scripts/seed-demo-doctors.ts && ts-node -r tsconfig-paths/register scripts/seed-demo-clinical-data.ts",
     "admin:bootstrap-owners": "ts-node -r tsconfig-paths/register scripts/bootstrap-super-admins.ts",
     "admin:check-owners": "ts-node -r tsconfig-paths/register scripts/check-super-admins.ts",
     "admin:set-password": "ts-node -r tsconfig-paths/register scripts/set-super-admin-password.ts",

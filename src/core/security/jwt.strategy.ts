@@ -12,6 +12,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
         (req: Request) => ExtractJwt.fromAuthHeaderAsBearerToken()(req),
+        (req: Request) => {
+          if (req.query && typeof req.query.token === 'string') {
+            return req.query.token;
+          }
+          return null;
+        },
       ]),
       ignoreExpiration: false,
       algorithms: ['RS256'],
