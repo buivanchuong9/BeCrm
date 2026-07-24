@@ -1267,6 +1267,35 @@ model ClinicalDocument {
   @@map("clinical_documents")
 }
 
+enum MedicalRecordBreakGlassStatus {
+  active
+  ended
+  expired
+}
+
+// Emergency, time-limited, MFA-gated read access to ONE encounter's medical
+// record for a clinical staff member who does not otherwise have standing
+// visibility into it (e.g. covering an ER shift). Distinct from
+// BreakGlassGrant, which is the platform Owner's patient-wide governance
+// escape hatch — this grant is scoped to a single encounter/medical record
+// and carries a shorter TTL. `GET /encounters/{id}/medical-record` checks
+// for an active, unexpired grant when the caller lacks normal visibility.
+model MedicalRecordBreakGlassGrant {
+  id              String                        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  encounterId     String                        @map("encounter_id") @db.Uuid
+  medicalRecordId String                        @map("medical_record_id") @db.Uuid
+  patientId       String                        @map("patient_id") @db.Uuid
+  grantedToUserId String                        @map("granted_to_user_id") @db.Uuid
+  reason          String
+  status          MedicalRecordBreakGlassStatus @default(active)
+  grantedAt       DateTime                      @default(now()) @map("granted_at") @db.Timestamptz
+  expiresAt       DateTime                      @map("expires_at") @db.Timestamptz
+  endedAt         DateTime?                     @map("ended_at") @db.Timestamptz
+
+  @@index([grantedToUserId, encounterId, status])
+  @@map("medical_record_break_glass_grants")
+}
+
 model CrmCarePlan {
   id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   patientId   String   @map("patient_id") @db.Uuid

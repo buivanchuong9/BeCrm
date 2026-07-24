@@ -1,4 +1,5 @@
-import { ConflictAppError } from '../../../../core/errors/app-error';
+import { AppError, ConflictAppError } from '../../../../core/errors/app-error';
+import { HttpStatus } from '@nestjs/common';
 
 /** Activity types eligible for automated reminder generation
  * (`POST /patients/{id}/care-automation-runs`) — verbatim from the
@@ -49,4 +50,27 @@ export function confirmVersionIncrement(fromStatus: string): number {
 
 export function isAutomationEligible(activityType: string): boolean {
   return AUTOMATED_ACTIVITY_TYPES.has(activityType);
+}
+
+/** `POST /follow-up-activities/{id}/transitions` — the Kanban board's
+ * explicit column-to-column state machine (contract section 2.2). Distinct
+ * from ADVANCE_TRANSITIONS above: this one lets `due` return to `scheduled`
+ * and `scheduled` jump straight to `completed`, since the UI lets a card be
+ * dropped on any column directly. `completed`/`cancelled` are terminal. */
+const KANBAN_TRANSITIONS: Record<string, string[]> = {
+  scheduled: ['due', 'completed', 'cancelled'],
+  due: ['scheduled', 'completed', 'escalated', 'cancelled'],
+  escalated: ['due', 'completed', 'cancelled'],
+  completed: [],
+  cancelled: [],
+};
+
+export function assertKanbanTransitionAllowed(fromStatus: string, toStatus: string): void {
+  if (!KANBAN_TRANSITIONS[fromStatus]?.includes(toStatus)) {
+    throw new AppError(
+      'INVALID_ACTIVITY_TRANSITION',
+      `${fromStatus} cannot transition to ${toStatus}.`,
+      HttpStatus.UNPROCESSABLE_ENTITY,
+    );
+  }
 }

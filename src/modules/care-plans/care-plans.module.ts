@@ -7,6 +7,7 @@ import {
   ActivitiesController,
   CarePlansController,
   FollowUpActivityConfirmationsController,
+  FollowUpActivityTransitionsController,
   PatientCarePlanController,
 } from './presentation/controllers/care-plans.controller';
 import { CarePlansRepository } from './infrastructure/repositories/care-plans.repository';
@@ -16,6 +17,7 @@ import { ListFollowUpActivitiesUseCase } from './application/use-cases/list-foll
 import { CreateFollowUpActivityUseCase } from './application/use-cases/create-follow-up-activity.use-case';
 import { AdvanceFollowUpActivityUseCase } from './application/use-cases/advance-follow-up-activity.use-case';
 import { ConfirmFollowUpActivityUseCase } from './application/use-cases/confirm-follow-up-activity.use-case';
+import { TransitionFollowUpActivityUseCase } from './application/use-cases/transition-follow-up-activity.use-case';
 import { RunCarePlanAutomationUseCase } from './application/use-cases/run-care-plan-automation.use-case';
 
 @Module({
@@ -25,6 +27,7 @@ import { RunCarePlanAutomationUseCase } from './application/use-cases/run-care-p
     CarePlansController,
     ActivitiesController,
     FollowUpActivityConfirmationsController,
+    FollowUpActivityTransitionsController,
   ],
   providers: [
     CarePlansRepository,
@@ -34,6 +37,7 @@ import { RunCarePlanAutomationUseCase } from './application/use-cases/run-care-p
     CreateFollowUpActivityUseCase,
     AdvanceFollowUpActivityUseCase,
     ConfirmFollowUpActivityUseCase,
+    TransitionFollowUpActivityUseCase,
     RunCarePlanAutomationUseCase,
   ],
 })

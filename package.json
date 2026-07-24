@@ -1,6 +1,6 @@
 {
   "name": "dermahealth-backend",
-  "version": "2.5.1",
+  "version": "2.6.0",
   "description": "DermaHealth clinic workflow backend (NestJS modular monolith)",
   "private": true,
   "license": "UNLICENSED",

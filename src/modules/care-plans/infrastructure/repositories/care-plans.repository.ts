@@ -54,6 +54,17 @@ export class CarePlansRepository {
     });
   }
 
+  /** Optimistic-concurrency transition for `POST
+   * /follow-up-activities/{id}/transitions`: the `version`+`status` guard in
+   * `where` means the update only lands if nobody else moved the card first;
+   * `count === 0` tells the caller to raise 409 CONCURRENCY_CONFLICT. */
+  transitionActivityStatus(id: string, fromStatus: string, toStatus: string, version: number) {
+    return this.prisma.followUpActivity.updateMany({
+      where: { id, status: fromStatus, version },
+      data: { status: toStatus, version: { increment: 1 } },
+    });
+  }
+
   findAutomationCandidates(carePlanId: string) {
     return this.prisma.followUpActivity.findMany({
       where: { carePlanId, status: { in: ['scheduled', 'due'] } },

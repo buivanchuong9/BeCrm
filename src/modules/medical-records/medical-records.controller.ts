@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Req } from '@nestjs/common';
+import { ApiOperation } from '@nestjs/swagger';
 import { Request } from 'express';
 import { Transform, Type } from 'class-transformer';
 import {
@@ -18,6 +19,7 @@ import { CurrentUser } from '../../core/security/current-user.decorator';
 import { AuthenticatedPrincipal } from '../../core/security/auth.types';
 import { RequireIdempotencyKey } from '../../core/idempotency/idempotency-key.decorator';
 import { MedicalRecordsService } from './medical-records.service';
+import { MedicalRecordBreakGlassService } from './medical-record-break-glass.service';
 
 function ctx(req: Request) {
   return { requestId: req.requestId, ip: req.ip, userAgent: req.header('user-agent') };
@@ -44,7 +46,7 @@ class DischargeDto {
   @IsInt() @Min(1) version!: number;
 }
 class DocumentDto {
-  @IsString() type!: string;
+  @Transform(trim) @IsString() @Length(1, 100) type!: string;
   @IsUUID() fileId!: string;
   @IsOptional() @IsUUID() workflowTaskId?: string;
   @IsOptional() @IsUUID() clinicalOrderId?: string;
@@ -58,15 +60,36 @@ class TextDto {
 class LateResultDto {
   @Transform(trim) @IsString() @Length(3, 2000) description!: string;
 }
+class CreateMedicalRecordBreakGlassGrantDto {
+  @Transform(trim) @IsString() @Length(10, 1000) reason!: string;
+  @IsString() @Length(6, 12) mfaCode!: string;
+}
 
 @Controller({ path: 'encounters', version: '1' })
 export class MedicalRecordsController {
-  constructor(private readonly service: MedicalRecordsService) {}
+  constructor(
+    private readonly service: MedicalRecordsService,
+    private readonly breakGlass: MedicalRecordBreakGlassService,
+  ) {}
   @Get(':encounterId/medical-record') get(
     @CurrentUser() p: AuthenticatedPrincipal,
     @Param('encounterId', ParseUUIDPipe) id: string,
+    @Req() r: Request,
   ) {
-    return this.service.ensureDraft(p, id);
+    return this.service.ensureDraft(p, id, ctx(r));
+  }
+  @ApiOperation({
+    summary: '🆕 Mới trong v2.6 — Yêu cầu quyền truy cập khẩn cấp (break-glass) vào hồ sơ',
+  })
+  @RequireIdempotencyKey()
+  @Post(':encounterId/medical-record/break-glass-grants')
+  requestBreakGlass(
+    @CurrentUser() p: AuthenticatedPrincipal,
+    @Param('encounterId', ParseUUIDPipe) id: string,
+    @Body() d: CreateMedicalRecordBreakGlassGrantDto,
+    @Req() r: Request,
+  ) {
+    return this.breakGlass.create(p, id, d, ctx(r));
   }
   @RequireIdempotencyKey()
   @Post(':encounterId/prescriptions')
@@ -157,6 +180,21 @@ export class RecordActionsController {
     @Req() r: Request,
   ) {
     return this.service.flagLateResult(p, id, d.description, ctx(r));
+  }
+}
+
+@Controller({ path: 'medical-record/break-glass-grants', version: '1' })
+export class MedicalRecordBreakGlassController {
+  constructor(private readonly breakGlass: MedicalRecordBreakGlassService) {}
+  @ApiOperation({ summary: '🆕 Mới trong v2.6 — Kết thúc quyền truy cập khẩn cấp (break-glass)' })
+  @RequireIdempotencyKey()
+  @Post(':grantId/end')
+  end(
+    @CurrentUser() p: AuthenticatedPrincipal,
+    @Param('grantId', ParseUUIDPipe) grantId: string,
+    @Req() r: Request,
+  ) {
+    return this.breakGlass.end(p, grantId, ctx(r));
   }
 }
 

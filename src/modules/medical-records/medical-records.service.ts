@@ -6,6 +6,7 @@ import { OutboxService } from '../../core/outbox/outbox.service';
 import { AuthenticatedPrincipal } from '../../core/security/auth.types';
 import { ConflictAppError, ForbiddenAppError, NotFoundAppError } from '../../core/errors/app-error';
 import { EncountersRepository } from '../encounters/encounters.repository';
+import { MedicalRecordBreakGlassService } from './medical-record-break-glass.service';
 
 type Context = { requestId?: string; ip?: string; userAgent?: string };
 // No `super_administrator` bypass: prescribing, diagnosing, signing, and
@@ -22,6 +23,7 @@ export class MedicalRecordsService {
     private readonly encounters: EncountersRepository,
     private readonly audit: AuditService,
     private readonly outbox: OutboxService,
+    private readonly breakGlass: MedicalRecordBreakGlassService,
   ) {}
 
   private hasRole(p: AuthenticatedPrincipal, roles: string[]) {
@@ -103,8 +105,15 @@ export class MedicalRecordsService {
     });
     return this.shape(record, addenda);
   }
-  async ensureDraft(p: AuthenticatedPrincipal, encounterId: string) {
-    await this.visible(p, encounterId);
+  async ensureDraft(p: AuthenticatedPrincipal, encounterId: string, c: Context = {}) {
+    const visible = await this.encounters.findVisibleById(p, encounterId);
+    let grant = null;
+    if (!visible) {
+      const raw = await this.encounters.findById(encounterId);
+      if (!raw) throw new NotFoundAppError('Encounter not found.');
+      grant = await this.breakGlass.findActiveGrant(p.userId, encounterId);
+      if (!grant) throw new NotFoundAppError('Encounter not found.');
+    }
     const record = await this.prisma.medicalRecord.upsert({
       where: { encounterId },
       update: {},
@@ -114,6 +123,9 @@ export class MedicalRecordsService {
       where: { recordId: record.id },
       orderBy: { addedAt: 'asc' },
     });
+    if (grant) {
+      await this.breakGlass.auditGrantedRead(p, grant, c);
+    }
     return { data: this.shape(record, addenda) };
   }
   async prescribe(
@@ -169,11 +181,32 @@ export class MedicalRecordsService {
     c: Context,
   ) {
     const e = await this.visible(p, encounterId);
-    const upload = await this.prisma.uploadObject.findFirst({
-      where: { id: dto.fileId, ownerId: p.userId, status: 'confirmed' },
+    const upload = await this.prisma.uploadObject.findUnique({ where: { id: dto.fileId } });
+    if (!upload) throw new NotFoundAppError('Upload not found.');
+    if (upload.ownerId !== p.userId) {
+      throw new ForbiddenAppError('AUTH_FORBIDDEN', 'Upload belongs to a different user.');
+    }
+    if (upload.status !== 'confirmed' || !upload.fileHash) {
+      throw new ConflictAppError('UPLOAD_NOT_CONFIRMED', 'Upload must be confirmed first.');
+    }
+    const alreadyLinked = await this.prisma.clinicalDocument.findFirst({
+      where: { fileId: dto.fileId },
     });
-    if (!upload?.fileHash)
-      throw new ConflictAppError('VALIDATION_FAILED', 'Upload must be confirmed first.');
+    if (alreadyLinked) {
+      throw new ConflictAppError('CONFLICT', 'This file is already linked to a document.');
+    }
+    if (dto.workflowTaskId) {
+      const task = await this.prisma.workflowTask.findFirst({
+        where: { id: dto.workflowTaskId, encounterId },
+      });
+      if (!task) throw new NotFoundAppError('Workflow task not found for this encounter.');
+    }
+    if (dto.clinicalOrderId) {
+      const order = await this.prisma.clinicalOrder.findFirst({
+        where: { id: dto.clinicalOrderId, encounterId },
+      });
+      if (!order) throw new NotFoundAppError('Clinical order not found for this encounter.');
+    }
     const fileHash = upload.fileHash;
     const doc = await this.prisma.$transaction(async (tx) => {
       const created = await tx.clinicalDocument.create({

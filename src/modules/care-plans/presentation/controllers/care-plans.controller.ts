@@ -1,5 +1,15 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Req } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Req,
+} from '@nestjs/common';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { CurrentUser } from '../../../../core/security/current-user.decorator';
 import { AuthenticatedPrincipal } from '../../../../core/security/auth.types';
@@ -14,9 +24,11 @@ import { ListFollowUpActivitiesUseCase } from '../../application/use-cases/list-
 import { CreateFollowUpActivityUseCase } from '../../application/use-cases/create-follow-up-activity.use-case';
 import { AdvanceFollowUpActivityUseCase } from '../../application/use-cases/advance-follow-up-activity.use-case';
 import { ConfirmFollowUpActivityUseCase } from '../../application/use-cases/confirm-follow-up-activity.use-case';
+import { TransitionFollowUpActivityUseCase } from '../../application/use-cases/transition-follow-up-activity.use-case';
 import { RunCarePlanAutomationUseCase } from '../../application/use-cases/run-care-plan-automation.use-case';
 import { CreateFollowUpActivityRequest } from '../requests/create-follow-up-activity.request';
 import { AdvanceFollowUpActivityRequest } from '../requests/advance-follow-up-activity.request';
+import { TransitionFollowUpActivityRequest } from '../requests/transition-follow-up-activity.request';
 import {
   CarePlanResponseDto,
   RunCarePlanAutomationResultDto,
@@ -124,5 +136,27 @@ export class FollowUpActivityConfirmationsController {
     @Req() req: Request,
   ) {
     return this.confirmActivity.execute(principal, activityId, requestContext(req));
+  }
+}
+
+@ApiTags('care-plans')
+@Controller({ path: 'follow-up-activities', version: '1' })
+export class FollowUpActivityTransitionsController {
+  constructor(private readonly transitionActivity: TransitionFollowUpActivityUseCase) {}
+
+  @ApiOperation({
+    summary: '🆕 Mới trong v2.6 — Chuyển cột Kanban kế hoạch điều trị (state machine tường minh)',
+  })
+  @RequireIdempotencyKey()
+  @HttpCode(HttpStatus.OK)
+  @ApiOkEnvelope(FollowUpActivityResponseDto)
+  @Post(':activityId/transitions')
+  transition(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Param('activityId', ParseUUIDPipe) activityId: string,
+    @Body() dto: TransitionFollowUpActivityRequest,
+    @Req() req: Request,
+  ) {
+    return this.transitionActivity.execute(principal, activityId, dto, requestContext(req));
   }
 }
