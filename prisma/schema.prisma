@@ -1609,6 +1609,13 @@ model StaffInvitation {
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
 
+  // A partial UNIQUE index on (email) WHERE status = 'pending' also exists in
+  // the database — added by migration 20260724110000, not expressible here
+  // because Prisma's schema DSL has no WHERE-clause index syntax. It closes
+  // the check-then-create race in StaffInvitationsService#invite. If
+  // `prisma migrate dev` ever proposes dropping an unrecognized index named
+  // staff_invitations_pending_email_key, that is this constraint — do not
+  // let it be dropped; edit the generated migration instead.
   @@index([email, status])
   @@map("staff_invitations")
 }

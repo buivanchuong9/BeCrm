@@ -76,19 +76,34 @@ export class StaffInvitationsService {
     }
 
     const raw = randomBytes(32).toString('base64url');
-    const invitation = await this.prisma.staffInvitation.create({
-      data: {
-        email,
-        displayName: dto.displayName,
-        role: dto.role,
-        organizationId: dto.organizationId,
-        clinicLocationId: dto.clinicLocationId ?? null,
-        departmentId: dto.departmentId ?? null,
-        invitedBy: principal.userId,
-        tokenHash: this.hash(raw),
-        expiresAt: new Date(Date.now() + INVITATION_TTL_MS),
-      },
-    });
+    // The findFirst above only reduces the odds of a duplicate; it cannot
+    // prevent one, since two concurrent calls can both read "no pending
+    // invitation" before either write commits. The partial unique index on
+    // staff_invitations(email) WHERE status = 'pending' (migration
+    // 20260724110000) is what actually closes the race — this create()
+    // fails with P2002 for the loser of that race, and we surface it as the
+    // same conflict the pre-check above already reports for the common case.
+    let invitation;
+    try {
+      invitation = await this.prisma.staffInvitation.create({
+        data: {
+          email,
+          displayName: dto.displayName,
+          role: dto.role,
+          organizationId: dto.organizationId,
+          clinicLocationId: dto.clinicLocationId ?? null,
+          departmentId: dto.departmentId ?? null,
+          invitedBy: principal.userId,
+          tokenHash: this.hash(raw),
+          expiresAt: new Date(Date.now() + INVITATION_TTL_MS),
+        },
+      });
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        throw new ConflictAppError('CONFLICT', 'An invitation is already pending for this email.');
+      }
+      throw err;
+    }
 
     await this.audit.write({
       actorId: principal.userId,

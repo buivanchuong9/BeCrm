@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { Request, Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { Public } from '../../core/security/public.decorator';
+import { RequireIdempotencyKey } from '../../core/idempotency/idempotency-key.decorator';
 import {
   ForbiddenAppError,
   UnauthorizedAppError,
@@ -92,9 +93,20 @@ export class AuthController {
    * privileged account by simply omitting a header: the branch is decided
    * server-side from a cryptographically verified token, not a client-sent
    * flag.
+   *
+   * `@RequireIdempotencyKey()` covers a retried/double-submitted request that
+   * reuses the same key (network timeout + client retry, or a caller that
+   * deliberately reuses one key per logical submission). It does NOT by
+   * itself stop two genuinely concurrent invites for the same email — a
+   * double-click that generates two different keys looks like two distinct
+   * requests here. That race is closed at the database layer instead: see
+   * the partial unique index on staff_invitations(email) WHERE status =
+   * 'pending' (migration 20260724110000) and the P2002 catch in
+   * StaffInvitationsService#invite.
    */
   @Public()
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @RequireIdempotencyKey()
   @ApiCreatedUnionEnvelope(PatientRegistrationResponseDto, StaffInvitationRegistrationResponseDto)
   @Post('registrations')
   @HttpCode(HttpStatus.CREATED)
