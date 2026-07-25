@@ -5137,6 +5137,184 @@
         "x-success-schema": "generic-fallback"
       }
     },
+    "/api/v1/patients/{patientId}/lifetime-medical-record": {
+      "get": {
+        "operationId": "LifetimeMedicalRecordController_get_v1",
+        "parameters": [
+          {
+            "name": "patientId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "data": {
+                          "$ref": "#/components/schemas/LifetimeMedicalRecordResponseDto"
+                        },
+                        "meta": {
+                          "type": "object"
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      },
+                      "required": [
+                        "success",
+                        "data",
+                        "meta",
+                        "requestId"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "🆕 Mới trong v2.7.1 — Hồ sơ bệnh án trọn đời (dòng thời gian hợp nhất trong tổ chức hiện tại)",
+        "tags": [
+          "patients"
+        ]
+      }
+    },
     "/api/v1/organizations": {
       "get": {
         "operationId": "OrganizationsController_list_v1",
@@ -34006,7 +34184,7 @@
   "info": {
     "title": "DermaHealth Backend API",
     "description": "Clinic workflow backend: identity, scheduling, clinical, workflow, EMR, CRM.",
-    "version": "2.6.0",
+    "version": "2.7.1",
     "contact": {}
   },
   "tags": [],
@@ -35140,6 +35318,386 @@
       "SetConsentRequest": {
         "type": "object",
         "properties": {}
+      },
+      "LifetimeRecordPatientDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nationalHealthId": {
+            "type": "object",
+            "nullable": true
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "dob": {
+            "type": "object",
+            "format": "date",
+            "nullable": true
+          },
+          "gender": {
+            "type": "string"
+          },
+          "bloodType": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "nationalHealthId",
+          "code",
+          "name",
+          "dob",
+          "gender",
+          "bloodType"
+        ]
+      },
+      "LifetimeRecordClinicalItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "object",
+            "nullable": true
+          },
+          "display": {
+            "type": "string"
+          },
+          "status": {
+            "type": "object",
+            "nullable": true
+          },
+          "value": {
+            "type": "object",
+            "nullable": true
+          },
+          "note": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "display",
+          "status",
+          "value",
+          "note"
+        ]
+      },
+      "LifetimeRecordSummaryDto": {
+        "type": "object",
+        "properties": {
+          "encounterCount": {
+            "type": "number"
+          },
+          "organizationCount": {
+            "type": "number"
+          },
+          "facilityCount": {
+            "type": "number"
+          },
+          "firstRecordedAt": {
+            "type": "object",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastRecordedAt": {
+            "type": "object",
+            "format": "date-time",
+            "nullable": true
+          },
+          "activeConditions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LifetimeRecordClinicalItemDto"
+            }
+          },
+          "allergies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LifetimeRecordClinicalItemDto"
+            }
+          },
+          "currentMedications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LifetimeRecordClinicalItemDto"
+            }
+          }
+        },
+        "required": [
+          "encounterCount",
+          "organizationCount",
+          "facilityCount",
+          "firstRecordedAt",
+          "lastRecordedAt",
+          "activeConditions",
+          "allergies",
+          "currentMedications"
+        ]
+      },
+      "LifetimeRecordSourceDto": {
+        "type": "object",
+        "properties": {
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organizationName": {
+            "type": "string"
+          },
+          "facilityId": {
+            "type": "object",
+            "format": "uuid",
+            "nullable": true
+          },
+          "facilityName": {
+            "type": "object",
+            "nullable": true
+          },
+          "province": {
+            "type": "object",
+            "nullable": true
+          },
+          "system": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "organizationId",
+          "organizationName",
+          "facilityId",
+          "facilityName",
+          "province",
+          "system"
+        ]
+      },
+      "LifetimeRecordDocumentDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "contentType": {
+            "type": "object",
+            "nullable": true
+          },
+          "signedAt": {
+            "type": "object",
+            "format": "date-time",
+            "nullable": true
+          },
+          "downloadUrl": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "contentType",
+          "signedAt",
+          "downloadUrl"
+        ]
+      },
+      "LifetimeRecordProvenanceDto": {
+        "type": "object",
+        "properties": {
+          "sourceRecordId": {
+            "type": "string"
+          },
+          "sourceSystem": {
+            "type": "object",
+            "nullable": true
+          },
+          "importedAt": {
+            "type": "object",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastVerifiedAt": {
+            "type": "object",
+            "format": "date-time",
+            "nullable": true
+          },
+          "integrityHash": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "sourceRecordId",
+          "sourceSystem",
+          "importedAt",
+          "lastVerifiedAt",
+          "integrityHash"
+        ]
+      },
+      "LifetimeRecordEventDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endedAt": {
+            "type": "object",
+            "format": "date-time",
+            "nullable": true
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "encounter",
+              "diagnosis",
+              "procedure",
+              "prescription",
+              "laboratory",
+              "imaging",
+              "vaccination",
+              "allergy",
+              "document",
+              "care_plan"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "object",
+            "nullable": true
+          },
+          "status": {
+            "type": "object",
+            "nullable": true
+          },
+          "specialty": {
+            "type": "object",
+            "nullable": true
+          },
+          "practitionerName": {
+            "type": "object",
+            "nullable": true
+          },
+          "source": {
+            "$ref": "#/components/schemas/LifetimeRecordSourceDto"
+          },
+          "diagnoses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LifetimeRecordClinicalItemDto"
+            }
+          },
+          "medications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LifetimeRecordClinicalItemDto"
+            }
+          },
+          "orders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LifetimeRecordClinicalItemDto"
+            }
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LifetimeRecordClinicalItemDto"
+            }
+          },
+          "procedures": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LifetimeRecordClinicalItemDto"
+            }
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LifetimeRecordDocumentDto"
+            }
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/LifetimeRecordProvenanceDto"
+          }
+        },
+        "required": [
+          "id",
+          "occurredAt",
+          "endedAt",
+          "type",
+          "title",
+          "summary",
+          "status",
+          "specialty",
+          "practitionerName",
+          "source",
+          "diagnoses",
+          "medications",
+          "orders",
+          "results",
+          "procedures",
+          "documents",
+          "provenance"
+        ]
+      },
+      "LifetimeMedicalRecordResponseDto": {
+        "type": "object",
+        "properties": {
+          "patient": {
+            "$ref": "#/components/schemas/LifetimeRecordPatientDto"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/LifetimeRecordSummaryDto"
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LifetimeRecordEventDto"
+            }
+          },
+          "page": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          },
+          "synchronizedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "patient",
+          "summary",
+          "events",
+          "page",
+          "limit",
+          "total",
+          "synchronizedAt"
+        ]
       },
       "OrganizationResponseDto": {
         "type": "object",

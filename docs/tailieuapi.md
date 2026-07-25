@@ -333,6 +333,7 @@ FE hiện tại (`Login.tsx`) **không gọi API nào** — nút "Đăng nhập"
 | PATCH | `/patients/:id` | Cập nhật hồ sơ (`profile{dob,gender,phone,email,address,bloodType}`) | |
 | GET | `/patients/:id/consents` | Danh sách đồng ý (VD: chia sẻ dữ liệu, nhận thông báo) | → `Consent[]` |
 | PUT | `/patients/:id/consents/:type` | Bật/tắt 1 loại consent | `{granted: boolean}` → `Consent` |
+| GET | `/patients/:id/lifetime-medical-record` ✅ v2.7.1 | Dòng thời gian hợp nhất (encounter, chẩn đoán, đơn thuốc, cận lâm sàng, tài liệu, kế hoạch điều trị) trong tổ chức hiện tại của bệnh nhân — chi tiết đầy đủ + trạng thái Phase 2/3 (import, share, đối sánh liên-cơ-sở) xem [`LIFETIME_MEDICAL_RECORD_API.md`](./LIFETIME_MEDICAL_RECORD_API.md) | patient (chính mình), doctor (có quan hệ điều trị), medical_administrator (cùng org) |
 
 ### 6.3 Appointment & QR Check-in
 
