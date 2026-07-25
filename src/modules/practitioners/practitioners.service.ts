@@ -5,18 +5,33 @@ import { AuthenticatedPrincipal } from '../../core/security/auth.types';
 import {
   ConflictAppError,
   ForbiddenAppError,
+  NotFoundAppError,
   ValidationAppError,
 } from '../../core/errors/app-error';
 import { PrismaService } from '../../core/database/prisma.service';
+import { AuditService } from '../../core/audit/audit.service';
 import { AppConfiguration } from '../../core/configuration/configuration';
 import { AvailabilityQuery } from './dto/availability.query';
 import { ListPractitionersQuery } from './dto/list-practitioners.query';
+import { ReplaceWeeklyScheduleRequest } from './dto/replace-weekly-schedule.dto';
+import { CreateScheduleExceptionRequest } from './dto/create-schedule-exception.dto';
 import { clinicLocalMinuteToUtc, weekdayForDate } from './timezone.util';
 import {
   issueSlotReference,
   SlotReferencePayload,
   verifySlotReference,
 } from './slot-reference.util';
+import { assertCanManageSchedule } from './policies/practitioner-policies';
+import {
+  toPractitionerScheduleResponse,
+  toScheduleExceptionResponse,
+} from './practitioner-schedule.mapper';
+
+export interface RequestContext {
+  requestId?: string;
+  ip?: string;
+  userAgent?: string;
+}
 
 type DbClient = Prisma.TransactionClient | PrismaService;
 
@@ -103,6 +118,7 @@ export class PractitionersService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
     config: ConfigService<AppConfiguration, true>,
   ) {
     this.slotSecret = config.get('auth', { infer: true }).fieldEncryptionKey;
@@ -548,5 +564,218 @@ export class PractitionersService {
       }
     }
     return { assignment, startsAt, endsAt };
+  }
+
+  private async requireAssignment(
+    principal: AuthenticatedPrincipal,
+    practitionerId: string,
+    clinicLocationId: string,
+  ) {
+    const scope = organizationScope(principal);
+    const assignment = await this.prisma.practitionerClinicAssignment.findFirst({
+      where: {
+        practitionerUserId: practitionerId,
+        clinicLocationId,
+        active: true,
+        ...(scope ? { organizationId: { in: scope } } : {}),
+      },
+      include: { clinicLocation: true, department: true },
+    });
+    if (!assignment) {
+      throw new NotFoundAppError('Practitioner clinic assignment not found.');
+    }
+    return assignment;
+  }
+
+  async getSchedule(
+    principal: AuthenticatedPrincipal,
+    practitionerId: string,
+    clinicLocationId: string,
+  ) {
+    const assignment = await this.requireAssignment(principal, practitionerId, clinicLocationId);
+    const [weeklySchedule, exceptions] = await Promise.all([
+      this.prisma.practitionerSchedule.findMany({
+        where: { assignmentId: assignment.id, active: true },
+        orderBy: [{ dayOfWeek: 'asc' }, { startMinute: 'asc' }],
+      }),
+      this.prisma.practitionerScheduleException.findMany({
+        where: { assignmentId: assignment.id, endsAt: { gte: new Date() } },
+        orderBy: { startsAt: 'asc' },
+      }),
+    ]);
+    return { data: toPractitionerScheduleResponse(assignment, weeklySchedule, exceptions) };
+  }
+
+  async replaceWeeklySchedule(
+    principal: AuthenticatedPrincipal,
+    practitionerId: string,
+    clinicLocationId: string,
+    dto: ReplaceWeeklyScheduleRequest,
+    context: RequestContext,
+  ) {
+    const assignment = await this.requireAssignment(principal, practitionerId, clinicLocationId);
+    assertCanManageSchedule(principal, assignment);
+
+    dto.windows.forEach((window, index) => {
+      if (window.startMinute >= window.endMinute) {
+        throw new ValidationAppError(
+          [{ field: `windows[${index}]`, code: 'INVALID_WINDOW_RANGE' }],
+          'startMinute must be before endMinute.',
+        );
+      }
+      if (window.effectiveTo && window.effectiveFrom && window.effectiveTo < window.effectiveFrom) {
+        throw new ValidationAppError(
+          [{ field: `windows[${index}].effectiveTo`, code: 'INVALID_EFFECTIVE_RANGE' }],
+          'effectiveTo must not be before effectiveFrom.',
+        );
+      }
+    });
+
+    const today = new Date().toISOString().slice(0, 10);
+    const weeklySchedule = await this.prisma.$transaction(async (tx) => {
+      await tx.practitionerSchedule.updateMany({
+        where: { assignmentId: assignment.id, active: true },
+        data: { active: false },
+      });
+      if (dto.windows.length > 0) {
+        await tx.practitionerSchedule.createMany({
+          data: dto.windows.map((window) => ({
+            assignmentId: assignment.id,
+            dayOfWeek: window.dayOfWeek,
+            startMinute: window.startMinute,
+            endMinute: window.endMinute,
+            effectiveFrom: new Date(window.effectiveFrom ?? today),
+            effectiveTo: window.effectiveTo ? new Date(window.effectiveTo) : null,
+            active: true,
+          })),
+        });
+      }
+      await this.audit.write(
+        {
+          actorId: principal.userId,
+          action: 'practitioner.schedule.replaced',
+          resourceType: 'practitioner_clinic_assignment',
+          resourceId: assignment.id,
+          organizationId: assignment.organizationId,
+          clinicLocationId: assignment.clinicLocationId,
+          result: 'success',
+          requestId: context.requestId ?? null,
+          ip: context.ip ?? null,
+          userAgent: context.userAgent ?? null,
+        },
+        tx,
+      );
+      return tx.practitionerSchedule.findMany({
+        where: { assignmentId: assignment.id, active: true },
+        orderBy: [{ dayOfWeek: 'asc' }, { startMinute: 'asc' }],
+      });
+    });
+
+    const exceptions = await this.prisma.practitionerScheduleException.findMany({
+      where: { assignmentId: assignment.id, endsAt: { gte: new Date() } },
+      orderBy: { startsAt: 'asc' },
+    });
+    return { data: toPractitionerScheduleResponse(assignment, weeklySchedule, exceptions) };
+  }
+
+  async listScheduleExceptions(
+    principal: AuthenticatedPrincipal,
+    practitionerId: string,
+    clinicLocationId: string,
+  ) {
+    const assignment = await this.requireAssignment(principal, practitionerId, clinicLocationId);
+    const exceptions = await this.prisma.practitionerScheduleException.findMany({
+      where: { assignmentId: assignment.id },
+      orderBy: { startsAt: 'asc' },
+    });
+    return { data: exceptions.map(toScheduleExceptionResponse) };
+  }
+
+  async createScheduleException(
+    principal: AuthenticatedPrincipal,
+    practitionerId: string,
+    clinicLocationId: string,
+    dto: CreateScheduleExceptionRequest,
+    context: RequestContext,
+  ) {
+    const assignment = await this.requireAssignment(principal, practitionerId, clinicLocationId);
+    assertCanManageSchedule(principal, assignment);
+
+    const startsAt = new Date(dto.startsAt);
+    const endsAt = new Date(dto.endsAt);
+    if (!(startsAt < endsAt)) {
+      throw new ValidationAppError(
+        [{ field: 'endsAt', code: 'INVALID_RANGE' }],
+        'endsAt must be after startsAt.',
+      );
+    }
+
+    const exception = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.practitionerScheduleException.create({
+        data: {
+          assignmentId: assignment.id,
+          kind: dto.kind,
+          startsAt,
+          endsAt,
+          reason: dto.reason ?? null,
+        },
+      });
+      await this.audit.write(
+        {
+          actorId: principal.userId,
+          action: 'practitioner.schedule_exception.created',
+          resourceType: 'practitioner_schedule_exception',
+          resourceId: created.id,
+          organizationId: assignment.organizationId,
+          clinicLocationId: assignment.clinicLocationId,
+          reason: dto.reason ?? null,
+          result: 'success',
+          requestId: context.requestId ?? null,
+          ip: context.ip ?? null,
+          userAgent: context.userAgent ?? null,
+        },
+        tx,
+      );
+      return created;
+    });
+
+    return { data: toScheduleExceptionResponse(exception) };
+  }
+
+  async deleteScheduleException(
+    principal: AuthenticatedPrincipal,
+    practitionerId: string,
+    clinicLocationId: string,
+    exceptionId: string,
+    context: RequestContext,
+  ) {
+    const assignment = await this.requireAssignment(principal, practitionerId, clinicLocationId);
+    assertCanManageSchedule(principal, assignment);
+
+    await this.prisma.$transaction(async (tx) => {
+      const result = await tx.practitionerScheduleException.deleteMany({
+        where: { id: exceptionId, assignmentId: assignment.id },
+      });
+      if (result.count === 0) {
+        throw new NotFoundAppError('Schedule exception not found.');
+      }
+      await this.audit.write(
+        {
+          actorId: principal.userId,
+          action: 'practitioner.schedule_exception.deleted',
+          resourceType: 'practitioner_schedule_exception',
+          resourceId: exceptionId,
+          organizationId: assignment.organizationId,
+          clinicLocationId: assignment.clinicLocationId,
+          result: 'success',
+          requestId: context.requestId ?? null,
+          ip: context.ip ?? null,
+          userAgent: context.userAgent ?? null,
+        },
+        tx,
+      );
+    });
+
+    return { data: { deleted: true } };
   }
 }
