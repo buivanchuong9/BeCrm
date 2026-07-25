@@ -96,5 +96,10 @@ export function validateEnv(raw: Record<string, unknown>): EnvConfig {
       'Invalid environment configuration: COOKIE_SECURE must be true when COOKIE_SAME_SITE=none',
     );
   }
+  if (parsed.data.NODE_ENV === 'production' && !parsed.data.COOKIE_SECURE) {
+    throw new Error(
+      'Invalid environment configuration: COOKIE_SECURE must be true in production — the refresh_token cookie must never be sent over plain HTTP.',
+    );
+  }
   return parsed.data;
 }

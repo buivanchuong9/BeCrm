@@ -277,6 +277,7 @@ export class AuthController {
 
   @Public()
   @ApiNoContentResponse()
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Delete('sessions')
   @HttpCode(HttpStatus.NO_CONTENT)
   async endAllSessions(

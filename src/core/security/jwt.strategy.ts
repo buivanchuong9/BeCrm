@@ -12,8 +12,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
         (req: Request) => ExtractJwt.fromAuthHeaderAsBearerToken()(req),
+        // `EventSource` cannot set an Authorization header, so the SSE
+        // stream is the one legitimate caller that must pass the access
+        // token via query string. Scoped to that exact route only — this
+        // extractor used to accept `?token=` on every authenticated
+        // endpoint in the app, which meant a full-power access token could
+        // leak into any URL an attacker convinced a client to hit, and from
+        // there into proxy/access logs and the Referer header.
         (req: Request) => {
-          if (req.query && typeof req.query.token === 'string') {
+          if (req.path.endsWith('/queue/stream') && typeof req.query.token === 'string') {
             return req.query.token;
           }
           return null;
