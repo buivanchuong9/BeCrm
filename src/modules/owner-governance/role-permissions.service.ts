@@ -3,7 +3,7 @@ import { UserRole } from '@prisma/client';
 import { PrismaService } from '../../core/database/prisma.service';
 import { AuditService } from '../../core/audit/audit.service';
 import { PolicyEngineService } from '../../common/authorization/policy-engine.service';
-import { NotFoundAppError } from '../../core/errors/app-error';
+import { ForbiddenAppError, NotFoundAppError } from '../../core/errors/app-error';
 
 export interface RequestContext {
   requestId?: string;
@@ -36,6 +36,17 @@ export class RolePermissionsService {
   async grant(role: UserRole, permissionCode: string, grantedBy: string, context: RequestContext) {
     const permission = await this.prisma.permission.findUnique({ where: { code: permissionCode } });
     if (!permission) throw new NotFoundAppError(`Unknown permission "${permissionCode}".`);
+    // Dangerous permissions are never a standing role grant — see
+    // permissions.catalog.ts's PermissionDefinition.dangerous doc comment.
+    // They're only ever exercised through DangerousActionsService's 2-of-4
+    // Owner quorum, so this endpoint refuses to create a role_permission row
+    // for one even though nothing else in the request path checks it.
+    if (permission.dangerous) {
+      throw new ForbiddenAppError(
+        'AUTH_FORBIDDEN',
+        `"${permissionCode}" is quorum-controlled and cannot be granted as a standing role permission. Use the dangerous-actions workflow instead.`,
+      );
+    }
 
     const row = await this.prisma.rolePermission.upsert({
       where: { role_permissionCode: { role, permissionCode } },

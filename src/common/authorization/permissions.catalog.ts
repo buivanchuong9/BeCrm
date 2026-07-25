@@ -204,13 +204,39 @@ const {
 /**
  * Default role → permission grants. `super_administrator` (Platform Owner)
  * deliberately holds none of the clinical-authorship permissions
- * (diagnosis/order/record/encounter-transition) — that gap is intentional,
- * not an oversight: Owners reach clinical data only through a
- * BreakGlassGrant, never through a standing permission. See RolesGuard /
- * PolicyEngine doc comments.
+ * (diagnosis/order/record/clinical_plan.approve/encounter-transition) — that
+ * gap is intentional, not an oversight: Owners reach clinical data only
+ * through a BreakGlassGrant, never through a standing permission. See
+ * RolesGuard / PolicyEngine doc comments.
+ *
+ * Nor does it hold the 5 `dangerous: true` permissions (owner.add,
+ * security.revoke_all_sessions, directory.export_bulk,
+ * membership.revoke_bulk, audit.disable) — those are only ever exercised
+ * through DangerousActionsService's 2-of-4 Owner quorum, never a standing
+ * role grant (RolePermissionsService.grant() rejects them outright).
+ *
+ * Everything else — every non-clinical-authorship, non-dangerous permission
+ * in the catalog — is granted here so an Owner can operate/administer every
+ * department (patients, scheduling, queue, workflow authoring, identity,
+ * platform config) without needing a per-feature runtime toggle.
  */
 export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, string[]> = {
   super_administrator: [
+    PATIENT_READ_ASSIGNED,
+    PATIENT_READ_ORG,
+    PATIENT_WRITE_CONTACT,
+    PATIENT_WRITE_CLINICAL,
+    CONSENT_MANAGE_SELF,
+    APPOINTMENT_BOOK,
+    APPOINTMENT_MANAGE,
+    CHECKIN_QR_REDEEM,
+    QUEUE_VIEW,
+    QUEUE_CALL,
+    ENCOUNTER_CREATE,
+    ENCOUNTER_CLOSE,
+    WORKFLOW_TASK_EXECUTE,
+    WORKFLOW_TEMPLATE_AUTHOR,
+    WORKFLOW_TEMPLATE_PUBLISH,
     USER_INVITE,
     USER_LOCK,
     USER_ROLE_ASSIGN,
