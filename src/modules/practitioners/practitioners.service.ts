@@ -20,6 +20,67 @@ import {
 
 type DbClient = Prisma.TransactionClient | PrismaService;
 
+type SlotStatus = 'AVAILABLE' | 'FULL' | 'BLOCKED' | 'BREAK' | 'PAST';
+type UnavailableReasonCode =
+  'CAPACITY_REACHED' | 'SCHEDULE_BLOCKED' | 'BREAK_TIME' | 'SLOT_IN_PAST';
+
+interface UnavailableReason {
+  code: UnavailableReasonCode;
+  display: string;
+}
+
+interface GeneratedSlot {
+  slotId: string;
+  startsAt: string;
+  endsAt: string;
+  capacity: number;
+  bookedCount: number;
+  remainingCapacity: number;
+  status: SlotStatus;
+  selectable: boolean;
+  unavailableReason: UnavailableReason | null;
+}
+
+interface ScheduleBreak {
+  startsAt: string;
+  endsAt: string;
+  reasonCode: 'BREAK_TIME' | 'SCHEDULE_BLOCKED';
+}
+
+interface ScheduleSummary {
+  startsAt: string;
+  endsAt: string;
+  breaks: ScheduleBreak[];
+}
+
+interface GenerateSlotsResult {
+  slots: GeneratedSlot[];
+  workingDay: boolean;
+  schedule: ScheduleSummary | null;
+}
+
+const UNAVAILABLE_REASON_DISPLAY: Record<UnavailableReasonCode, string> = {
+  CAPACITY_REACHED: 'Khung giờ đã kín',
+  SCHEDULE_BLOCKED: 'Khung giờ đã bị khóa',
+  BREAK_TIME: 'Giờ nghỉ',
+  SLOT_IN_PAST: 'Khung giờ đã qua',
+};
+
+const NEXT_AVAILABLE_MAX_DATES = 5;
+const NEXT_AVAILABLE_MAX_LOOKAHEAD_DAYS = 14;
+
+type AssignmentForSlots = {
+  id: string;
+  version: number;
+  practitionerUserId: string;
+  organizationId: string;
+  clinicLocationId: string;
+  departmentId: string;
+  slotDurationMinutes: number;
+  capacity: number;
+  clinicLocation: { timezone: string };
+};
+
 function organizationScope(principal: AuthenticatedPrincipal): string[] | null {
   if (principal.memberships.some((membership) => membership.role === 'super_administrator'))
     return null;
@@ -28,6 +89,12 @@ function organizationScope(principal: AuthenticatedPrincipal): string[] | null {
 
 function overlaps(startsAt: Date, endsAt: Date, rangeStart: Date, rangeEnd: Date): boolean {
   return startsAt < rangeEnd && endsAt > rangeStart;
+}
+
+function addDays(date: string, days: number): string {
+  const [year, month, day] = date.split('-').map(Number);
+  const next = new Date(Date.UTC(year, month - 1, day + days));
+  return next.toISOString().slice(0, 10);
 }
 
 @Injectable()
@@ -137,45 +204,81 @@ export class PractitionersService {
           clinicLocationId: query.clinicLocationId,
           date: query.date,
           timezone: null,
+          workingDay: false,
           slotDurationMinutes: null,
           capacity: null,
+          defaultCapacity: null,
+          schedule: null,
           slots: [],
+          nextAvailableDates: [],
+          generatedAt: new Date().toISOString(),
         },
       };
     }
 
-    const slots = await this.generateSlots(this.prisma, assignment, query.date);
+    const { slots, workingDay, schedule } = await this.generateSlots(
+      this.prisma,
+      assignment,
+      query.date,
+      { includeUnavailable: query.includeUnavailable },
+    );
+    const nextAvailableDates = await this.computeNextAvailableDates(
+      this.prisma,
+      assignment,
+      query.date,
+    );
     return {
       data: {
         practitionerId,
         clinicLocationId: assignment.clinicLocationId,
         timezone: assignment.clinicLocation.timezone,
         date: query.date,
+        workingDay,
         slotDurationMinutes: assignment.slotDurationMinutes,
         capacity: assignment.capacity,
+        defaultCapacity: assignment.capacity,
+        schedule,
         slots,
+        nextAvailableDates,
+        generatedAt: new Date().toISOString(),
       },
     };
   }
 
+  private async computeNextAvailableDates(
+    db: DbClient,
+    assignment: AssignmentForSlots,
+    fromDate: string,
+  ) {
+    const results: { date: string; availableSlotCount: number; firstAvailableAt: string }[] = [];
+    for (
+      let offset = 1;
+      offset <= NEXT_AVAILABLE_MAX_LOOKAHEAD_DAYS && results.length < NEXT_AVAILABLE_MAX_DATES;
+      offset += 1
+    ) {
+      const candidateDate = addDays(fromDate, offset);
+      const { slots } = await this.generateSlots(db, assignment, candidateDate);
+      if (slots.length > 0) {
+        results.push({
+          date: candidateDate,
+          availableSlotCount: slots.length,
+          firstAvailableAt: slots[0].startsAt,
+        });
+      }
+    }
+    return results;
+  }
+
   private async generateSlots(
     db: DbClient,
-    assignment: {
-      id: string;
-      version: number;
-      practitionerUserId: string;
-      organizationId: string;
-      clinicLocationId: string;
-      departmentId: string;
-      slotDurationMinutes: number;
-      capacity: number;
-      clinicLocation: { timezone: string };
-    },
+    assignment: AssignmentForSlots,
     date: string,
-    excludeAppointmentId?: string,
-  ) {
-    const dayStart = clinicLocalMinuteToUtc(date, 0, assignment.clinicLocation.timezone);
-    const dayEnd = clinicLocalMinuteToUtc(date, 1440, assignment.clinicLocation.timezone);
+    options: { excludeAppointmentId?: string; includeUnavailable?: boolean } = {},
+  ): Promise<GenerateSlotsResult> {
+    const includeUnavailable = options.includeUnavailable ?? false;
+    const timezone = assignment.clinicLocation.timezone;
+    const dayStart = clinicLocalMinuteToUtc(date, 0, timezone);
+    const dayEnd = clinicLocalMinuteToUtc(date, 1440, timezone);
     const dateValue = new Date(`${date}T00:00:00.000Z`);
     const [schedules, exceptions, appointments] = await Promise.all([
       db.practitionerSchedule.findMany({
@@ -192,7 +295,7 @@ export class PractitionersService {
       }),
       db.appointment.findMany({
         where: {
-          ...(excludeAppointmentId ? { id: { not: excludeAppointmentId } } : {}),
+          ...(options.excludeAppointmentId ? { id: { not: options.excludeAppointmentId } } : {}),
           doctorId: assignment.practitionerUserId,
           clinicLocationId: assignment.clinicLocationId,
           status: 'upcoming',
@@ -203,71 +306,171 @@ export class PractitionersService {
       }),
     ]);
 
-    const windows = schedules.map((schedule) => ({
-      start: schedule.startMinute,
-      end: schedule.endMinute,
-    }));
-    for (const exception of exceptions.filter((item) => item.kind === 'override')) {
-      const start = Math.max(
-        0,
-        Math.round((exception.startsAt.getTime() - dayStart.getTime()) / 60_000),
-      );
-      const end = Math.min(
-        1440,
-        Math.round((exception.endsAt.getTime() - dayStart.getTime()) / 60_000),
-      );
-      windows.push({ start, end });
-    }
+    const windows = schedules
+      .map((schedule) => ({ start: schedule.startMinute, end: schedule.endMinute }))
+      .concat(
+        exceptions
+          .filter((item) => item.kind === 'override')
+          .map((exception) => ({
+            start: Math.max(
+              0,
+              Math.round((exception.startsAt.getTime() - dayStart.getTime()) / 60_000),
+            ),
+            end: Math.min(
+              1440,
+              Math.round((exception.endsAt.getTime() - dayStart.getTime()) / 60_000),
+            ),
+          })),
+      )
+      .sort((a, b) => a.start - b.start);
 
-    const unique = new Map<
-      string,
-      { slotId: string; startsAt: string; endsAt: string; remainingCapacity: number }
-    >();
-    for (const window of windows) {
+    const workingDay = windows.length > 0;
+    const blockingExceptions = exceptions.filter((item) => item.kind === 'unavailable');
+    const now = Date.now();
+
+    const buildSlot = (minute: number, status: SlotStatus, bookedCount: number): GeneratedSlot => {
+      const startsAt = clinicLocalMinuteToUtc(date, minute, timezone);
+      const endsAt = clinicLocalMinuteToUtc(
+        date,
+        minute + assignment.slotDurationMinutes,
+        timezone,
+      );
+      const payload: SlotReferencePayload = {
+        v: 1,
+        assignmentId: assignment.id,
+        assignmentVersion: assignment.version,
+        practitionerId: assignment.practitionerUserId,
+        organizationId: assignment.organizationId,
+        clinicLocationId: assignment.clinicLocationId,
+        departmentId: assignment.departmentId,
+        startsAt: startsAt.toISOString(),
+        endsAt: endsAt.toISOString(),
+      };
+      const reasonCode: UnavailableReasonCode | null =
+        status === 'PAST'
+          ? 'SLOT_IN_PAST'
+          : status === 'BLOCKED'
+            ? 'SCHEDULE_BLOCKED'
+            : status === 'FULL'
+              ? 'CAPACITY_REACHED'
+              : status === 'BREAK'
+                ? 'BREAK_TIME'
+                : null;
+      return {
+        slotId: issueSlotReference(payload, this.slotSecret),
+        startsAt: payload.startsAt,
+        endsAt: payload.endsAt,
+        capacity: assignment.capacity,
+        bookedCount,
+        remainingCapacity: Math.max(assignment.capacity - bookedCount, 0),
+        status,
+        selectable: status === 'AVAILABLE',
+        unavailableReason: reasonCode
+          ? { code: reasonCode, display: UNAVAILABLE_REASON_DISPLAY[reasonCode] }
+          : null,
+      };
+    };
+
+    const unique = new Map<string, GeneratedSlot>();
+
+    const classifyWithinWindow = (
+      startsAt: Date,
+      endsAt: Date,
+    ): { status: SlotStatus; bookedCount: number } => {
+      const bookedCount = appointments.filter((appointment) =>
+        overlaps(startsAt, endsAt, appointment.startAt, appointment.endAt),
+      ).length;
+      if (startsAt.getTime() <= now) return { status: 'PAST', bookedCount };
+      if (
+        blockingExceptions.some((exception) =>
+          overlaps(startsAt, endsAt, exception.startsAt, exception.endsAt),
+        )
+      )
+        return { status: 'BLOCKED', bookedCount };
+      if (bookedCount >= assignment.capacity) return { status: 'FULL', bookedCount };
+      return { status: 'AVAILABLE', bookedCount };
+    };
+
+    if (!includeUnavailable) {
+      for (const window of windows) {
+        for (
+          let minute = window.start;
+          minute + assignment.slotDurationMinutes <= window.end;
+          minute += assignment.slotDurationMinutes
+        ) {
+          const startsAt = clinicLocalMinuteToUtc(date, minute, timezone);
+          const endsAt = clinicLocalMinuteToUtc(
+            date,
+            minute + assignment.slotDurationMinutes,
+            timezone,
+          );
+          const { status, bookedCount } = classifyWithinWindow(startsAt, endsAt);
+          if (status !== 'AVAILABLE') continue;
+          unique.set(startsAt.toISOString(), buildSlot(minute, status, bookedCount));
+        }
+      }
+    } else if (workingDay) {
+      const scheduleStartMinute = windows[0].start;
+      const scheduleEndMinute = windows.reduce((max, w) => Math.max(max, w.end), windows[0].end);
       for (
-        let minute = window.start;
-        minute + assignment.slotDurationMinutes <= window.end;
+        let minute = scheduleStartMinute;
+        minute + assignment.slotDurationMinutes <= scheduleEndMinute;
         minute += assignment.slotDurationMinutes
       ) {
-        const startsAt = clinicLocalMinuteToUtc(date, minute, assignment.clinicLocation.timezone);
+        const startsAt = clinicLocalMinuteToUtc(date, minute, timezone);
         const endsAt = clinicLocalMinuteToUtc(
           date,
           minute + assignment.slotDurationMinutes,
-          assignment.clinicLocation.timezone,
+          timezone,
         );
-        if (startsAt.getTime() <= Date.now()) continue;
-        if (
-          exceptions.some(
-            (exception) =>
-              exception.kind === 'unavailable' &&
-              overlaps(startsAt, endsAt, exception.startsAt, exception.endsAt),
-          )
-        )
+        const inWindow = windows.some(
+          (w) => minute >= w.start && minute + assignment.slotDurationMinutes <= w.end,
+        );
+        if (!inWindow) {
+          unique.set(startsAt.toISOString(), buildSlot(minute, 'BREAK', 0));
           continue;
-        const booked = appointments.filter((appointment) =>
-          overlaps(startsAt, endsAt, appointment.startAt, appointment.endAt),
-        ).length;
-        if (booked >= assignment.capacity) continue;
-        const payload: SlotReferencePayload = {
-          v: 1,
-          assignmentId: assignment.id,
-          assignmentVersion: assignment.version,
-          practitionerId: assignment.practitionerUserId,
-          organizationId: assignment.organizationId,
-          clinicLocationId: assignment.clinicLocationId,
-          departmentId: assignment.departmentId,
-          startsAt: startsAt.toISOString(),
-          endsAt: endsAt.toISOString(),
-        };
-        unique.set(startsAt.toISOString(), {
-          slotId: issueSlotReference(payload, this.slotSecret),
-          startsAt: payload.startsAt,
-          endsAt: payload.endsAt,
-          remainingCapacity: assignment.capacity - booked,
-        });
+        }
+        const { status, bookedCount } = classifyWithinWindow(startsAt, endsAt);
+        unique.set(startsAt.toISOString(), buildSlot(minute, status, bookedCount));
       }
     }
-    return [...unique.values()].sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+
+    const slots = [...unique.values()].sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+
+    let schedule: ScheduleSummary | null = null;
+    if (workingDay) {
+      const scheduleStartMinute = windows[0].start;
+      const scheduleEndMinute = windows.reduce((max, w) => Math.max(max, w.end), windows[0].end);
+      const breaks: ScheduleBreak[] = [];
+      for (let i = 0; i < windows.length - 1; i += 1) {
+        if (windows[i].end < windows[i + 1].start) {
+          breaks.push({
+            startsAt: clinicLocalMinuteToUtc(date, windows[i].end, timezone).toISOString(),
+            endsAt: clinicLocalMinuteToUtc(date, windows[i + 1].start, timezone).toISOString(),
+            reasonCode: 'BREAK_TIME',
+          });
+        }
+      }
+      for (const exception of blockingExceptions) {
+        const clippedStart = new Date(Math.max(exception.startsAt.getTime(), dayStart.getTime()));
+        const clippedEnd = new Date(Math.min(exception.endsAt.getTime(), dayEnd.getTime()));
+        if (clippedStart < clippedEnd) {
+          breaks.push({
+            startsAt: clippedStart.toISOString(),
+            endsAt: clippedEnd.toISOString(),
+            reasonCode: 'SCHEDULE_BLOCKED',
+          });
+        }
+      }
+      breaks.sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+      schedule = {
+        startsAt: clinicLocalMinuteToUtc(date, scheduleStartMinute, timezone).toISOString(),
+        endsAt: clinicLocalMinuteToUtc(date, scheduleEndMinute, timezone).toISOString(),
+        breaks,
+      };
+    }
+
+    return { slots, workingDay, schedule };
   }
 
   async consumeSlot(db: DbClient, slotId: string, excludeAppointmentId?: string) {
@@ -317,12 +520,11 @@ export class PractitionersService {
       month: '2-digit',
       day: '2-digit',
     }).format(startsAt);
-    const validSlots = await this.generateSlots(db, assignment, date, excludeAppointmentId);
-    if (
-      !validSlots.some(
-        (slot) => slot.startsAt === payload.startsAt && slot.endsAt === payload.endsAt,
-      )
-    ) {
+    const { slots } = await this.generateSlots(db, assignment, date, { excludeAppointmentId });
+    const matched = slots.find(
+      (slot) => slot.startsAt === payload.startsAt && slot.endsAt === payload.endsAt,
+    );
+    if (!matched || !matched.selectable) {
       throw new ConflictAppError(
         'APPOINTMENT_SLOT_UNAVAILABLE',
         'This slot is no longer available.',
