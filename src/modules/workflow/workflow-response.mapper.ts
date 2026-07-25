@@ -84,6 +84,8 @@ export function toWorkflowTaskResponse(task: WorkflowTask): WorkflowTaskResponse
     priority: task.priority,
     urgency: task.urgency,
     mandatory: task.mandatory,
+    origin: task.origin,
+    createdBy: task.createdBy,
     clinicalWarning: task.clinicalWarning,
     reworkCount: task.reworkCount,
     version: task.version,

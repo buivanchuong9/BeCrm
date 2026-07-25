@@ -12,7 +12,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 
-const ROLE_VALUES = [
+export const ROLE_VALUES = [
   'super_administrator',
   'patient',
   'doctor',

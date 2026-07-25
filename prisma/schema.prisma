@@ -1169,6 +1169,11 @@ enum WorkflowPriority {
   high
 }
 
+enum WorkflowTaskOrigin {
+  template
+  ad_hoc
+}
+
 model WorkflowTask {
   id                 String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   instanceId         String             @map("instance_id") @db.Uuid
@@ -1184,6 +1189,11 @@ model WorkflowTask {
   priority           WorkflowPriority   @default(medium)
   urgency            Urgency            @default(routine)
   mandatory          Boolean            @default(false)
+  // Ad-hoc tasks are doctor-authored, per-instance additions that never
+  // mutate the shared WorkflowTemplateVersion; always non-mandatory so they
+  // can never gate instance completion or need a mandatory-skip override.
+  origin             WorkflowTaskOrigin @default(template)
+  createdBy          String?            @map("created_by") @db.Uuid
   clinicalWarning    String?            @map("clinical_warning")
   reworkCount        Int                @default(0) @map("rework_count")
   version            Int                @default(1)

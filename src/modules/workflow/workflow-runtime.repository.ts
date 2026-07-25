@@ -111,6 +111,27 @@ export class WorkflowRuntimeRepository {
     });
   }
 
+  /** Deliberately bypasses ALLOWED_TASK_TRANSITIONS — that table governs the
+   * general clinical-task lifecycle and stays untouched. Removing an ad-hoc
+   * task is a narrower, doctor-initiated action scoped by `origin: 'ad_hoc'`
+   * and only reachable pre-terminal, so it's implemented as its own
+   * conditional update rather than an entry in the shared state machine. */
+  cancelAdHocTask(
+    tx: Prisma.TransactionClient,
+    id: string,
+    expectedVersion: number,
+  ): Promise<Prisma.BatchPayload> {
+    return tx.workflowTask.updateMany({
+      where: {
+        id,
+        version: expectedVersion,
+        origin: 'ad_hoc',
+        status: { notIn: TERMINAL_TASK_STATUSES },
+      },
+      data: { status: 'cancelled', version: { increment: 1 } },
+    });
+  }
+
   /** docs/api.md section 28 "on completed/skipped, re-evaluate dependent
    * pending/blocked tasks" — flips a task to `ready` once all of its
    * dependsOnStepCodes are completed/skipped, else keeps/sets it `blocked`

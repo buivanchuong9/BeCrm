@@ -25,6 +25,10 @@ export const STAFF_QUEUE_ROLES: UserRole[] = [
 export const WORKFLOW_ACTIVATION_ROLES: UserRole[] = ['doctor', 'medical_administrator'];
 export const WORKFLOW_CANCEL_ROLES: UserRole[] = ['doctor', 'medical_administrator'];
 export const TASK_REASSIGN_ROLES: UserRole[] = ['nurse', 'doctor', 'medical_administrator'];
+/** Clinical staff who may attach/edit/remove a per-patient ad-hoc task on a
+ * running instance. Deliberately excludes clinical_process_designer — that
+ * role authors the shared template, not a single patient's live instance. */
+export const AD_HOC_TASK_ROLES: UserRole[] = ['doctor', 'nurse', 'medical_administrator'];
 
 /** No `super_administrator` bypass on either function below — authoring a
  * clinical workflow template and executing/reassigning a patient's workflow

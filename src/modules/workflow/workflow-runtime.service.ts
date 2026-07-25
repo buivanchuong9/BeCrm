@@ -20,11 +20,15 @@ import {
   WORKFLOW_ACTIVATION_ROLES,
   WORKFLOW_CANCEL_ROLES,
   TASK_REASSIGN_ROLES,
+  AD_HOC_TASK_ROLES,
 } from './policies/workflow-policies';
 import { assertTaskTransitionAllowed, TERMINAL_TASK_STATUSES } from './workflow-task-state-machine';
 import { WorkflowStepDefinition } from './workflow-step-graph.util';
 import { computeWorkflowIntegrityHash, generateInstanceCode } from './workflow-identity.util';
 import { toWorkflowInstanceResponse, toWorkflowTaskResponse } from './workflow-response.mapper';
+import { CreateAdHocTaskRequest, UpdateAdHocTaskRequest } from './dto/workflow-ad-hoc-task.dto';
+
+const EDITABLE_AD_HOC_STATUSES = ['pending', 'blocked', 'ready'] as const;
 
 export interface RequestContext {
   requestId?: string;
@@ -831,6 +835,189 @@ export class WorkflowRuntimeService {
         {
           actorId: principal.userId,
           action: 'workflow_task.reassigned',
+          resourceType: 'workflow_task',
+          resourceId: taskId,
+          patientId: encounter.patientId,
+          organizationId: encounter.organizationId,
+          result: 'success',
+          requestId: context.requestId ?? null,
+          ip: context.ip ?? null,
+          userAgent: context.userAgent ?? null,
+        },
+        tx,
+      );
+      return tx.workflowTask.findUniqueOrThrow({ where: { id: taskId } });
+    });
+
+    return { data: toWorkflowTaskResponse(result) };
+  }
+
+  /** Attaches a doctor-authored task to a single running instance. Never
+   * touches the shared WorkflowTemplateVersion — this is deliberately the
+   * only way for clinical staff to customize one patient's flow without
+   * changing the process for every other patient. Always non-mandatory and
+   * dependency-free so it can never gate `complete()`'s mandatory-task check
+   * or need the mandatory-skip override. */
+  async addAdHocTask(
+    principal: AuthenticatedPrincipal,
+    instanceId: string,
+    dto: CreateAdHocTaskRequest,
+    context: RequestContext,
+  ) {
+    const { instance, encounter } = await this.loadInstance(principal, instanceId);
+    assertHasRole(
+      principal,
+      encounter.organizationId,
+      AD_HOC_TASK_ROLES,
+      'This role cannot add a task to a workflow instance.',
+    );
+    if (instance.status !== 'active') {
+      throw new ConflictAppError(
+        'INVALID_STATE_TRANSITION',
+        'Tasks can only be added to an active instance.',
+      );
+    }
+
+    const stepCode = `AD_HOC_${randomUUID().slice(0, 8)}`;
+    const result = await this.prisma.$transaction(async (tx) => {
+      await this.runtime.createTasks(tx, [
+        {
+          instanceId,
+          encounterId: instance.encounterId,
+          stepCode,
+          name: dto.name,
+          responsibleRole: dto.responsibleRole,
+          department: dto.department,
+          status: 'ready',
+          dependsOnStepCodes: [],
+          slaMinutes: dto.slaMinutes,
+          priority: 'medium',
+          urgency: 'routine',
+          mandatory: false,
+          origin: 'ad_hoc',
+          createdBy: principal.userId,
+        },
+      ]);
+      const created = await tx.workflowTask.findFirstOrThrow({
+        where: { instanceId, stepCode },
+      });
+      await this.audit.write(
+        {
+          actorId: principal.userId,
+          action: 'workflow_task.ad_hoc_created',
+          resourceType: 'workflow_task',
+          resourceId: created.id,
+          patientId: instance.patientId,
+          organizationId: encounter.organizationId,
+          result: 'success',
+          requestId: context.requestId ?? null,
+          ip: context.ip ?? null,
+          userAgent: context.userAgent ?? null,
+        },
+        tx,
+      );
+      return created;
+    });
+
+    return { data: toWorkflowTaskResponse(result) };
+  }
+
+  async updateAdHocTask(
+    principal: AuthenticatedPrincipal,
+    taskId: string,
+    patch: UpdateAdHocTaskRequest,
+    context: RequestContext,
+  ) {
+    const { task, encounter } = await this.loadTaskWithEncounter(principal, taskId);
+    assertHasRole(
+      principal,
+      encounter.organizationId,
+      AD_HOC_TASK_ROLES,
+      'This role cannot edit this task.',
+    );
+    if (task.origin !== 'ad_hoc') {
+      throw new ConflictAppError(
+        'WORKFLOW_TASK_NOT_AD_HOC',
+        'Only an ad-hoc task can be edited directly — template-derived steps require a new template version.',
+      );
+    }
+    if (!EDITABLE_AD_HOC_STATUSES.includes(task.status as (typeof EDITABLE_AD_HOC_STATUSES)[number])) {
+      throw new ConflictAppError(
+        'INVALID_STATE_TRANSITION',
+        'This task has already started and can no longer be edited.',
+      );
+    }
+
+    const { version: expectedVersion, ...fields } = patch;
+    const result = await this.prisma.$transaction(async (tx) => {
+      const updateResult = await this.runtime.transition(tx, taskId, expectedVersion, {
+        ...(fields.name !== undefined ? { name: fields.name } : {}),
+        ...(fields.responsibleRole !== undefined ? { responsibleRole: fields.responsibleRole } : {}),
+        ...(fields.department !== undefined ? { department: fields.department } : {}),
+        ...(fields.slaMinutes !== undefined ? { slaMinutes: fields.slaMinutes } : {}),
+      } as never);
+      if (updateResult.count === 0) {
+        throw new ConflictAppError(
+          'OPTIMISTIC_LOCK_FAILED',
+          'The task was modified by another request.',
+        );
+      }
+      await this.audit.write(
+        {
+          actorId: principal.userId,
+          action: 'workflow_task.ad_hoc_updated',
+          resourceType: 'workflow_task',
+          resourceId: taskId,
+          patientId: encounter.patientId,
+          organizationId: encounter.organizationId,
+          result: 'success',
+          requestId: context.requestId ?? null,
+          ip: context.ip ?? null,
+          userAgent: context.userAgent ?? null,
+        },
+        tx,
+      );
+      return tx.workflowTask.findUniqueOrThrow({ where: { id: taskId } });
+    });
+
+    return { data: toWorkflowTaskResponse(result) };
+  }
+
+  async cancelAdHocTask(
+    principal: AuthenticatedPrincipal,
+    taskId: string,
+    expectedVersion: number,
+    context: RequestContext,
+  ) {
+    const { task, encounter } = await this.loadTaskWithEncounter(principal, taskId);
+    assertHasRole(
+      principal,
+      encounter.organizationId,
+      AD_HOC_TASK_ROLES,
+      'This role cannot remove this task.',
+    );
+    if (task.origin !== 'ad_hoc') {
+      throw new ConflictAppError(
+        'WORKFLOW_TASK_NOT_AD_HOC',
+        'Only an ad-hoc task can be removed directly.',
+      );
+    }
+    if (TERMINAL_TASK_STATUSES.includes(task.status)) {
+      throw new ConflictAppError('INVALID_STATE_TRANSITION', 'This task is already terminal.');
+    }
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const updateResult = await this.runtime.cancelAdHocTask(tx, taskId, expectedVersion);
+      if (updateResult.count === 0) {
+        throw new ConflictAppError(
+          'OPTIMISTIC_LOCK_FAILED',
+          'The task was modified by another request.',
+        );
+      }
+      await this.audit.write(
+        {
+          actorId: principal.userId,
+          action: 'workflow_task.ad_hoc_cancelled',
           resourceType: 'workflow_task',
           resourceId: taskId,
           patientId: encounter.patientId,

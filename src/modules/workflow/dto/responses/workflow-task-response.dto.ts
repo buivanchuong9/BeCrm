@@ -21,6 +21,7 @@ const TASK_STATUS_VALUES = [
 ] as const;
 const PRIORITY_VALUES = ['low', 'medium', 'high'] as const;
 const URGENCY_VALUES = ['routine', 'urgent', 'emergency'] as const;
+const ORIGIN_VALUES = ['template', 'ad_hoc'] as const;
 
 export class WorkflowTaskResponseDto {
   @ApiProperty({ format: 'uuid' }) id!: string;
@@ -37,6 +38,8 @@ export class WorkflowTaskResponseDto {
   @ApiProperty({ enum: PRIORITY_VALUES }) priority!: (typeof PRIORITY_VALUES)[number];
   @ApiProperty({ enum: URGENCY_VALUES }) urgency!: (typeof URGENCY_VALUES)[number];
   @ApiProperty() mandatory!: boolean;
+  @ApiProperty({ enum: ORIGIN_VALUES }) origin!: (typeof ORIGIN_VALUES)[number];
+  @ApiProperty({ format: 'uuid', nullable: true }) createdBy!: string | null;
   @ApiProperty({ nullable: true }) clinicalWarning!: string | null;
   @ApiProperty() reworkCount!: number;
   @ApiProperty() version!: number;

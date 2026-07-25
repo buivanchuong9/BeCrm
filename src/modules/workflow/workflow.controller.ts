@@ -26,6 +26,11 @@ import {
   VersionOnlyRequest,
 } from './dto/workflow-template.dto';
 import { ReplaceStepsRequest, WorkflowStepDefinitionDto } from './dto/workflow-step-definition.dto';
+import {
+  CancelAdHocTaskRequest,
+  CreateAdHocTaskRequest,
+  UpdateAdHocTaskRequest,
+} from './dto/workflow-ad-hoc-task.dto';
 import { WorkflowTemplatesService } from './workflow-templates.service';
 import { WorkflowRuntimeService } from './workflow-runtime.service';
 
@@ -301,6 +306,17 @@ export class WorkflowInstancesController {
   ) {
     return this.runtime.complete(principal, id, dto.version, context(req));
   }
+
+  @RequireIdempotencyKey()
+  @Post(':instanceId/tasks')
+  addAdHocTask(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Param('instanceId', ParseUUIDPipe) id: string,
+    @Body() dto: CreateAdHocTaskRequest,
+    @Req() req: Request,
+  ) {
+    return this.runtime.addAdHocTask(principal, id, dto, context(req));
+  }
 }
 
 class TaskQuery {
@@ -420,5 +436,25 @@ export class WorkflowTasksController {
     @Req() r: Request,
   ) {
     return this.runtime.reassign(p, id, d.assigneeId, d.version, context(r));
+  }
+
+  @Patch(':taskId')
+  updateAdHocTask(
+    @CurrentUser() p: AuthenticatedPrincipal,
+    @Param('taskId', ParseUUIDPipe) id: string,
+    @Body() d: UpdateAdHocTaskRequest,
+    @Req() r: Request,
+  ) {
+    return this.runtime.updateAdHocTask(p, id, d, context(r));
+  }
+
+  @Post(':taskId/cancel')
+  cancelAdHocTask(
+    @CurrentUser() p: AuthenticatedPrincipal,
+    @Param('taskId', ParseUUIDPipe) id: string,
+    @Body() d: CancelAdHocTaskRequest,
+    @Req() r: Request,
+  ) {
+    return this.runtime.cancelAdHocTask(p, id, d.version, context(r));
   }
 }
