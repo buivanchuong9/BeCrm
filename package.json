@@ -26,6 +26,7 @@
     "admin:bootstrap-owners": "ts-node -r tsconfig-paths/register scripts/bootstrap-super-admins.ts",
     "admin:check-owners": "ts-node -r tsconfig-paths/register scripts/check-super-admins.ts",
     "admin:set-password": "ts-node -r tsconfig-paths/register scripts/set-super-admin-password.ts",
+    "admin:test-owners-full-access": "ts-node -r tsconfig-paths/register scripts/test-owners-full-access.ts",
     "openapi:generate": "ts-node -r tsconfig-paths/register scripts/generate-openapi.ts"
   },
   "dependencies": {
