@@ -42,6 +42,7 @@ export function toWorkflowTemplateVersionResponse(
       string,
       { x: number; y: number }
     > | null,
+    terminalEdges: version.terminalEdges as unknown as Array<{ source: string; target: string }>,
     rowVersion: version.rowVersion,
     createdAt: version.createdAt.toISOString(),
     publishedAt: version.publishedAt?.toISOString() ?? null,

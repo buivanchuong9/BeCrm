@@ -16,8 +16,11 @@ import {
 } from './policies/workflow-policies';
 import {
   validateStepGraph,
+  validatePublishableWorkflowGraph,
+  validateTerminalEdgeShape,
   assertNoMandatoryStepRemoved,
   WorkflowStepDefinition,
+  WorkflowTerminalEdge,
 } from './workflow-step-graph.util';
 import {
   toWorkflowTemplateResponse,
@@ -27,6 +30,7 @@ import {
   CreateWorkflowTemplateRequest,
   UpdateWorkflowTemplateRequest,
   NodePositionsRequest,
+  WorkflowGraphLayoutRequest,
 } from './dto/workflow-template.dto';
 import { ReplaceStepsRequest } from './dto/workflow-step-definition.dto';
 
@@ -216,6 +220,7 @@ export class WorkflowTemplatesService {
         status: 'draft',
         steps: published.steps as never,
         nodePositions: published.nodePositions as never,
+        terminalEdges: published.terminalEdges as never,
       });
       await this.audit.write(
         {
@@ -268,10 +273,27 @@ export class WorkflowTemplatesService {
     const nextSteps = dto.steps as unknown as WorkflowStepDefinition[];
     validateStepGraph(nextSteps);
     assertNoMandatoryStepRemoved(version.steps as unknown as WorkflowStepDefinition[], nextSteps);
+    const nextCodes = new Set(nextSteps.map((step) => step.code));
+    const currentPositions =
+      (version.nodePositions as Record<string, { x: number; y: number }> | null) ?? {};
+    const nextPositions = Object.fromEntries(
+      Object.entries(currentPositions).filter(
+        ([code]) => code === '__START__' || code === '__END__' || nextCodes.has(code),
+      ),
+    );
+    const nextTerminalEdges = (
+      version.terminalEdges as unknown as WorkflowTerminalEdge[]
+    ).filter(
+      (edge) =>
+        (edge.source === '__START__' || nextCodes.has(edge.source)) &&
+        (edge.target === '__END__' || nextCodes.has(edge.target)),
+    );
 
     const updated = await this.prisma.$transaction(async (tx) => {
       const result = await this.repo.updateVersion(tx, versionId, dto.rowVersion, {
         steps: nextSteps as never,
+        nodePositions: nextPositions as never,
+        terminalEdges: nextTerminalEdges as never,
       });
       if (result.count === 0) {
         throw new ConflictAppError(
@@ -449,6 +471,60 @@ export class WorkflowTemplatesService {
     return { data: toWorkflowTemplateVersionResponse(updated) };
   }
 
+  async updateGraphLayout(
+    principal: AuthenticatedPrincipal,
+    versionId: string,
+    dto: WorkflowGraphLayoutRequest,
+    context: RequestContext,
+  ) {
+    const { version, template } = await this.loadDraftVersionForEdit(principal, versionId);
+    const steps = version.steps as unknown as WorkflowStepDefinition[];
+    validateTerminalEdgeShape(steps, dto.terminalEdges);
+    const allowedPositionCodes = new Set([
+      '__START__',
+      '__END__',
+      ...steps.map((step) => step.code),
+    ]);
+    const positions = Object.fromEntries(
+      Object.entries(dto.positions).filter(
+        ([code, position]) =>
+          allowedPositionCodes.has(code) &&
+          Number.isFinite(position.x) &&
+          Number.isFinite(position.y) &&
+          Math.abs(position.x) < 100_000 &&
+          Math.abs(position.y) < 100_000,
+      ),
+    );
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await this.repo.updateVersion(tx, versionId, dto.rowVersion, {
+        nodePositions: positions as never,
+        terminalEdges: dto.terminalEdges as never,
+      });
+      if (result.count === 0) {
+        throw new ConflictAppError(
+          'OPTIMISTIC_LOCK_FAILED',
+          'The graph was modified by another request.',
+        );
+      }
+      await this.audit.write(
+        {
+          actorId: principal.userId,
+          action: 'workflow_template_version.graph_layout_updated',
+          resourceType: 'workflow_template_version',
+          resourceId: versionId,
+          organizationId: template.organizationId,
+          result: 'success',
+          requestId: context.requestId ?? null,
+          ip: context.ip ?? null,
+          userAgent: context.userAgent ?? null,
+        },
+        tx,
+      );
+      return tx.workflowTemplateVersion.findUniqueOrThrow({ where: { id: versionId } });
+    });
+    return { data: toWorkflowTemplateVersionResponse(updated) };
+  }
+
   async publish(
     principal: AuthenticatedPrincipal,
     versionId: string,
@@ -482,6 +558,11 @@ export class WorkflowTemplatesService {
         'A version needs at least one step to publish.',
       );
     }
+    validatePublishableWorkflowGraph(
+      steps,
+      version.nodePositions as Record<string, { x: number; y: number }> | null,
+      version.terminalEdges as unknown as WorkflowTerminalEdge[],
+    );
 
     const published = await this.prisma.$transaction(async (tx) => {
       const result = await this.repo.updateVersion(tx, versionId, expectedRowVersion, {

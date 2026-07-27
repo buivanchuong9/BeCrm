@@ -1,5 +1,16 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsInt, IsObject, IsOptional, IsString, IsUUID, Min } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  IsArray,
+  IsInt,
+  IsNumber,
+  IsObject,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Min,
+  ValidateNested,
+} from 'class-validator';
 
 export class CreateWorkflowTemplateRequest {
   @ApiProperty()
@@ -41,6 +52,46 @@ export class NodePositionsRequest {
   @ApiProperty({ description: 'Merged into existing positions, not replaced wholesale.' })
   @IsObject()
   positions!: Record<string, { x: number; y: number }>;
+}
+
+export class WorkflowTerminalEdgeRequest {
+  @ApiProperty()
+  @IsString()
+  source!: string;
+
+  @ApiProperty()
+  @IsString()
+  target!: string;
+}
+
+export class WorkflowGraphPositionRequest {
+  @ApiProperty()
+  @IsNumber()
+  x!: number;
+
+  @ApiProperty()
+  @IsNumber()
+  y!: number;
+}
+
+export class WorkflowGraphLayoutRequest {
+  @ApiProperty({
+    description: 'Complete graph position snapshot. Reserved keys __START__ and __END__ are supported.',
+    additionalProperties: { type: 'object' },
+  })
+  @IsObject()
+  positions!: Record<string, WorkflowGraphPositionRequest>;
+
+  @ApiProperty({ type: [WorkflowTerminalEdgeRequest] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => WorkflowTerminalEdgeRequest)
+  terminalEdges!: WorkflowTerminalEdgeRequest[];
+
+  @ApiProperty()
+  @IsInt()
+  @Min(1)
+  rowVersion!: number;
 }
 
 export class ActivateWorkflowRequest {

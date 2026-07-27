@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsBoolean, IsInt, IsString, Min } from 'class-validator';
+import { IsBoolean, IsInt, IsOptional, IsString, Min } from 'class-validator';
 
 export class SubmitResultRequest {
   @ApiProperty()
@@ -9,6 +9,16 @@ export class SubmitResultRequest {
   @ApiProperty()
   @IsBoolean()
   abnormal!: boolean;
+
+  @ApiProperty({ required: false, default: false })
+  @IsOptional()
+  @IsBoolean()
+  critical?: boolean;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  criticalReason?: string;
 
   @ApiProperty()
   @IsInt()

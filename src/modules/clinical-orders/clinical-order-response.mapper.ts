@@ -26,6 +26,12 @@ export function toClinicalResultResponse(result: ClinicalResult): ClinicalResult
     orderId: result.orderId,
     summary: result.summary,
     abnormal: result.abnormal,
+    critical: result.critical,
+    criticalReason: result.criticalReason,
+    acknowledgedAt: result.acknowledgedAt?.toISOString() ?? null,
+    acknowledgedBy: result.acknowledgedBy,
+    acknowledgementNote: result.acknowledgementNote,
+    version: result.version,
     recordedAt: result.recordedAt.toISOString(),
     recordedBy: result.recordedBy,
   };

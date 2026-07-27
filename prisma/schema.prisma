@@ -1031,12 +1031,18 @@ model ClinicalOrder {
 }
 
 model ClinicalResult {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  orderId    String   @unique @map("order_id") @db.Uuid
-  summary    String
-  abnormal   Boolean
-  recordedAt DateTime @default(now()) @map("recorded_at") @db.Timestamptz
-  recordedBy String   @map("recorded_by") @db.Uuid
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId             String    @unique @map("order_id") @db.Uuid
+  summary             String
+  abnormal            Boolean
+  critical            Boolean   @default(false)
+  criticalReason      String?   @map("critical_reason")
+  acknowledgedAt      DateTime? @map("acknowledged_at") @db.Timestamptz
+  acknowledgedBy      String?   @map("acknowledged_by") @db.Uuid
+  acknowledgementNote String?   @map("acknowledgement_note")
+  version             Int       @default(1)
+  recordedAt          DateTime  @default(now()) @map("recorded_at") @db.Timestamptz
+  recordedBy          String    @map("recorded_by") @db.Uuid
 
   order ClinicalOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
 
@@ -1094,6 +1100,9 @@ model WorkflowTemplateVersion {
   // requiredOutput?,prerequisiteStepCodes[]}
   steps         Json                   @default("[]")
   nodePositions Json?                  @map("node_positions")
+  // Reserved graph-boundary edges. Business-to-business edges remain encoded
+  // in prerequisiteStepCodes so runtime task dependencies stay immutable.
+  terminalEdges Json                   @default("[]") @map("terminal_edges")
   // Optimistic lock for concurrent draft edits — distinct from
   // `versionNumber` (the human-facing template version, e.g. v1/v2/v3).
   rowVersion    Int                    @default(1) @map("row_version")

@@ -12,6 +12,7 @@ import {
 import { CreateClinicalOrderRequest } from './dto/create-clinical-order.dto';
 import { InvalidSampleRequest } from './dto/invalid-sample.dto';
 import { SubmitResultRequest } from './dto/submit-result.dto';
+import { AcknowledgeCriticalResultRequest } from './dto/acknowledge-critical-result.dto';
 import {
   ClinicalOrderResponseDto,
   ClinicalResultResponseDto,
@@ -54,6 +55,12 @@ export class EncounterClinicalOrdersController {
 export class ClinicalOrdersController {
   constructor(private readonly clinicalOrdersService: ClinicalOrdersService) {}
 
+  @ApiOkListEnvelope(ClinicalOrderResponseDto)
+  @Get()
+  async listAssigned(@CurrentUser() principal: AuthenticatedPrincipal) {
+    return this.clinicalOrdersService.listAssigned(principal);
+  }
+
   @ApiOkEnvelope(ClinicalOrderResponseDto)
   @Patch(':orderId/invalid-sample')
   async markInvalidSample(
@@ -80,6 +87,23 @@ export class ClinicalOrdersController {
     @Req() req: Request,
   ) {
     return this.clinicalOrdersService.submitResult(principal, orderId, dto, requestContext(req));
+  }
+
+  @ApiOkEnvelope(ClinicalResultResponseDto)
+  @RequireIdempotencyKey({ clinical: true })
+  @Post(':orderId/result/acknowledgements')
+  async acknowledgeCriticalResult(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Param('orderId', ParseUUIDPipe) orderId: string,
+    @Body() dto: AcknowledgeCriticalResultRequest,
+    @Req() req: Request,
+  ) {
+    return this.clinicalOrdersService.acknowledgeCriticalResult(
+      principal,
+      orderId,
+      dto,
+      requestContext(req),
+    );
   }
 
   @ApiOkEnvelope(ClinicalResultResponseDto)

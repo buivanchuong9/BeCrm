@@ -20,6 +20,7 @@ import {
   ActivateWorkflowRequest,
   CreateWorkflowTemplateRequest,
   NodePositionsRequest,
+  WorkflowGraphLayoutRequest,
   ReasonedVersionRequest,
   ReassignTaskRequest,
   UpdateWorkflowTemplateRequest,
@@ -199,6 +200,16 @@ export class WorkflowTemplateVersionsController {
     @Body() dto: NodePositionsRequest,
   ) {
     return this.service.updateNodePositions(principal, versionId, dto);
+  }
+
+  @Put(':versionId/graph-layout')
+  graphLayout(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Param('versionId', ParseUUIDPipe) versionId: string,
+    @Body() dto: WorkflowGraphLayoutRequest,
+    @Req() req: Request,
+  ) {
+    return this.service.updateGraphLayout(principal, versionId, dto, context(req));
   }
 
   @Post(':versionId/publish')

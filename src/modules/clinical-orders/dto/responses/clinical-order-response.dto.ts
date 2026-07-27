@@ -29,6 +29,12 @@ export class ClinicalResultResponseDto {
   @ApiProperty({ format: 'uuid' }) orderId!: string;
   @ApiProperty() summary!: string;
   @ApiProperty() abnormal!: boolean;
+  @ApiProperty() critical!: boolean;
+  @ApiProperty({ nullable: true }) criticalReason!: string | null;
+  @ApiProperty({ format: 'date-time', nullable: true }) acknowledgedAt!: string | null;
+  @ApiProperty({ format: 'uuid', nullable: true }) acknowledgedBy!: string | null;
+  @ApiProperty({ nullable: true }) acknowledgementNote!: string | null;
+  @ApiProperty() version!: number;
   @ApiProperty({ format: 'date-time' }) recordedAt!: string;
   @ApiProperty({ format: 'uuid' }) recordedBy!: string;
 }

@@ -288,6 +288,20 @@ export class EncountersService {
         'The encounter cannot be closed until its medical record has been signed.',
       );
     }
+    const unacknowledgedCriticalResult = await this.prisma.clinicalResult.findFirst({
+      where: {
+        critical: true,
+        acknowledgedAt: null,
+        order: { encounterId },
+      },
+      select: { id: true },
+    });
+    if (unacknowledgedCriticalResult) {
+      throw new ConflictAppError(
+        'ENCOUNTER_CLOSE_BLOCKED_BY_CRITICAL_RESULT',
+        'The encounter cannot be closed until every critical result has been acknowledged.',
+      );
+    }
 
     const updated = await this.prisma.$transaction(async (tx) => {
       const result = await tx.medicalEncounter.updateMany({

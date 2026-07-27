@@ -3,7 +3,12 @@ import { UserRole } from '@prisma/client';
 import { PrismaService } from '../../core/database/prisma.service';
 import { AuditService } from '../../core/audit/audit.service';
 import { AuthenticatedPrincipal } from '../../core/security/auth.types';
-import { ConflictAppError, ForbiddenAppError, NotFoundAppError } from '../../core/errors/app-error';
+import {
+  ConflictAppError,
+  ForbiddenAppError,
+  NotFoundAppError,
+  ValidationAppError,
+} from '../../core/errors/app-error';
 import { EncountersRepository } from '../encounters/encounters.repository';
 import { canTransition } from '../encounters/encounter-state-machine';
 import { ClinicalOrdersRepository } from './clinical-orders.repository';
@@ -14,6 +19,7 @@ import {
 import { CreateClinicalOrderRequest } from './dto/create-clinical-order.dto';
 import { InvalidSampleRequest } from './dto/invalid-sample.dto';
 import { SubmitResultRequest } from './dto/submit-result.dto';
+import { AcknowledgeCriticalResultRequest } from './dto/acknowledge-critical-result.dto';
 
 export interface RequestContext {
   requestId?: string;
@@ -114,6 +120,35 @@ export class ClinicalOrdersService {
     return { data: rows.map(toClinicalOrderResponse) };
   }
 
+  async listAssigned(principal: AuthenticatedPrincipal) {
+    const operationalRoles: UserRole[] = [
+      'doctor',
+      'lab_technician',
+      'imaging_technician',
+    ];
+    const scopes = principal.memberships.filter((membership) =>
+      operationalRoles.includes(membership.role),
+    );
+    const adminOrganizationIds = principal.memberships
+      .filter((membership) => membership.role === 'medical_administrator')
+      .map((membership) => membership.organizationId);
+    const rows = await this.prisma.clinicalOrder.findMany({
+      where: {
+        OR: [
+          ...scopes.map((scope) => ({
+            assignedRole: scope.role,
+            encounter: { organizationId: scope.organizationId },
+          })),
+          ...(adminOrganizationIds.length > 0
+            ? [{ encounter: { organizationId: { in: adminOrganizationIds } } }]
+            : []),
+        ],
+      },
+      orderBy: [{ status: 'asc' }, { createdAt: 'asc' }],
+    });
+    return { data: rows.map(toClinicalOrderResponse) };
+  }
+
   private async loadOrderAndEncounter(principal: AuthenticatedPrincipal, orderId: string) {
     const order = await this.repo.findById(orderId);
     if (!order) {
@@ -184,6 +219,18 @@ export class ClinicalOrdersService {
         'This order cannot receive a result now.',
       );
     }
+    if (dto.critical && !dto.abnormal) {
+      throw new ValidationAppError(
+        [{ field: 'critical', code: 'VALIDATION_FAILED', message: 'A critical result must also be marked abnormal.' }],
+        'A critical result must also be marked abnormal.',
+      );
+    }
+    if (dto.critical && !dto.criticalReason?.trim()) {
+      throw new ValidationAppError(
+        [{ field: 'criticalReason', code: 'VALIDATION_FAILED', message: 'Critical reason is required.' }],
+        'Critical reason is required for a critical result.',
+      );
+    }
     const newStatus = dto.abnormal ? 'result_ready' : 'completed';
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -198,13 +245,15 @@ export class ClinicalOrdersService {
         orderId,
         summary: dto.summary,
         abnormal: dto.abnormal,
+        critical: dto.critical ?? false,
+        criticalReason: dto.criticalReason?.trim() || null,
         recordedBy: principal.userId,
       });
       await this.encounters.addEvent(
         tx,
         order.encounterId,
         `Kết quả cận lâm sàng đã có (${order.type})${dto.abnormal ? ' — bất thường' : ''}`,
-        dto.abnormal ? 'warning' : 'success',
+        dto.critical ? 'danger' : dto.abnormal ? 'warning' : 'success',
       );
       await this.audit.write(
         {
@@ -215,6 +264,7 @@ export class ClinicalOrdersService {
           patientId: encounter.patientId,
           organizationId: encounter.organizationId,
           result: 'success',
+          severity: dto.critical ? 'critical' : dto.abnormal ? 'warning' : 'info',
           requestId: context.requestId ?? null,
           ip: context.ip ?? null,
           userAgent: context.userAgent ?? null,
@@ -225,6 +275,79 @@ export class ClinicalOrdersService {
     });
 
     return { data: toClinicalResultResponse(result) };
+  }
+
+  async acknowledgeCriticalResult(
+    principal: AuthenticatedPrincipal,
+    orderId: string,
+    dto: AcknowledgeCriticalResultRequest,
+    context: RequestContext,
+  ) {
+    const order = await this.repo.findById(orderId);
+    if (!order) throw new NotFoundAppError('Clinical order not found.');
+    const encounter = await this.loadEncounter(principal, order.encounterId);
+    const canAcknowledge = principal.memberships.some(
+      (membership) =>
+        membership.organizationId === encounter.organizationId &&
+        (membership.role === 'doctor' || membership.role === 'medical_administrator'),
+    );
+    if (!canAcknowledge) {
+      throw new ForbiddenAppError(
+        'AUTH_FORBIDDEN',
+        'Only a doctor or medical administrator in this organization may acknowledge a critical result.',
+      );
+    }
+    const result = await this.repo.findResultByOrderId(orderId);
+    if (!result) throw new NotFoundAppError('Result not found.');
+    if (!result.critical) {
+      throw new ConflictAppError('RESULT_NOT_CRITICAL', 'This result is not marked critical.');
+    }
+    if (result.acknowledgedAt) {
+      return { data: toClinicalResultResponse(result) };
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const mutation = await tx.clinicalResult.updateMany({
+        where: { id: result.id, version: dto.version, acknowledgedAt: null },
+        data: {
+          acknowledgedAt: new Date(),
+          acknowledgedBy: principal.userId,
+          acknowledgementNote: dto.note.trim(),
+          version: { increment: 1 },
+        },
+      });
+      if (mutation.count === 0) {
+        throw new ConflictAppError(
+          'OPTIMISTIC_LOCK_FAILED',
+          'The critical result was modified or acknowledged by another user.',
+        );
+      }
+      await this.encounters.addEvent(
+        tx,
+        order.encounterId,
+        `Kết quả nguy cấp đã được xác nhận và xử trí: ${dto.note.trim()}`,
+        'warning',
+      );
+      await this.audit.write(
+        {
+          actorId: principal.userId,
+          action: 'clinical_result.critical_acknowledged',
+          resourceType: 'clinical_result',
+          resourceId: result.id,
+          patientId: encounter.patientId,
+          organizationId: encounter.organizationId,
+          reason: dto.note.trim(),
+          result: 'success',
+          severity: 'critical',
+          requestId: context.requestId ?? null,
+          ip: context.ip ?? null,
+          userAgent: context.userAgent ?? null,
+        },
+        tx,
+      );
+      return tx.clinicalResult.findUniqueOrThrow({ where: { id: result.id } });
+    });
+    return { data: toClinicalResultResponse(updated) };
   }
 
   // Read-only: relationship scope only (docs/api.md section 26 "GET
