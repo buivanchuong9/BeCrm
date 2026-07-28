@@ -46,6 +46,39 @@ services:
       timeout: 5s
       retries: 10
 
+  ai:
+    build:
+      context: .
+      dockerfile: ai/Dockerfile
+      args:
+        PYTORCH_INDEX_URL: ${PYTORCH_INDEX_URL:-https://download.pytorch.org/whl/cu126}
+    container_name: dermahealth-ai
+    restart: unless-stopped
+    environment:
+      AI_INTERNAL_API_KEY: ${AI_API_KEY:?set AI_API_KEY in .env.production}
+      AI_REQUIRE_CUDA: 'true'
+      AI_TORCH_THREADS: ${AI_TORCH_THREADS:-2}
+      NVIDIA_VISIBLE_DEVICES: ${AI_GPU_DEVICE:-0}
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'python',
+          '-c',
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/live')",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   api:
     build:
       context: .
@@ -58,8 +91,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      ai:
+        condition: service_healthy
     env_file:
-      - .env.production
+      - ${APP_ENV_FILE:-.env.production}
+    environment:
+      AI_SERVICE_URL: http://ai:8000
     ports:
       # 127.0.0.1-only: nginx on the same host is the public entry point and
       # terminates TLS (see nginx/dermahealth.host.conf.example) — the app

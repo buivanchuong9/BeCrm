@@ -62,7 +62,9 @@ export function createOpenApiDocument(app: INestApplication): OpenAPIObject {
   const version = documentationVersion(app);
   const swaggerConfig = new DocumentBuilder()
     .setTitle('DermaHealth Backend API')
-    .setDescription('Clinic workflow backend: identity, scheduling, clinical, workflow, EMR, CRM.')
+    .setDescription(
+      'Clinic workflow backend: identity, scheduling, clinical, AI skin analysis, workflow, EMR, CRM.',
+    )
     .setVersion(version)
     .addBearerAuth()
     .addCookieAuth('refresh_token')

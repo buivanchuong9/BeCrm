@@ -67,7 +67,13 @@ export function buildConfiguration(env: EnvConfig) {
       password: env.SMTP_PASSWORD,
     },
     sms: { provider: env.SMS_PROVIDER, apiKey: env.SMS_API_KEY },
-    ai: { provider: env.AI_PROVIDER, modelVersion: env.AI_MODEL_VERSION, apiKey: env.AI_API_KEY },
+    ai: {
+      provider: env.AI_PROVIDER,
+      modelVersion: env.AI_MODEL_VERSION,
+      apiKey: env.AI_API_KEY,
+      serviceUrl: env.AI_SERVICE_URL.replace(/\/+$/, ''),
+      timeoutMs: env.AI_TIMEOUT_MS,
+    },
     logLevel: env.LOG_LEVEL,
   };
 }

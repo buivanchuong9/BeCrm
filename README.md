@@ -107,7 +107,7 @@ Các dịch vụ chính:
 - API: http://localhost:3000
 - Swagger UI (stable URL): http://localhost:3000/api/docs
 - OpenAPI JSON (stable URL): http://localhost:3000/api/docs/openapi.json
-- Versioned URL (optional): http://localhost:3000/api/docs/2.5.1
+- Versioned URL (optional): http://localhost:3000/api/docs/2.8.0
 - PostgreSQL: localhost:5442
 - Redis: localhost:6389
 - MinIO: localhost:9000 (console 9001)
@@ -139,10 +139,10 @@ git pull --ff-only origin main
 Script deploy sẽ tự động:
 
 - kiểm tra cấu hình compose production
-- build lại image API
-- đảm bảo PostgreSQL và Redis đang chạy
+- build lại image API và CUDA AI
+- đảm bảo PostgreSQL, Redis và AI GPU đang chạy
 - chạy `prisma migrate deploy`
-- recreate API container và chờ trạng thái healthy
+- recreate API container và chờ cả AI/API healthy
 
 Build sạch không dùng cache:
 

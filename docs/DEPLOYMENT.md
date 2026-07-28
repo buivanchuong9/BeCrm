@@ -3,11 +3,12 @@
 Backend production chạy bằng `docker-compose.prod.yml`:
 
 - API container: `dermahealth-api`
+- AI inference container: `dermahealth-ai` (NVIDIA GPU bắt buộc)
 - API trên host: `127.0.0.1:43000`
 - PostgreSQL và Redis chỉ nằm trong Docker network
 - Swagger UI cố định: `/api/docs`
 - OpenAPI JSON cố định: `/api/docs/openapi.json`
-- URL theo release (tùy chọn): `/api/docs/2.5.1`
+- URL theo release (tùy chọn): `/api/docs/2.8.0`
 
 Swagger runtime được sinh từ source code khi API khởi động, không đọc trực tiếp
 `docs/openapi.json`. Mọi response HTML, JavaScript, CSS và OpenAPI JSON dưới
@@ -31,6 +32,41 @@ sudo usermod -aG docker "$USER"
 
 Đăng xuất SSH và đăng nhập lại. Nếu chưa đăng nhập lại thì script deploy sẽ tự
 dùng `sudo docker`.
+
+### 1.1 Chuẩn bị NVIDIA GPU runtime
+
+Production không fallback sang CPU. Server phải có NVIDIA GPU, driver Linux hỗ
+trợ CUDA 12.x và NVIDIA Container Toolkit. Kiểm tra driver trước:
+
+```sh
+nvidia-smi
+```
+
+Cài NVIDIA Container Toolkit theo repository chính thức, sau đó cấu hình Docker:
+
+```sh
+curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey \
+  | sudo gpg --dearmor --yes \
+      -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+
+curl -sL https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list \
+  | sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' \
+  | sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+
+sudo apt-get update
+sudo apt-get install -y nvidia-container-toolkit
+sudo nvidia-ctk runtime configure --runtime=docker
+sudo systemctl restart docker
+```
+
+Xác minh Docker nhìn thấy GPU trước khi deploy:
+
+```sh
+docker run --rm --gpus all ubuntu:24.04 nvidia-smi
+```
+
+Nếu lệnh này lỗi thì không chạy deploy; sửa driver/toolkit trước. Runbook chính
+thức: <https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html>.
 
 Clone repo đúng một cấp thư mục:
 
@@ -65,6 +101,7 @@ openssl pkey \
 DB_PASSWORD="$(openssl rand -hex 24)"
 PASSWORD_PEPPER="$(openssl rand -hex 32)"
 FIELD_ENCRYPTION_KEY="$(openssl rand -base64 32 | tr -d '\n')"
+AI_API_KEY="$(openssl rand -hex 32)"
 ACCESS_PRIVATE_KEY="$(awk '{printf "%s\\n", $0}' "$HOME/.config/dermahealth/access_private.pem")"
 ACCESS_PUBLIC_KEY="$(awk '{printf "%s\\n", $0}' "$HOME/.config/dermahealth/access_public.pem")"
 
@@ -102,12 +139,17 @@ FIELD_ENCRYPTION_KEY=${FIELD_ENCRYPTION_KEY}
 
 SMS_PROVIDER=disabled
 AI_PROVIDER=deterministic
-AI_MODEL_VERSION=derma-vision-2.4.0
+AI_MODEL_VERSION=efficientnet-b0-31class
+AI_SERVICE_URL=http://ai:8000
+AI_TIMEOUT_MS=30000
+AI_API_KEY=${AI_API_KEY}
+AI_GPU_DEVICE=0
+PYTORCH_INDEX_URL=https://download.pytorch.org/whl/cu126
 LOG_LEVEL=info
 EOF
 
 chmod 600 .env.production
-unset DB_PASSWORD PASSWORD_PEPPER FIELD_ENCRYPTION_KEY
+unset DB_PASSWORD PASSWORD_PEPPER FIELD_ENCRYPTION_KEY AI_API_KEY
 unset ACCESS_PRIVATE_KEY ACCESS_PUBLIC_KEY
 ```
 
@@ -205,7 +247,7 @@ Kiểm tra các secret bắt buộc mà không in giá trị:
 for key in \
   POSTGRES_PASSWORD DATABASE_URL REDIS_URL \
   ACCESS_TOKEN_PRIVATE_KEY ACCESS_TOKEN_PUBLIC_KEY \
-  PASSWORD_PEPPER FIELD_ENCRYPTION_KEY
+  PASSWORD_PEPPER FIELD_ENCRYPTION_KEY AI_API_KEY
 do
   if grep -q "^${key}=." .env.production; then
     echo "$key OK"
@@ -227,11 +269,12 @@ cd ~/BE_Y_Te/BeCrm
 Script sẽ tự động:
 
 1. Đọc và kiểm tra `.env.production`.
-2. Build image API.
-3. Khởi động PostgreSQL và Redis.
-4. Chạy `prisma migrate deploy`.
-5. Recreate API bằng image mới.
-6. Chờ đến khi container API báo `healthy`.
+2. Build image CUDA AI và image API.
+3. Khởi động PostgreSQL, Redis và AI.
+4. Chờ AI load model trên `cuda:0` và báo `healthy`.
+5. Chạy `prisma migrate deploy`.
+6. Recreate API bằng image mới.
+7. Chờ đến khi container API báo `healthy`.
 
 ## 4. Deploy các lần tiếp theo
 
@@ -302,6 +345,13 @@ curl -sSI http://127.0.0.1:43000/api/docs/openapi.json \
 docker inspect \
   --format '{{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{end}}' \
   dermahealth-api
+
+docker inspect \
+  --format '{{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{end}}' \
+  dermahealth-ai
+
+docker exec dermahealth-ai python -c \
+  "import torch; print(torch.cuda.is_available(), torch.cuda.get_device_name(0))"
 ```
 
 Nếu user chưa có quyền Docker, thêm `sudo` trước `docker compose` trong các lệnh

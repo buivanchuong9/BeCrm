@@ -54,6 +54,8 @@ export const envSchema = z.object({
   AI_PROVIDER: z.string().default('deterministic'),
   AI_MODEL_VERSION: z.string().default('derma-vision-2.4.0'),
   AI_API_KEY: z.string().optional(),
+  AI_SERVICE_URL: z.string().url().default('http://localhost:8000'),
+  AI_TIMEOUT_MS: z.coerce.number().int().positive().max(120_000).default(30_000),
 
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
   SENTRY_DSN: z.string().optional(),

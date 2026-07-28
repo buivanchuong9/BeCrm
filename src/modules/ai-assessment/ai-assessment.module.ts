@@ -6,11 +6,17 @@ import {
 } from './ai-assessment.controller';
 import { AiAssessmentService } from './ai-assessment.service';
 import { AiAssessmentRepository } from './ai-assessment.repository';
+import { SkinAnalysisController } from './skin-analysis.controller';
+import { SkinAnalysisService } from './skin-analysis.service';
 
 @Module({
   imports: [EncountersModule],
-  controllers: [EncounterAiAssessmentController, AiAssessmentDetailController],
-  providers: [AiAssessmentService, AiAssessmentRepository],
+  controllers: [
+    EncounterAiAssessmentController,
+    AiAssessmentDetailController,
+    SkinAnalysisController,
+  ],
+  providers: [AiAssessmentService, AiAssessmentRepository, SkinAnalysisService],
   exports: [AiAssessmentRepository],
 })
 export class AiAssessmentModule {}
