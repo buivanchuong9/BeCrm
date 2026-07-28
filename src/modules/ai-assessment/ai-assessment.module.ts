@@ -8,15 +8,24 @@ import { AiAssessmentService } from './ai-assessment.service';
 import { AiAssessmentRepository } from './ai-assessment.repository';
 import { SkinAnalysisController } from './skin-analysis.controller';
 import { SkinAnalysisService } from './skin-analysis.service';
+import { PatientsModule } from '../patients/patients.module';
+import { SkinAnalysisCaseController } from './skin-analysis-case.controller';
+import { SkinAnalysisCaseService } from './skin-analysis-case.service';
 
 @Module({
-  imports: [EncountersModule],
+  imports: [EncountersModule, PatientsModule],
   controllers: [
     EncounterAiAssessmentController,
     AiAssessmentDetailController,
     SkinAnalysisController,
+    SkinAnalysisCaseController,
   ],
-  providers: [AiAssessmentService, AiAssessmentRepository, SkinAnalysisService],
+  providers: [
+    AiAssessmentService,
+    AiAssessmentRepository,
+    SkinAnalysisService,
+    SkinAnalysisCaseService,
+  ],
   exports: [AiAssessmentRepository],
 })
 export class AiAssessmentModule {}

@@ -395,7 +395,9 @@ Response: `{ok: true, ticket: QueueTicket, repeated: boolean}` hoặc `{ok: fals
 
 | Method | Endpoint | Mô tả | 🔒 |
 |---|---|---|---|
-| POST | `/ai/skin-analysis` ✅ v2.8.0 | `multipart/form-data`, field `file` (JPEG/PNG/WebP, tối đa 10 MB) → gọi service EfficientNet-B0 nội bộ và trả top-5 `{classIndex, label, probability}`. Kết quả chỉ dùng để sàng lọc. | authenticated |
+| POST | `/ai/skin-analysis` 🔧 **FIXED v2.8.1** | `multipart/form-data`, field `file` (JPEG/PNG/WebP, tối đa 10 MB) → gọi GPU EfficientNet-B0 nội bộ. Không trả tên bệnh khi mapping labels chưa xác minh. | authenticated |
+| POST | `/ai/skin-analysis-cases` 🆕 **NEW v2.8.1** | Multi-image `overview?`, `closeup`, `alternate?`, `bodyRegion`, `durationDays?`, `symptoms?`, `patientId?`; inference độc lập + Grad-CAM thật + quality/abstention + heuristic aggregation. | authenticated |
+| POST | `/ai/skin-analysis-cases/:caseId/review` 🆕 **NEW v2.8.1** | Bác sĩ ghi `accepted`, `rejected`, `different_diagnosis` hoặc `image_unsuitable`; review không tự động đưa vào retraining. | doctor |
 | POST | `/encounters/:id/intake` | `{chiefComplaint, severity(1-5), durationDays, symptoms[], history[], currentMedication[], images[]}` → tạo `SymptomIntake` + **tự động** trigger AI assessment (side-effect, không phải API riêng ở FE hiện tại) | patient |
 | GET | `/encounters/:id/ai-assessments` | Lịch sử tất cả assessment (kể cả bị `supersededBy`) | |
 | GET | `/ai-assessments/:id` | Chi tiết 1 assessment | |
@@ -592,7 +594,7 @@ Toàn bộ số liệu dưới đây hiện đang là **mảng dữ liệu tĩnh
 | **Reports.tsx** | Phần lớn (breakdown cải thiện, lịch sử điều trị/thuốc, AI report 4 phần, nút Xuất PDF) hardcode, không có handler xuất PDF | Xem mục 6.15; cần thêm report-generation service |
 | **Support.tsx** | Form gửi yêu cầu hỗ trợ chỉ `clear()` input, không gửi đi đâu | `POST /support/tickets {topic, message}` + kênh liên hệ (hotline/chat/email) hiện đang là danh sách tĩnh, có thể để tĩnh nếu không đổi thường xuyên |
 | **SettingsPage.tsx** | Toggle thông báo/quyền riêng tư/thiết bị chỉ là state cục bộ, nút "Lưu cài đặt" không hoạt động; "Xóa tài khoản" không có handler | `GET/PUT /users/:id/preferences {notifications, privacy, device, display, language}`; `POST /users/:id/deletion-request` (nên là luồng có xác nhận, không xoá ngay) |
-| **AIAnalysis.tsx — upload ảnh/camera** | Backend v2.8.0 đã có `POST /api/v1/ai/skin-analysis` nhận ảnh và chạy EfficientNet-B0; frontend vẫn cần nối `Upload.Dragger`/camera vào endpoint này | Dùng API AI trực tiếp; luồng lưu ảnh y tế lâu dài vẫn qua generic upload ở mục 8.4 |
+| **AIAnalysis.tsx — upload ảnh/camera** | Backend v2.8.1 có API một ảnh và multi-image Grad-CAM; frontend vẫn cần nối `Upload.Dragger`/camera vào endpoint phù hợp | Ưu tiên `/api/v1/ai/skin-analysis-cases`; luồng lưu ảnh y tế lâu dài vẫn qua generic upload ở mục 8.4 |
 | **Profile.tsx — avatar upload, "Chỉnh sửa hồ sơ", "Cài đặt thông báo", "Quyền riêng tư"** | Icon camera và các nút menu không có handler | Nối vào `PATCH /users/:id` (avatar cần presigned upload URL) và `/users/:id/preferences` ở trên |
 | **Integrations.tsx** | Gọi thẳng repository, không qua service — xem mục 6.14 | Chốt lại chính xác nghiệp vụ retry/reconcile trước khi build |
 

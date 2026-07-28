@@ -107,7 +107,7 @@ Các dịch vụ chính:
 - API: http://localhost:3000
 - Swagger UI (stable URL): http://localhost:3000/api/docs
 - OpenAPI JSON (stable URL): http://localhost:3000/api/docs/openapi.json
-- Versioned URL (optional): http://localhost:3000/api/docs/2.8.0
+- Versioned URL (optional): http://localhost:3000/api/docs/2.8.1
 - PostgreSQL: localhost:5442
 - Redis: localhost:6389
 - MinIO: localhost:9000 (console 9001)

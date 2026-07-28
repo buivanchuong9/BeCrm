@@ -58,6 +58,14 @@ services:
       AI_INTERNAL_API_KEY: ${AI_API_KEY:?set AI_API_KEY in .env.production}
       AI_REQUIRE_CUDA: 'true'
       AI_TORCH_THREADS: ${AI_TORCH_THREADS:-2}
+      AI_MAX_CONCURRENT_CASES: ${AI_MAX_CONCURRENT_CASES:-1}
+      AI_QUALITY_MIN_SCORE: ${AI_QUALITY_MIN_SCORE:-0.55}
+      AI_MIN_TOP_PROBABILITY: ${AI_MIN_TOP_PROBABILITY:-0.60}
+      AI_MIN_PROBABILITY_MARGIN: ${AI_MIN_PROBABILITY_MARGIN:-0.15}
+      AI_MIN_BRIGHTNESS: ${AI_MIN_BRIGHTNESS:-0.12}
+      AI_MAX_BRIGHTNESS: ${AI_MAX_BRIGHTNESS:-0.95}
+      AI_MIN_BLUR_VARIANCE: ${AI_MIN_BLUR_VARIANCE:-0.001}
+      AI_APPROVED_PREPROCESSING_VERSION: ${AI_APPROVED_PREPROCESSING_VERSION:-imagenet-eval-224-v1}
       NVIDIA_VISIBLE_DEVICES: ${AI_GPU_DEVICE:-0}
       NVIDIA_DRIVER_CAPABILITIES: compute,utility
     deploy:
@@ -97,6 +105,7 @@ services:
       - ${APP_ENV_FILE:-.env.production}
     environment:
       AI_SERVICE_URL: http://ai:8000
+      AI_MAX_RESPONSE_BYTES: ${AI_MAX_RESPONSE_BYTES:-5000000}
     ports:
       # 127.0.0.1-only: nginx on the same host is the public entry point and
       # terminates TLS (see nginx/dermahealth.host.conf.example) — the app

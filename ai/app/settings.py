@@ -18,6 +18,16 @@ class Settings:
     top_k: int = int(os.getenv("AI_TOP_K", "5"))
     torch_threads: int = int(os.getenv("AI_TORCH_THREADS", "2"))
     require_cuda: bool = os.getenv("AI_REQUIRE_CUDA", "true").lower() == "true"
+    max_concurrent_cases: int = int(os.getenv("AI_MAX_CONCURRENT_CASES", "1"))
+    quality_min_score: float = float(os.getenv("AI_QUALITY_MIN_SCORE", "0.55"))
+    min_top_probability: float = float(os.getenv("AI_MIN_TOP_PROBABILITY", "0.60"))
+    min_probability_margin: float = float(os.getenv("AI_MIN_PROBABILITY_MARGIN", "0.15"))
+    min_brightness: float = float(os.getenv("AI_MIN_BRIGHTNESS", "0.12"))
+    max_brightness: float = float(os.getenv("AI_MAX_BRIGHTNESS", "0.95"))
+    min_blur_variance: float = float(os.getenv("AI_MIN_BLUR_VARIANCE", "0.001"))
+    approved_preprocessing_version: str = os.getenv(
+        "AI_APPROVED_PREPROCESSING_VERSION", "imagenet-eval-224-v1"
+    )
 
 
 settings = Settings()

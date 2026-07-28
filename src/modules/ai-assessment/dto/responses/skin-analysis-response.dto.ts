@@ -1,11 +1,14 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class SkinPredictionDto {
   @ApiProperty({ example: 4 })
   classIndex!: number;
 
-  @ApiProperty({ example: 'class_04' })
-  label!: string;
+  @ApiPropertyOptional({
+    example: 'verified-label',
+    description: 'Omitted until labels.json has a verified training class_to_idx mapping.',
+  })
+  label?: string;
 
   @ApiProperty({ example: 0.812345 })
   probability!: number;

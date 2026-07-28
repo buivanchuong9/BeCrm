@@ -63,7 +63,16 @@ export function createOpenApiDocument(app: INestApplication): OpenAPIObject {
   const swaggerConfig = new DocumentBuilder()
     .setTitle('DermaHealth Backend API')
     .setDescription(
-      'Clinic workflow backend: identity, scheduling, clinical, AI skin analysis, workflow, EMR, CRM.',
+      [
+        'Clinic workflow backend: identity, scheduling, clinical, AI skin analysis, workflow, EMR, CRM.',
+        '',
+        '## Release 2.8.1',
+        '',
+        '- **NEW** `POST /api/v1/ai/skin-analysis-cases`: tối đa 3 ảnh, quality gate, Grad-CAM, abstention, aggregation và triage.',
+        '- **NEW** `POST /api/v1/ai/skin-analysis-cases/{caseId}/review`: bác sĩ review kết quả AI.',
+        '- **FIXED** `POST /api/v1/ai/skin-analysis`: chạy model qua GPU service và không trả tên nhãn khi mapping training chưa được xác minh.',
+        '- **SAFETY** AI production bắt buộc CUDA; không fallback CPU và không coi probability/Grad-CAM là chẩn đoán.',
+      ].join('\n'),
     )
     .setVersion(version)
     .addBearerAuth()

@@ -15481,7 +15481,7 @@
     },
     "/api/v1/ai/skin-analysis": {
       "post": {
-        "description": "Nhận một ảnh da và chuyển đến AI inference service nội bộ. Kết quả chỉ dùng để sàng lọc, không thay thế chẩn đoán của bác sĩ.",
+        "description": "Đã nối GPU inference service và fail-safe labels: khi labelsConfigured=false response không trả tên bệnh. Endpoint được giữ tương thích ngược. Kết quả chỉ dùng để sàng lọc, không thay thế chẩn đoán của bác sĩ.",
         "operationId": "SkinAnalysisController_analyze_v1",
         "parameters": [],
         "requestBody": {
@@ -15667,10 +15667,397 @@
             "bearer": []
           }
         ],
-        "summary": "Phân tích ảnh da bằng EfficientNet-B0",
+        "summary": "[v2.8.1 FIXED] Phân tích một ảnh da bằng EfficientNet-B0",
         "tags": [
           "ai-assessment"
         ]
+      }
+    },
+    "/api/v1/ai/skin-analysis-cases": {
+      "post": {
+        "description": "Close-up là ảnh bắt buộc. Grad-CAM thể hiện vùng ảnh ảnh hưởng đến prediction, không phải mask tổn thương hoặc bằng chứng chẩn đoán.",
+        "operationId": "SkinAnalysisCaseController_analyze_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "closeup",
+                  "bodyRegion"
+                ],
+                "properties": {
+                  "overview": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "closeup": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "alternate": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "bodyRegion": {
+                    "type": "string",
+                    "maxLength": 100
+                  },
+                  "durationDays": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 36500
+                  },
+                  "symptoms": {
+                    "type": "string",
+                    "description": "JSON string array, e.g. [\"fever\",\"rapid_spreading\"]"
+                  },
+                  "patientId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "data": {
+                          "$ref": "#/components/schemas/SkinAnalysisCaseResponseDto"
+                        },
+                        "meta": {
+                          "type": "object"
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      },
+                      "required": [
+                        "success",
+                        "data",
+                        "meta",
+                        "requestId"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "[v2.8.1 NEW] Phân tích ca da liễu từ tối đa ba ảnh với Grad-CAM",
+        "tags": [
+          "ai-assessment"
+        ]
+      }
+    },
+    "/api/v1/ai/skin-analysis-cases/{caseId}/review": {
+      "post": {
+        "operationId": "SkinAnalysisCaseController_review_v1",
+        "parameters": [
+          {
+            "name": "caseId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewSkinCaseRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenericSuccessEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Standard API error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "[v2.8.1 NEW] Bác sĩ xác nhận hoặc bác bỏ kết quả phân tích ảnh da",
+        "tags": [
+          "ai-assessment"
+        ],
+        "x-success-schema": "generic-fallback"
       }
     },
     "/api/v1/encounters/{encounterId}/ai-assessments/{aiAssessmentId}/reviews": {
@@ -36291,8 +36678,8 @@
   },
   "info": {
     "title": "DermaHealth Backend API",
-    "description": "Clinic workflow backend: identity, scheduling, clinical, AI skin analysis, workflow, EMR, CRM.",
-    "version": "2.8.0",
+    "description": "Clinic workflow backend: identity, scheduling, clinical, AI skin analysis, workflow, EMR, CRM.\n\n## Release 2.8.1\n\n- **NEW** `POST /api/v1/ai/skin-analysis-cases`: tối đa 3 ảnh, quality gate, Grad-CAM, abstention, aggregation và triage.\n- **NEW** `POST /api/v1/ai/skin-analysis-cases/{caseId}/review`: bác sĩ review kết quả AI.\n- **FIXED** `POST /api/v1/ai/skin-analysis`: chạy model qua GPU service và không trả tên nhãn khi mapping training chưa được xác minh.\n- **SAFETY** AI production bắt buộc CUDA; không fallback CPU và không coi probability/Grad-CAM là chẩn đoán.",
+    "version": "2.8.1",
     "contact": {}
   },
   "tags": [],
@@ -39711,7 +40098,8 @@
           },
           "label": {
             "type": "string",
-            "example": "class_04"
+            "example": "verified-label",
+            "description": "Omitted until labels.json has a verified training class_to_idx mapping."
           },
           "probability": {
             "type": "number",
@@ -39720,7 +40108,6 @@
         },
         "required": [
           "classIndex",
-          "label",
           "probability"
         ]
       },
@@ -39759,6 +40146,327 @@
           "predictions",
           "disclaimer"
         ]
+      },
+      "SkinImageQualityDto": {
+        "type": "object",
+        "properties": {
+          "usable": {
+            "type": "boolean"
+          },
+          "score": {
+            "type": "number"
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "usable",
+          "score",
+          "issues"
+        ]
+      },
+      "SanitizedOriginalDto": {
+        "type": "object",
+        "properties": {
+          "width": {
+            "type": "number"
+          },
+          "height": {
+            "type": "number"
+          },
+          "mimeType": {
+            "type": "string",
+            "enum": [
+              "image/jpeg"
+            ]
+          },
+          "dataUrl": {
+            "type": "string",
+            "description": "EXIF-stripped 224x224 rendering for side-by-side review."
+          }
+        },
+        "required": [
+          "width",
+          "height",
+          "mimeType",
+          "dataUrl"
+        ]
+      },
+      "CasePredictionDto": {
+        "type": "object",
+        "properties": {
+          "classIndex": {
+            "type": "number"
+          },
+          "label": {
+            "type": "string"
+          },
+          "probability": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "classIndex",
+          "probability"
+        ]
+      },
+      "GradCamDto": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "type": "string",
+            "enum": [
+              "grad_cam"
+            ]
+          },
+          "targetLayer": {
+            "type": "string"
+          },
+          "targetClassIndex": {
+            "type": "number"
+          },
+          "width": {
+            "type": "number"
+          },
+          "height": {
+            "type": "number"
+          },
+          "mimeType": {
+            "type": "string",
+            "enum": [
+              "image/png"
+            ]
+          },
+          "dataUrl": {
+            "type": "string",
+            "description": "Sanitized 224x224 PNG overlay, no source EXIF metadata."
+          },
+          "allZero": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "method",
+          "targetLayer",
+          "targetClassIndex",
+          "width",
+          "height",
+          "mimeType",
+          "dataUrl",
+          "allZero"
+        ]
+      },
+      "CaseImageResultDto": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "overview",
+              "closeup",
+              "alternate"
+            ]
+          },
+          "width": {
+            "type": "number"
+          },
+          "height": {
+            "type": "number"
+          },
+          "quality": {
+            "$ref": "#/components/schemas/SkinImageQualityDto"
+          },
+          "original": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SanitizedOriginalDto"
+              }
+            ]
+          },
+          "predictions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CasePredictionDto"
+            }
+          },
+          "heatmap": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/GradCamDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "role",
+          "width",
+          "height",
+          "quality",
+          "predictions"
+        ]
+      },
+      "CaseAggregateDto": {
+        "type": "object",
+        "properties": {
+          "predictions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CasePredictionDto"
+            }
+          },
+          "agreement": {
+            "type": "number"
+          },
+          "conflictingImages": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "abstained": {
+            "type": "boolean"
+          },
+          "abstainReasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "aggregationMethod": {
+            "type": "string"
+          },
+          "validationStatus": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "predictions",
+          "agreement",
+          "conflictingImages",
+          "abstained",
+          "abstainReasons",
+          "aggregationMethod",
+          "validationStatus"
+        ]
+      },
+      "CaseTriageDto": {
+        "type": "object",
+        "properties": {
+          "level": {
+            "type": "string",
+            "enum": [
+              "emergency",
+              "urgent",
+              "soon",
+              "routine"
+            ]
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "basis": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "level",
+          "reasons",
+          "basis"
+        ]
+      },
+      "SkinAnalysisCaseResponseDto": {
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "completed",
+              "partial",
+              "abstained",
+              "failed"
+            ]
+          },
+          "model": {
+            "type": "string"
+          },
+          "modelVersion": {
+            "type": "string"
+          },
+          "device": {
+            "type": "string",
+            "example": "cuda:0",
+            "description": "Production requires cuda:0; AI service refuses startup without CUDA."
+          },
+          "labelsVersion": {
+            "type": "string"
+          },
+          "calibrationVersion": {
+            "type": "object",
+            "nullable": true
+          },
+          "preprocessingVersion": {
+            "type": "string"
+          },
+          "labelsConfigured": {
+            "type": "boolean"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CaseImageResultDto"
+            }
+          },
+          "aggregate": {
+            "$ref": "#/components/schemas/CaseAggregateDto"
+          },
+          "triage": {
+            "$ref": "#/components/schemas/CaseTriageDto"
+          },
+          "disclaimer": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "caseId",
+          "status",
+          "model",
+          "modelVersion",
+          "device",
+          "labelsVersion",
+          "preprocessingVersion",
+          "labelsConfigured",
+          "generatedAt",
+          "images",
+          "aggregate",
+          "triage",
+          "disclaimer"
+        ]
+      },
+      "ReviewSkinCaseRequest": {
+        "type": "object",
+        "properties": {}
       },
       "DoctorReviewResponseDto": {
         "type": "object",

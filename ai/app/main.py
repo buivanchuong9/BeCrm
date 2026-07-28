@@ -1,13 +1,21 @@
+import asyncio
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
+import json
 from typing import Annotated
+from uuid import uuid4
 
-from fastapi import Depends, FastAPI, File, Header, HTTPException, UploadFile, status
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Response, UploadFile, status
+from starlette.concurrency import run_in_threadpool
 
+from .case_analysis import CaseContext, aggregate_case, triage
 from .model import InvalidImageError, SkinClassifier
+from .metrics import metrics, monotonic
 from .settings import settings
 
 
 classifier: SkinClassifier | None = None
+case_semaphore = asyncio.Semaphore(settings.max_concurrent_cases)
 
 
 @asynccontextmanager
@@ -53,6 +61,11 @@ def ready(_: None = Depends(authorize)):
     }
 
 
+@app.get("/metrics", response_class=Response)
+def prometheus_metrics(_: None = Depends(authorize)):
+    return Response(metrics.render(), media_type="text/plain; version=0.0.4")
+
+
 @app.post("/v1/analyze")
 async def analyze(
     file: Annotated[UploadFile, File()],
@@ -82,7 +95,7 @@ async def analyze(
         "predictions": [
             {
                 "classIndex": prediction.class_index,
-                "label": prediction.label,
+                **({"label": prediction.label} if prediction.label is not None else {}),
                 "probability": prediction.probability,
             }
             for prediction in predictions
@@ -90,4 +103,87 @@ async def analyze(
         "disclaimer": (
             "Kết quả chỉ dùng để sàng lọc, không thay thế chẩn đoán của bác sĩ."
         ),
+    }
+
+
+async def read_image(file: UploadFile, role: str) -> tuple[str, bytes]:
+    if file.content_type not in {"image/jpeg", "image/png", "image/webp"}:
+        raise HTTPException(
+            status_code=415, detail=f"{role}: only JPEG, PNG and WebP images are accepted"
+        )
+    payload = await file.read(settings.max_image_bytes + 1)
+    if not payload:
+        raise HTTPException(status_code=400, detail=f"{role}: image is empty")
+    if len(payload) > settings.max_image_bytes:
+        raise HTTPException(status_code=413, detail=f"{role}: image exceeds size limit")
+    return role, payload
+
+
+@app.post("/v1/analyze-case")
+async def analyze_case(
+    closeup: Annotated[UploadFile, File()],
+    body_region: Annotated[str, Form(alias="bodyRegion")],
+    overview: Annotated[UploadFile | None, File()] = None,
+    alternate: Annotated[UploadFile | None, File()] = None,
+    duration_days: Annotated[int | None, Form(alias="durationDays")] = None,
+    symptoms_json: Annotated[str | None, Form(alias="symptoms")] = None,
+    request_id: Annotated[str | None, Header(alias="X-Request-Id")] = None,
+    _: None = Depends(authorize),
+):
+    if classifier is None:
+        raise HTTPException(status_code=503, detail="Model is not loaded")
+    if not body_region.strip() or len(body_region) > 100:
+        raise HTTPException(status_code=400, detail="bodyRegion is required and too long")
+    if duration_days is not None and (duration_days < 0 or duration_days > 36500):
+        raise HTTPException(status_code=400, detail="durationDays is outside the accepted range")
+    try:
+        symptoms = json.loads(symptoms_json) if symptoms_json else []
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail="symptoms must be a JSON string array") from exc
+    if (
+        not isinstance(symptoms, list)
+        or len(symptoms) > 30
+        or not all(isinstance(item, str) and 0 < len(item) <= 100 for item in symptoms)
+    ):
+        raise HTTPException(status_code=400, detail="symptoms must be a JSON string array")
+
+    files: list[tuple[str, bytes]] = [await read_image(closeup, "closeup")]
+    if overview is not None:
+        files.insert(0, await read_image(overview, "overview"))
+    if alternate is not None:
+        files.append(await read_image(alternate, "alternate"))
+
+    context = CaseContext(body_region.strip(), duration_days, symptoms)
+    started_at = monotonic()
+    try:
+        async with case_semaphore:
+            results = await run_in_threadpool(classifier.analyze_images, files)
+    except InvalidImageError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    case_status, aggregate = aggregate_case(
+        results, context, classifier.labels_configured, settings
+    )
+    metrics.observe_case(
+        case_status,
+        monotonic() - started_at,
+        sum(not image["quality"]["usable"] for image in results),
+        bool(aggregate["conflictingImages"]),
+    )
+    return {
+        "caseId": str(uuid4()),
+        "status": case_status,
+        "model": "efficientnet_b0",
+        "modelVersion": classifier.model_version,
+        "device": str(classifier.device),
+        "labelsVersion": classifier.labels_version,
+        "calibrationVersion": None,
+        "preprocessingVersion": classifier.config.approved_preprocessing_version,
+        "labelsConfigured": classifier.labels_configured,
+        "generatedAt": datetime.now(timezone.utc).isoformat(),
+        "requestId": request_id,
+        "images": results,
+        "aggregate": aggregate,
+        "triage": triage(context),
+        "disclaimer": "Kết quả hỗ trợ sàng lọc, không thay thế chẩn đoán của bác sĩ.",
     }

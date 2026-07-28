@@ -73,6 +73,7 @@ export function buildConfiguration(env: EnvConfig) {
       apiKey: env.AI_API_KEY,
       serviceUrl: env.AI_SERVICE_URL.replace(/\/+$/, ''),
       timeoutMs: env.AI_TIMEOUT_MS,
+      maxResponseBytes: env.AI_MAX_RESPONSE_BYTES,
     },
     logLevel: env.LOG_LEVEL,
   };

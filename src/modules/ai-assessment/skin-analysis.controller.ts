@@ -29,9 +29,9 @@ export class SkinAnalysisController {
   @Post()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Phân tích ảnh da bằng EfficientNet-B0',
+    summary: '[v2.8.1 FIXED] Phân tích một ảnh da bằng EfficientNet-B0',
     description:
-      'Nhận một ảnh da và chuyển đến AI inference service nội bộ. Kết quả chỉ dùng để sàng lọc, không thay thế chẩn đoán của bác sĩ.',
+      'Đã nối GPU inference service và fail-safe labels: khi labelsConfigured=false response không trả tên bệnh. Endpoint được giữ tương thích ngược. Kết quả chỉ dùng để sàng lọc, không thay thế chẩn đoán của bác sĩ.',
   })
   @ApiConsumes('multipart/form-data')
   @ApiBody({

@@ -1740,3 +1740,34 @@ model PlatformSecuritySetting {
 
   @@map("platform_security_settings")
 }
+
+// Metadata-only record for a multi-image inference case. Raw images and
+// base64 Grad-CAM artifacts are deliberately not persisted in PostgreSQL.
+model AISkinAnalysisCase {
+  id                   String    @id @db.Uuid
+  patientId            String?   @map("patient_id") @db.Uuid
+  actorId              String    @map("actor_id") @db.Uuid
+  organizationId       String?   @map("organization_id") @db.Uuid
+  status               String
+  bodyRegion           String    @map("body_region")
+  durationDays         Int?      @map("duration_days")
+  symptomSnapshot      Json      @map("symptom_snapshot")
+  imageMetadata        Json      @map("image_metadata")
+  aggregateOutput      Json      @map("aggregate_output")
+  triageOutput         Json      @map("triage_output")
+  modelVersion         String    @map("model_version")
+  labelsVersion        String    @map("labels_version")
+  preprocessingVersion String    @map("preprocessing_version")
+  labelsConfigured     Boolean   @map("labels_configured")
+  reviewerDecision     String?   @map("reviewer_decision")
+  reviewerDiagnosis    String?   @map("reviewer_diagnosis")
+  reviewerNote         String?   @map("reviewer_note")
+  reviewedBy           String?   @map("reviewed_by") @db.Uuid
+  reviewedAt           DateTime? @map("reviewed_at") @db.Timestamptz
+  generatedAt          DateTime  @map("generated_at") @db.Timestamptz
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([patientId, generatedAt])
+  @@index([actorId, generatedAt])
+  @@map("ai_skin_analysis_cases")
+}

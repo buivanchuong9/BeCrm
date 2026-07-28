@@ -8,7 +8,7 @@ Backend production chạy bằng `docker-compose.prod.yml`:
 - PostgreSQL và Redis chỉ nằm trong Docker network
 - Swagger UI cố định: `/api/docs`
 - OpenAPI JSON cố định: `/api/docs/openapi.json`
-- URL theo release (tùy chọn): `/api/docs/2.8.0`
+- URL theo release (tùy chọn): `/api/docs/2.8.1`
 
 Swagger runtime được sinh từ source code khi API khởi động, không đọc trực tiếp
 `docs/openapi.json`. Mọi response HTML, JavaScript, CSS và OpenAPI JSON dưới
@@ -142,9 +142,15 @@ AI_PROVIDER=deterministic
 AI_MODEL_VERSION=efficientnet-b0-31class
 AI_SERVICE_URL=http://ai:8000
 AI_TIMEOUT_MS=30000
+AI_MAX_RESPONSE_BYTES=5000000
 AI_API_KEY=${AI_API_KEY}
 AI_GPU_DEVICE=0
 PYTORCH_INDEX_URL=https://download.pytorch.org/whl/cu126
+AI_MAX_CONCURRENT_CASES=1
+AI_QUALITY_MIN_SCORE=0.55
+AI_MIN_TOP_PROBABILITY=0.60
+AI_MIN_PROBABILITY_MARGIN=0.15
+AI_APPROVED_PREPROCESSING_VERSION=imagenet-eval-224-v1
 LOG_LEVEL=info
 EOF
 
