@@ -6,6 +6,7 @@ import {
   RecordActionsController,
   DocumentsController,
   MedicalRecordBreakGlassController,
+  MedicationOrdersController,
 } from './medical-records.controller';
 import { MedicalRecordsService } from './medical-records.service';
 import { MedicalRecordBreakGlassService } from './medical-record-break-glass.service';
@@ -17,6 +18,7 @@ import { MedicalRecordBreakGlassService } from './medical-record-break-glass.ser
     RecordActionsController,
     DocumentsController,
     MedicalRecordBreakGlassController,
+    MedicationOrdersController,
   ],
   providers: [MedicalRecordsService, MedicalRecordBreakGlassService],
 })

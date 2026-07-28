@@ -135,7 +135,7 @@ export class WorkflowRuntimeRepository {
   /** docs/api.md section 28 "on completed/skipped, re-evaluate dependent
    * pending/blocked tasks" — flips a task to `ready` once all of its
    * dependsOnStepCodes are completed/skipped, else keeps/sets it `blocked`
-   * with a clinicalWarning naming the unmet steps. */
+   * with an operational blockedReason naming the unmet steps. */
   async refreshDependentTasks(tx: Prisma.TransactionClient, instanceId: string): Promise<void> {
     const tasks = await tx.workflowTask.findMany({ where: { instanceId } });
     const doneStepCodes = new Set(
@@ -147,14 +147,14 @@ export class WorkflowRuntimeRepository {
       if (unmet.length === 0) {
         await tx.workflowTask.update({
           where: { id: task.id },
-          data: { status: 'ready', clinicalWarning: null, version: { increment: 1 } },
+          data: { status: 'ready', blockedReason: null, version: { increment: 1 } },
         });
       } else if (unmet.length > 0 && task.status !== 'blocked') {
         await tx.workflowTask.update({
           where: { id: task.id },
           data: {
             status: 'blocked',
-            clinicalWarning: `Chờ hoàn tất: ${unmet.join(', ')}`,
+            blockedReason: `Chờ hoàn tất: ${unmet.join(', ')}`,
             version: { increment: 1 },
           },
         });

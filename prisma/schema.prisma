@@ -982,17 +982,86 @@ model DoctorDiagnosis {
 // auto-activate a workflow instance (docs section 28 ACT-1), handled at the
 // service layer once the Workflow module exists.
 model ClinicalPlan {
-  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  encounterId String   @unique @map("encounter_id") @db.Uuid
-  doctorId    String   @map("doctor_id") @db.Uuid
-  diagnosisId String   @map("diagnosis_id") @db.Uuid
-  summary     String
-  approvedAt  DateTime @default(now()) @map("approved_at") @db.Timestamptz
+  id                        String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  encounterId               String                @unique @map("encounter_id") @db.Uuid
+  doctorId                  String                @map("doctor_id") @db.Uuid
+  diagnosisId               String                @map("diagnosis_id") @db.Uuid
+  summary                   String
+  measurableGoals           String[]              @default([]) @map("measurable_goals")
+  protocolTemplateId        String?               @map("protocol_template_id") @db.Uuid
+  protocolTemplateVersionId String?               @map("protocol_template_version_id") @db.Uuid
+  milestones                Json                  @default("[]")
+  monitoringMetrics         String[]              @default([]) @map("monitoring_metrics")
+  stopOrChangeCriteria      String                @default("") @map("stop_or_change_criteria")
+  contraindications         String[]              @default([])
+  prerequisites             String[]              @default([])
+  responsibleProviderId     String                @map("responsible_provider_id") @db.Uuid
+  deviationFromProtocol     Json?                 @map("deviation_from_protocol")
+  outcome                   String?
+  currentStage              ClinicalCarePlanStage @default(induction) @map("current_stage")
+  signedBy                  String?               @map("signed_by") @db.Uuid
+  signedAt                  DateTime?             @map("signed_at") @db.Timestamptz
+  version                   Int                   @default(1)
+  approvedAt                DateTime              @default(now()) @map("approved_at") @db.Timestamptz
+  createdAt                 DateTime              @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                 DateTime              @updatedAt @map("updated_at") @db.Timestamptz
 
-  encounter MedicalEncounter @relation(fields: [encounterId], references: [id], onDelete: Restrict)
-  diagnosis DoctorDiagnosis  @relation(fields: [diagnosisId], references: [id], onDelete: Restrict)
+  encounter               MedicalEncounter         @relation(fields: [encounterId], references: [id], onDelete: Restrict)
+  diagnosis               DoctorDiagnosis          @relation(fields: [diagnosisId], references: [id], onDelete: Restrict)
+  protocolTemplate        WorkflowTemplate?        @relation("ClinicalPlanProtocolTemplate", fields: [protocolTemplateId], references: [id], onDelete: Restrict)
+  protocolTemplateVersion WorkflowTemplateVersion? @relation("ClinicalPlanProtocolVersion", fields: [protocolTemplateVersionId], references: [id], onDelete: Restrict)
+  revisions               ClinicalPlanRevision[]
+  orderRefs               ClinicalPlanOrderRef[]
 
   @@map("clinical_plans")
+}
+
+enum ClinicalCarePlanStage {
+  induction
+  monitoring
+  response_assessment
+  maintenance
+}
+
+enum ClinicalPlanOrderKind {
+  medication
+  laboratory
+  imaging
+  procedure
+  patient_education
+  consultation
+}
+
+// Immutable clinical snapshots. The current ClinicalPlan row is the query
+// projection; every material change appends a revision first.
+model ClinicalPlanRevision {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  planId     String   @map("plan_id") @db.Uuid
+  version    Int
+  action     String
+  snapshot   Json
+  actorId    String   @map("actor_id") @db.Uuid
+  occurredAt DateTime @default(now()) @map("occurred_at") @db.Timestamptz
+
+  plan ClinicalPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
+
+  @@unique([planId, version])
+  @@index([planId, occurredAt])
+  @@map("clinical_plan_revisions")
+}
+
+model ClinicalPlanOrderRef {
+  id          String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  planId      String                @map("plan_id") @db.Uuid
+  kind        ClinicalPlanOrderKind
+  referenceId String                @map("reference_id") @db.Uuid
+  createdAt   DateTime              @default(now()) @map("created_at") @db.Timestamptz
+
+  plan ClinicalPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
+
+  @@unique([planId, kind, referenceId])
+  @@index([referenceId])
+  @@map("clinical_plan_order_refs")
 }
 
 enum ClinicalOrderType {
@@ -1023,8 +1092,9 @@ model ClinicalOrder {
   createdAt           DateTime            @default(now()) @map("created_at") @db.Timestamptz
   updatedAt           DateTime            @updatedAt @map("updated_at") @db.Timestamptz
 
-  encounter MedicalEncounter @relation(fields: [encounterId], references: [id], onDelete: Restrict)
-  result    ClinicalResult?
+  encounter     MedicalEncounter @relation(fields: [encounterId], references: [id], onDelete: Restrict)
+  result        ClinicalResult?
+  workflowTasks WorkflowTask[]
 
   @@index([encounterId])
   @@map("clinical_orders")
@@ -1082,7 +1152,8 @@ model WorkflowTemplate {
   createdAt                DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt                DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
-  versions WorkflowTemplateVersion[]
+  versions      WorkflowTemplateVersion[]
+  clinicalPlans ClinicalPlan[]            @relation("ClinicalPlanProtocolTemplate")
 
   @@index([organizationId, specialty])
   @@map("workflow_templates")
@@ -1109,8 +1180,9 @@ model WorkflowTemplateVersion {
   createdAt     DateTime               @default(now()) @map("created_at") @db.Timestamptz
   publishedAt   DateTime?              @map("published_at") @db.Timestamptz
 
-  template  WorkflowTemplate   @relation(fields: [templateId], references: [id], onDelete: Restrict)
-  instances WorkflowInstance[]
+  template      WorkflowTemplate   @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  instances     WorkflowInstance[]
+  clinicalPlans ClinicalPlan[]     @relation("ClinicalPlanProtocolVersion")
 
   @@unique([templateId, versionNumber])
   @@index([templateId])
@@ -1184,38 +1256,47 @@ enum WorkflowTaskOrigin {
 }
 
 model WorkflowTask {
-  id                 String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  instanceId         String             @map("instance_id") @db.Uuid
-  encounterId        String             @map("encounter_id") @db.Uuid
-  stepCode           String             @map("step_code")
-  name               String
-  responsibleRole    UserRole           @map("responsible_role")
-  department         String
-  status             WorkflowTaskStatus @default(pending)
-  assigneeId         String?            @map("assignee_id") @db.Uuid
-  dependsOnStepCodes String[]           @map("depends_on_step_codes")
-  slaMinutes         Int                @map("sla_minutes")
-  priority           WorkflowPriority   @default(medium)
-  urgency            Urgency            @default(routine)
-  mandatory          Boolean            @default(false)
+  id                        String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  instanceId                String             @map("instance_id") @db.Uuid
+  encounterId               String             @map("encounter_id") @db.Uuid
+  stepCode                  String             @map("step_code")
+  name                      String
+  responsibleRole           UserRole           @map("responsible_role")
+  department                String
+  status                    WorkflowTaskStatus @default(pending)
+  assigneeId                String?            @map("assignee_id") @db.Uuid
+  dependsOnStepCodes        String[]           @map("depends_on_step_codes")
+  slaMinutes                Int                @map("sla_minutes")
+  priority                  WorkflowPriority   @default(medium)
+  urgency                   Urgency            @default(routine)
+  mandatory                 Boolean            @default(false)
   // Ad-hoc tasks are doctor-authored, per-instance additions that never
   // mutate the shared WorkflowTemplateVersion; always non-mandatory so they
   // can never gate instance completion or need a mandatory-skip override.
-  origin             WorkflowTaskOrigin @default(template)
-  createdBy          String?            @map("created_by") @db.Uuid
-  clinicalWarning    String?            @map("clinical_warning")
-  reworkCount        Int                @default(0) @map("rework_count")
-  version            Int                @default(1)
-  createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamptz
-  startedAt          DateTime?          @map("started_at") @db.Timestamptz
-  completedAt        DateTime?          @map("completed_at") @db.Timestamptz
+  origin                    WorkflowTaskOrigin @default(template)
+  createdBy                 String?            @map("created_by") @db.Uuid
+  relatedOrderId            String?            @map("related_order_id") @db.Uuid
+  blockedReason             String?            @map("blocked_reason")
+  evidenceOfCompletion      String?            @map("evidence_of_completion")
+  abnormalResultFlaggedAt   DateTime?          @map("abnormal_result_flagged_at") @db.Timestamptz
+  abnormalResultEscalatedTo String?            @map("abnormal_result_escalated_to") @db.Uuid
+  // Deprecated compatibility column. New operational code writes
+  // blockedReason; clinical decisions belong to CarePlan/Order/Result.
+  clinicalWarning           String?            @map("clinical_warning")
+  reworkCount               Int                @default(0) @map("rework_count")
+  version                   Int                @default(1)
+  createdAt                 DateTime           @default(now()) @map("created_at") @db.Timestamptz
+  startedAt                 DateTime?          @map("started_at") @db.Timestamptz
+  completedAt               DateTime?          @map("completed_at") @db.Timestamptz
 
-  instance WorkflowInstance @relation(fields: [instanceId], references: [id], onDelete: Restrict)
+  instance     WorkflowInstance @relation(fields: [instanceId], references: [id], onDelete: Restrict)
+  relatedOrder ClinicalOrder?   @relation(fields: [relatedOrderId], references: [id], onDelete: SetNull)
 
   @@index([instanceId])
   @@index([encounterId])
   @@index([responsibleRole, department, status])
   @@index([assigneeId, status])
+  @@index([relatedOrderId])
   @@map("workflow_tasks")
 }
 
@@ -1262,8 +1343,57 @@ model Prescription {
   medications Json
   issuedAt    DateTime @default(now()) @map("issued_at") @db.Timestamptz
 
+  orders MedicationOrder[]
+
   @@index([encounterId, issuedAt])
   @@map("prescriptions")
+}
+
+enum MedicationOrderEventType {
+  prescribed
+  dispensed
+  administered
+  adherence_confirmed
+  adherence_note
+}
+
+// One order per prescribed medication. Prescription.medications remains as a
+// compatibility snapshot during migration; all new lifecycle facts are
+// append-only MedicationOrderEvent rows and are never inferred from Kanban.
+model MedicationOrder {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  prescriptionId String   @map("prescription_id") @db.Uuid
+  encounterId    String   @map("encounter_id") @db.Uuid
+  medicationName String   @map("medication_name")
+  dose           String
+  route          String?
+  frequency      String?
+  durationDays   Int      @map("duration_days")
+  instructions   String?
+  prescribedBy   String   @map("prescribed_by") @db.Uuid
+  prescribedAt   DateTime @default(now()) @map("prescribed_at") @db.Timestamptz
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  prescription Prescription           @relation(fields: [prescriptionId], references: [id], onDelete: Restrict)
+  events       MedicationOrderEvent[]
+
+  @@index([encounterId, prescribedAt])
+  @@index([prescriptionId])
+  @@map("medication_orders")
+}
+
+model MedicationOrderEvent {
+  id         String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId    String                   @map("order_id") @db.Uuid
+  type       MedicationOrderEventType
+  actorId    String                   @map("actor_id") @db.Uuid
+  notes      String?
+  occurredAt DateTime                 @default(now()) @map("occurred_at") @db.Timestamptz
+
+  order MedicationOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@index([orderId, occurredAt])
+  @@map("medication_order_events")
 }
 
 model ClinicalDocument {

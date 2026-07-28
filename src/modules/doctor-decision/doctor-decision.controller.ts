@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Req } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { CurrentUser } from '../../core/security/current-user.decorator';
@@ -12,9 +12,13 @@ import {
 import { ReviewAssessmentRequest } from './dto/review-assessment.dto';
 import { RecordDiagnosisRequest } from './dto/record-diagnosis.dto';
 import { ReviseDiagnosisRequest } from './dto/revise-diagnosis.dto';
-import { ApproveClinicalPlanRequest } from './dto/approve-clinical-plan.dto';
+import {
+  ApproveClinicalPlanRequest,
+  ReviseClinicalPlanRequest,
+} from './dto/approve-clinical-plan.dto';
 import {
   ClinicalPlanResponseDto,
+  ClinicalPlanRevisionResponseDto,
   DoctorDiagnosisResponseDto,
   DoctorReviewResponseDto,
 } from './dto/responses/doctor-decision-response.dto';
@@ -125,6 +129,32 @@ export class EncounterDoctorDecisionController {
     @Param('encounterId', ParseUUIDPipe) encounterId: string,
   ) {
     return this.doctorDecisionService.getClinicalPlan(principal, encounterId);
+  }
+
+  @ApiOkEnvelope(ClinicalPlanResponseDto)
+  @RequireIdempotencyKey({ clinical: true })
+  @Patch(':encounterId/clinical-plan')
+  async reviseClinicalPlan(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Param('encounterId', ParseUUIDPipe) encounterId: string,
+    @Body() dto: ReviseClinicalPlanRequest,
+    @Req() req: Request,
+  ) {
+    return this.doctorDecisionService.reviseClinicalPlan(
+      principal,
+      encounterId,
+      dto,
+      requestContext(req),
+    );
+  }
+
+  @ApiOkListEnvelope(ClinicalPlanRevisionResponseDto)
+  @Get(':encounterId/clinical-plan/revisions')
+  async listClinicalPlanRevisions(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Param('encounterId', ParseUUIDPipe) encounterId: string,
+  ) {
+    return this.doctorDecisionService.listClinicalPlanRevisions(principal, encounterId);
   }
 }
 

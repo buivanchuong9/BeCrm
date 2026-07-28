@@ -237,6 +237,14 @@ export class WorkflowTemplateVersionsController {
 export class EncounterWorkflowController {
   constructor(private readonly runtime: WorkflowRuntimeService) {}
 
+  @Get(':encounterId/workflow')
+  detail(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Param('encounterId', ParseUUIDPipe) encounterId: string,
+  ) {
+    return this.runtime.getInstanceForEncounter(principal, encounterId);
+  }
+
   @RequireIdempotencyKey()
   @Post(':encounterId/workflow/activate')
   activate(

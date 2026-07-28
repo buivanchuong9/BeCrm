@@ -40,6 +40,14 @@ export class WorkflowTaskResponseDto {
   @ApiProperty() mandatory!: boolean;
   @ApiProperty({ enum: ORIGIN_VALUES }) origin!: (typeof ORIGIN_VALUES)[number];
   @ApiProperty({ format: 'uuid', nullable: true }) createdBy!: string | null;
+  @ApiProperty({ format: 'uuid', nullable: true }) relatedOrderId!: string | null;
+  @ApiProperty({ nullable: true }) blockedReason!: string | null;
+  @ApiProperty({ nullable: true }) evidenceOfCompletion!: string | null;
+  @ApiProperty({ format: 'date-time', nullable: true })
+  abnormalResultFlaggedAt!: string | null;
+  @ApiProperty({ format: 'uuid', nullable: true })
+  abnormalResultEscalatedTo!: string | null;
+  /** @deprecated Kept for old clients; use blockedReason. */
   @ApiProperty({ nullable: true }) clinicalWarning!: string | null;
   @ApiProperty() reworkCount!: number;
   @ApiProperty() version!: number;

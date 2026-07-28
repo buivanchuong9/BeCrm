@@ -1,5 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { ClinicalPlan, DoctorDiagnosis, DoctorReview, Prisma } from '@prisma/client';
+import {
+  ClinicalPlan,
+  ClinicalPlanRevision,
+  DoctorDiagnosis,
+  DoctorReview,
+  Prisma,
+} from '@prisma/client';
 import { PrismaService } from '../../core/database/prisma.service';
 
 @Injectable()
@@ -49,7 +55,17 @@ export class DoctorDecisionRepository {
     return tx.clinicalPlan.create({ data });
   }
 
-  findClinicalPlanByEncounterId(encounterId: string): Promise<ClinicalPlan | null> {
-    return this.prisma.clinicalPlan.findUnique({ where: { encounterId } });
+  findClinicalPlanByEncounterId(encounterId: string) {
+    return this.prisma.clinicalPlan.findUnique({
+      where: { encounterId },
+      include: { orderRefs: true },
+    });
+  }
+
+  listClinicalPlanRevisions(planId: string): Promise<ClinicalPlanRevision[]> {
+    return this.prisma.clinicalPlanRevision.findMany({
+      where: { planId },
+      orderBy: { version: 'desc' },
+    });
   }
 }

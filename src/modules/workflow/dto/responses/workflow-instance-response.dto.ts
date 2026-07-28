@@ -14,7 +14,13 @@ export class WorkflowInstanceResponseDto {
   @ApiProperty({ format: 'uuid' }) encounterId!: string;
   @ApiProperty({ format: 'uuid' }) templateId!: string;
   @ApiProperty({ format: 'uuid' }) templateVersionId!: string;
+  @ApiProperty({
+    type: Object,
+    description: 'Immutable reference to the protocol version copied into this encounter.',
+  })
+  protocolRef!: { templateId: string; templateVersionId: string };
   @ApiProperty() instanceCode!: string;
+  @ApiProperty() integrityHash!: string;
   @ApiProperty() identityVersion!: number;
   @ApiProperty({ enum: INSTANCE_STATUS_VALUES }) status!: (typeof INSTANCE_STATUS_VALUES)[number];
   @ApiProperty({ format: 'uuid' }) activatedBy!: string;

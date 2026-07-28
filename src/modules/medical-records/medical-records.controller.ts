@@ -4,6 +4,7 @@ import { Request } from 'express';
 import { Transform, Type } from 'class-transformer';
 import {
   IsArray,
+  ArrayMinSize,
   IsInt,
   IsObject,
   IsOptional,
@@ -26,12 +27,16 @@ function ctx(req: Request) {
 }
 
 class MedicationDto {
-  @IsString() name!: string;
-  @IsString() dose!: string;
+  @Transform(trim) @IsString() @Length(1, 200) name!: string;
+  @Transform(trim) @IsString() @Length(1, 200) dose!: string;
+  @IsOptional() @Transform(trim) @IsString() @Length(1, 100) route?: string;
+  @IsOptional() @Transform(trim) @IsString() @Length(1, 100) frequency?: string;
+  @IsOptional() @Transform(trim) @IsString() @Length(1, 1000) instructions?: string;
   @IsInt() @Min(1) durationDays!: number;
 }
 class PrescriptionDto {
   @IsArray()
+  @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => MedicationDto)
   medications!: MedicationDto[];
@@ -63,6 +68,19 @@ class LateResultDto {
 class CreateMedicalRecordBreakGlassGrantDto {
   @Transform(trim) @IsString() @Length(10, 1000) reason!: string;
   @IsString() @Length(6, 12) mfaCode!: string;
+}
+class MedicationEventDto {
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @Length(1, 2000)
+  notes?: string;
+}
+class RequiredMedicationEventNoteDto {
+  @Transform(trim)
+  @IsString()
+  @Length(1, 2000)
+  notes!: string;
 }
 
 @Controller({ path: 'encounters', version: '1' })
@@ -180,6 +198,55 @@ export class RecordActionsController {
     @Req() r: Request,
   ) {
     return this.service.flagLateResult(p, id, d.description, ctx(r));
+  }
+}
+
+@Controller({ path: 'medication-orders', version: '1' })
+export class MedicationOrdersController {
+  constructor(private readonly service: MedicalRecordsService) {}
+
+  @RequireIdempotencyKey({ clinical: true })
+  @Post(':orderId/dispense')
+  dispense(
+    @CurrentUser() p: AuthenticatedPrincipal,
+    @Param('orderId', ParseUUIDPipe) orderId: string,
+    @Body() d: MedicationEventDto,
+    @Req() r: Request,
+  ) {
+    return this.service.dispenseMedication(p, orderId, d.notes, ctx(r));
+  }
+
+  @RequireIdempotencyKey({ clinical: true })
+  @Post(':orderId/administer')
+  administer(
+    @CurrentUser() p: AuthenticatedPrincipal,
+    @Param('orderId', ParseUUIDPipe) orderId: string,
+    @Body() d: MedicationEventDto,
+    @Req() r: Request,
+  ) {
+    return this.service.administerMedication(p, orderId, d.notes, ctx(r));
+  }
+
+  @RequireIdempotencyKey({ clinical: true })
+  @Post(':orderId/adherence-confirmations')
+  confirmAdherence(
+    @CurrentUser() p: AuthenticatedPrincipal,
+    @Param('orderId', ParseUUIDPipe) orderId: string,
+    @Body() d: MedicationEventDto,
+    @Req() r: Request,
+  ) {
+    return this.service.confirmMedicationAdherence(p, orderId, d.notes, ctx(r));
+  }
+
+  @RequireIdempotencyKey({ clinical: true })
+  @Post(':orderId/adherence-notes')
+  addAdherenceNote(
+    @CurrentUser() p: AuthenticatedPrincipal,
+    @Param('orderId', ParseUUIDPipe) orderId: string,
+    @Body() d: RequiredMedicationEventNoteDto,
+    @Req() r: Request,
+  ) {
+    return this.service.addMedicationAdherenceNote(p, orderId, d.notes, ctx(r));
   }
 }
 

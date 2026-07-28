@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { MedicationOrderEventType, Prisma } from '@prisma/client';
 import { PrismaService } from '../../core/database/prisma.service';
 import { AuditService } from '../../core/audit/audit.service';
 import { OutboxService } from '../../core/outbox/outbox.service';
@@ -131,7 +131,14 @@ export class MedicalRecordsService {
   async prescribe(
     p: AuthenticatedPrincipal,
     encounterId: string,
-    medications: Array<{ name: string; dose: string; durationDays: number }>,
+    medications: Array<{
+      name: string;
+      dose: string;
+      route?: string;
+      frequency?: string;
+      durationDays: number;
+      instructions?: string;
+    }>,
     c: Context,
   ) {
     this.requireRole(p, DOCTOR);
@@ -148,7 +155,30 @@ export class MedicalRecordsService {
           'Signed records cannot be changed.',
         );
       const prescription = await tx.prescription.create({
-        data: { encounterId, doctorId: p.userId, medications },
+        data: {
+          encounterId,
+          doctorId: p.userId,
+          medications: medications as Prisma.InputJsonValue,
+          orders: {
+            create: medications.map((medication) => ({
+              encounterId,
+              medicationName: medication.name,
+              dose: medication.dose,
+              route: medication.route,
+              frequency: medication.frequency,
+              durationDays: medication.durationDays,
+              instructions: medication.instructions,
+              prescribedBy: p.userId,
+              events: {
+                create: {
+                  type: 'prescribed',
+                  actorId: p.userId,
+                },
+              },
+            })),
+          },
+        },
+        include: { orders: { include: { events: true } } },
       });
       await tx.medicalRecord.update({
         where: { id: record.id },
@@ -171,8 +201,115 @@ export class MedicalRecordsService {
       data: await this.prisma.prescription.findMany({
         where: { encounterId },
         orderBy: { issuedAt: 'desc' },
+        include: { orders: { include: { events: { orderBy: { occurredAt: 'asc' } } } } },
       }),
     };
+  }
+
+  private async appendMedicationEvent(
+    p: AuthenticatedPrincipal,
+    orderId: string,
+    type: MedicationOrderEventType,
+    allowedRoles: string[],
+    notes: string | undefined,
+    c: Context,
+  ) {
+    this.requireRole(p, allowedRoles);
+    const order = await this.prisma.medicationOrder.findUnique({ where: { id: orderId } });
+    if (!order) {
+      throw new NotFoundAppError('Medication order not found.');
+    }
+    const e = await this.visible(p, order.encounterId);
+    const result = await this.prisma.$transaction(async (tx) => {
+      const event = await tx.medicationOrderEvent.create({
+        data: {
+          orderId,
+          type,
+          actorId: p.userId,
+          notes,
+        },
+      });
+      await this.audit.write(
+        {
+          actorId: p.userId,
+          action: `medication_order.${type}`,
+          resourceType: 'medication_order',
+          resourceId: orderId,
+          patientId: e.patientId,
+          encounterId: e.id,
+          organizationId: e.organizationId,
+          result: 'success',
+          reason: notes ?? null,
+          requestId: c.requestId ?? null,
+          ip: c.ip ?? null,
+          userAgent: c.userAgent ?? null,
+        },
+        tx,
+      );
+      await this.outbox.write(tx, {
+        aggregateType: 'medication_order',
+        aggregateId: orderId,
+        eventType: `medication_order.${type}`,
+        payload: { orderId, encounterId: order.encounterId, patientId: e.patientId },
+      });
+      return event;
+    });
+    return {
+      data: {
+        ...result,
+        occurredAt: result.occurredAt.toISOString(),
+      },
+    };
+  }
+
+  dispenseMedication(
+    p: AuthenticatedPrincipal,
+    orderId: string,
+    notes: string | undefined,
+    c: Context,
+  ) {
+    return this.appendMedicationEvent(p, orderId, 'dispensed', ['pharmacist'], notes, c);
+  }
+
+  administerMedication(
+    p: AuthenticatedPrincipal,
+    orderId: string,
+    notes: string | undefined,
+    c: Context,
+  ) {
+    return this.appendMedicationEvent(p, orderId, 'administered', ['doctor', 'nurse'], notes, c);
+  }
+
+  confirmMedicationAdherence(
+    p: AuthenticatedPrincipal,
+    orderId: string,
+    notes: string | undefined,
+    c: Context,
+  ) {
+    return this.appendMedicationEvent(
+      p,
+      orderId,
+      'adherence_confirmed',
+      ['patient', 'doctor', 'nurse', 'care_coordinator'],
+      notes,
+      c,
+    );
+  }
+
+  addMedicationAdherenceNote(
+    p: AuthenticatedPrincipal,
+    orderId: string,
+    notes: string | undefined,
+    c: Context,
+  ) {
+    return this.appendMedicationEvent(
+      p,
+      orderId,
+      'adherence_note',
+      ['patient', 'doctor', 'nurse', 'care_coordinator'],
+      notes,
+      c,
+    );
   }
   async addDocument(
     p: AuthenticatedPrincipal,

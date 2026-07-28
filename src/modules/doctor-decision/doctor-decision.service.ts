@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../core/database/prisma.service';
 import { AuditService } from '../../core/audit/audit.service';
 import { AuthenticatedPrincipal } from '../../core/security/auth.types';
@@ -15,13 +16,17 @@ import { CandidateCondition } from '../ai-assessment/ai-scoring.util';
 import { DoctorDecisionRepository } from './doctor-decision.repository';
 import {
   toClinicalPlanResponse,
+  toClinicalPlanRevisionResponse,
   toDoctorDiagnosisResponse,
   toDoctorReviewResponse,
 } from './doctor-decision-response.mapper';
 import { ReviewAssessmentRequest } from './dto/review-assessment.dto';
 import { RecordDiagnosisRequest } from './dto/record-diagnosis.dto';
 import { ReviseDiagnosisRequest } from './dto/revise-diagnosis.dto';
-import { ApproveClinicalPlanRequest } from './dto/approve-clinical-plan.dto';
+import {
+  ApproveClinicalPlanRequest,
+  ReviseClinicalPlanRequest,
+} from './dto/approve-clinical-plan.dto';
 
 export interface RequestContext {
   requestId?: string;
@@ -287,12 +292,85 @@ export class DoctorDecisionService {
       );
     }
 
+    if (dto.protocolRef) {
+      const protocolVersion = await this.prisma.workflowTemplateVersion.findFirst({
+        where: {
+          id: dto.protocolRef.templateVersionId,
+          templateId: dto.protocolRef.templateId,
+          status: 'published',
+        },
+      });
+      if (!protocolVersion) {
+        throw new ValidationAppError(
+          [{ field: 'protocolRef', code: 'INVALID_PUBLISHED_VERSION' }],
+          'The care plan must reference a published version of the selected protocol.',
+        );
+      }
+    }
+
     const plan = await this.prisma.$transaction(async (tx) => {
+      const signedAt = new Date();
       const created = await this.repo.createClinicalPlan(tx, {
         encounterId,
         doctorId: principal.userId,
         diagnosisId: dto.diagnosisId,
         summary: dto.summary,
+        measurableGoals:
+          dto.measurableGoals && dto.measurableGoals.length > 0
+            ? dto.measurableGoals
+            : [dto.summary],
+        protocolTemplateId: dto.protocolRef?.templateId,
+        protocolTemplateVersionId: dto.protocolRef?.templateVersionId,
+        milestones: (dto.milestones ?? []) as unknown as Prisma.InputJsonValue,
+        monitoringMetrics: dto.monitoringMetrics ?? [],
+        stopOrChangeCriteria: dto.stopOrChangeCriteria ?? '',
+        contraindications: dto.contraindications ?? [],
+        prerequisites: dto.prerequisites ?? [],
+        responsibleProviderId: principal.userId,
+        deviationFromProtocol: dto.deviationFromProtocol
+          ? {
+              reason: dto.deviationFromProtocol.reason,
+              approvedBy: principal.userId,
+              approvedAt: signedAt.toISOString(),
+            }
+          : undefined,
+        outcome: dto.outcome,
+        currentStage: dto.currentStage ?? 'induction',
+        signedBy: principal.userId,
+        signedAt,
+      });
+      await tx.clinicalPlanRevision.create({
+        data: {
+          planId: created.id,
+          version: created.version,
+          action: 'approved',
+          actorId: principal.userId,
+          snapshot: {
+            id: created.id,
+            encounterId: created.encounterId,
+            diagnosisId: created.diagnosisId,
+            summary: created.summary,
+            measurableGoals: created.measurableGoals,
+            protocolRef:
+              created.protocolTemplateId && created.protocolTemplateVersionId
+                ? {
+                    templateId: created.protocolTemplateId,
+                    templateVersionId: created.protocolTemplateVersionId,
+                  }
+                : null,
+            milestones: created.milestones,
+            monitoringMetrics: created.monitoringMetrics,
+            stopOrChangeCriteria: created.stopOrChangeCriteria,
+            contraindications: created.contraindications,
+            prerequisites: created.prerequisites,
+            responsibleProviderId: created.responsibleProviderId,
+            deviationFromProtocol: created.deviationFromProtocol,
+            outcome: created.outcome,
+            currentStage: created.currentStage,
+            signedBy: created.signedBy,
+            signedAt: created.signedAt?.toISOString() ?? null,
+          },
+        },
       });
       await tx.medicalEncounter.update({
         where: { id: encounterId },
@@ -327,5 +405,178 @@ export class DoctorDecisionService {
       throw new NotFoundAppError('Clinical plan not found.');
     }
     return { data: toClinicalPlanResponse(plan) };
+  }
+
+  async reviseClinicalPlan(
+    principal: AuthenticatedPrincipal,
+    encounterId: string,
+    dto: ReviseClinicalPlanRequest,
+    context: RequestContext,
+  ) {
+    assertDoctor(principal);
+    const encounter = await this.loadEncounter(principal, encounterId);
+    const current = await this.repo.findClinicalPlanByEncounterId(encounterId);
+    if (!current) {
+      throw new NotFoundAppError('Clinical plan not found.');
+    }
+    const hasMaterialChange = [
+      dto.summary,
+      dto.measurableGoals,
+      dto.protocolRef,
+      dto.milestones,
+      dto.monitoringMetrics,
+      dto.stopOrChangeCriteria,
+      dto.contraindications,
+      dto.prerequisites,
+      dto.deviationFromProtocol,
+      dto.outcome,
+      dto.currentStage,
+    ].some((value) => value !== undefined);
+    if (!hasMaterialChange) {
+      throw new ValidationAppError(
+        [{ field: 'body', code: 'NO_MATERIAL_CHANGE' }],
+        'At least one care-plan field must change.',
+      );
+    }
+    if (dto.protocolRef) {
+      const protocolVersion = await this.prisma.workflowTemplateVersion.findFirst({
+        where: {
+          id: dto.protocolRef.templateVersionId,
+          templateId: dto.protocolRef.templateId,
+          status: 'published',
+        },
+      });
+      if (!protocolVersion) {
+        throw new ValidationAppError(
+          [{ field: 'protocolRef', code: 'INVALID_PUBLISHED_VERSION' }],
+          'The care plan must reference a published version of the selected protocol.',
+        );
+      }
+    }
+
+    const revised = await this.prisma.$transaction(async (tx) => {
+      const signedAt = new Date();
+      const updated = await tx.clinicalPlan.updateMany({
+        where: { id: current.id, version: dto.version },
+        data: {
+          ...(dto.summary !== undefined ? { summary: dto.summary } : {}),
+          ...(dto.measurableGoals !== undefined ? { measurableGoals: dto.measurableGoals } : {}),
+          ...(dto.protocolRef
+            ? {
+                protocolTemplateId: dto.protocolRef.templateId,
+                protocolTemplateVersionId: dto.protocolRef.templateVersionId,
+              }
+            : {}),
+          ...(dto.milestones !== undefined
+            ? {
+                milestones: dto.milestones as unknown as Prisma.InputJsonValue,
+              }
+            : {}),
+          ...(dto.monitoringMetrics !== undefined
+            ? { monitoringMetrics: dto.monitoringMetrics }
+            : {}),
+          ...(dto.stopOrChangeCriteria !== undefined
+            ? { stopOrChangeCriteria: dto.stopOrChangeCriteria }
+            : {}),
+          ...(dto.contraindications !== undefined
+            ? { contraindications: dto.contraindications }
+            : {}),
+          ...(dto.prerequisites !== undefined ? { prerequisites: dto.prerequisites } : {}),
+          ...(dto.deviationFromProtocol !== undefined
+            ? {
+                deviationFromProtocol: {
+                  reason: dto.deviationFromProtocol.reason,
+                  approvedBy: principal.userId,
+                  approvedAt: signedAt.toISOString(),
+                },
+              }
+            : {}),
+          ...(dto.outcome !== undefined ? { outcome: dto.outcome } : {}),
+          ...(dto.currentStage !== undefined ? { currentStage: dto.currentStage } : {}),
+          signedBy: principal.userId,
+          signedAt,
+          version: { increment: 1 },
+        },
+      });
+      if (updated.count === 0) {
+        throw new ConflictAppError(
+          'OPTIMISTIC_LOCK_FAILED',
+          'The clinical plan was modified by another request.',
+        );
+      }
+      const plan = await tx.clinicalPlan.findUniqueOrThrow({
+        where: { id: current.id },
+        include: { orderRefs: true },
+      });
+      await tx.clinicalPlanRevision.create({
+        data: {
+          planId: plan.id,
+          version: plan.version,
+          action: 'revised',
+          actorId: principal.userId,
+          snapshot: {
+            id: plan.id,
+            encounterId: plan.encounterId,
+            diagnosisId: plan.diagnosisId,
+            summary: plan.summary,
+            measurableGoals: plan.measurableGoals,
+            protocolRef:
+              plan.protocolTemplateId && plan.protocolTemplateVersionId
+                ? {
+                    templateId: plan.protocolTemplateId,
+                    templateVersionId: plan.protocolTemplateVersionId,
+                  }
+                : null,
+            milestones: plan.milestones,
+            monitoringMetrics: plan.monitoringMetrics,
+            stopOrChangeCriteria: plan.stopOrChangeCriteria,
+            contraindications: plan.contraindications,
+            prerequisites: plan.prerequisites,
+            responsibleProviderId: plan.responsibleProviderId,
+            deviationFromProtocol: plan.deviationFromProtocol,
+            outcome: plan.outcome,
+            currentStage: plan.currentStage,
+            signedBy: plan.signedBy,
+            signedAt: plan.signedAt?.toISOString() ?? null,
+          },
+        },
+      });
+      await this.encounters.addEvent(
+        tx,
+        encounterId,
+        `Kế hoạch điều trị được cập nhật: ${dto.reason}`,
+        'warning',
+      );
+      await this.audit.write(
+        {
+          actorId: principal.userId,
+          action: 'clinical_plan.revised',
+          resourceType: 'clinical_plan',
+          resourceId: plan.id,
+          patientId: encounter.patientId,
+          encounterId,
+          organizationId: encounter.organizationId,
+          reason: dto.reason,
+          result: 'success',
+          requestId: context.requestId ?? null,
+          ip: context.ip ?? null,
+          userAgent: context.userAgent ?? null,
+        },
+        tx,
+      );
+      return plan;
+    });
+
+    return { data: toClinicalPlanResponse(revised) };
+  }
+
+  async listClinicalPlanRevisions(principal: AuthenticatedPrincipal, encounterId: string) {
+    await this.loadEncounter(principal, encounterId);
+    const plan = await this.repo.findClinicalPlanByEncounterId(encounterId);
+    if (!plan) {
+      throw new NotFoundAppError('Clinical plan not found.');
+    }
+    const revisions = await this.repo.listClinicalPlanRevisions(plan.id);
+    return { data: revisions.map(toClinicalPlanRevisionResponse) };
   }
 }

@@ -200,6 +200,18 @@ export class WorkflowRuntimeService {
     return { data: toWorkflowInstanceResponse(instance) };
   }
 
+  async getInstanceForEncounter(principal: AuthenticatedPrincipal, encounterId: string) {
+    const encounter = await this.encounters.findVisibleById(principal, encounterId);
+    if (!encounter) {
+      throw new NotFoundAppError('Encounter not found.');
+    }
+    const instance = await this.runtime.findInstanceByEncounterId(encounterId);
+    if (!instance) {
+      throw new NotFoundAppError('Workflow instance not found for this encounter.');
+    }
+    return { data: toWorkflowInstanceResponse(instance) };
+  }
+
   async verifyIdentity(principal: AuthenticatedPrincipal, instanceId: string) {
     const instance = await this.runtime.findInstanceById(instanceId);
     if (!instance) {
@@ -941,7 +953,9 @@ export class WorkflowRuntimeService {
         'Only an ad-hoc task can be edited directly — template-derived steps require a new template version.',
       );
     }
-    if (!EDITABLE_AD_HOC_STATUSES.includes(task.status as (typeof EDITABLE_AD_HOC_STATUSES)[number])) {
+    if (
+      !EDITABLE_AD_HOC_STATUSES.includes(task.status as (typeof EDITABLE_AD_HOC_STATUSES)[number])
+    ) {
       throw new ConflictAppError(
         'INVALID_STATE_TRANSITION',
         'This task has already started and can no longer be edited.',
@@ -952,7 +966,9 @@ export class WorkflowRuntimeService {
     const result = await this.prisma.$transaction(async (tx) => {
       const updateResult = await this.runtime.transition(tx, taskId, expectedVersion, {
         ...(fields.name !== undefined ? { name: fields.name } : {}),
-        ...(fields.responsibleRole !== undefined ? { responsibleRole: fields.responsibleRole } : {}),
+        ...(fields.responsibleRole !== undefined
+          ? { responsibleRole: fields.responsibleRole }
+          : {}),
         ...(fields.department !== undefined ? { department: fields.department } : {}),
         ...(fields.slaMinutes !== undefined ? { slaMinutes: fields.slaMinutes } : {}),
       } as never);
