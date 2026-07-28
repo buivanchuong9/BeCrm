@@ -14,6 +14,13 @@ if [ ! -s "$ENV_FILE" ]; then
   exit 1
 fi
 
+if ! grep -q '^AI_API_KEY=.' "$ENV_FILE"; then
+  echo "Missing AI_API_KEY in $ENV_FILE." >&2
+  echo "Generate one with: openssl rand -hex 32" >&2
+  echo "Then add it as AI_API_KEY=<generated-value> and rerun deployment." >&2
+  exit 1
+fi
+
 MODEL_FILE="$ROOT_DIR/ai/model/best_efficientnet_b0.pth"
 if [ ! -s "$MODEL_FILE" ]; then
   echo "Missing AI checkpoint: $MODEL_FILE" >&2
@@ -55,12 +62,16 @@ compose() {
 compose config >/dev/null
 
 if [ "${1:-}" = "--no-cache" ]; then
-  compose build --no-cache ai api
+  # Build the small API image first. A package-registry or base-image failure
+  # should fail fast before spending time and several GB exporting CUDA layers.
+  compose build --no-cache api
+  compose build --no-cache ai
 elif [ "$#" -gt 0 ]; then
   echo "Usage: $0 [--no-cache]" >&2
   exit 2
 else
-  compose build ai api
+  compose build api
+  compose build ai
 fi
 
 # Keep data services available, start the GPU inference service, apply

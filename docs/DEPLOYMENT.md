@@ -153,6 +153,42 @@ unset DB_PASSWORD PASSWORD_PEPPER FIELD_ENCRYPTION_KEY AI_API_KEY
 unset ACCESS_PRIVATE_KEY ACCESS_PUBLIC_KEY
 ```
 
+### Nâng cấp server đã có `.env.production` từ trước v2.8.0
+
+Không tạo lại toàn bộ file vì sẽ làm thay đổi password pepper/JWT/database
+secret đang dùng. Chỉ bổ sung cấu hình AI còn thiếu:
+
+```sh
+cd ~/BE_Y_Te/BeCrm
+umask 077
+
+if ! grep -q '^AI_API_KEY=.' .env.production; then
+  sed -i '/^AI_API_KEY=/d' .env.production
+  printf '\nAI_API_KEY=%s\n' "$(openssl rand -hex 32)" >> .env.production
+fi
+
+grep -q '^AI_MODEL_VERSION=' .env.production \
+  || printf 'AI_MODEL_VERSION=efficientnet-b0-31class\n' >> .env.production
+grep -q '^AI_SERVICE_URL=' .env.production \
+  || printf 'AI_SERVICE_URL=http://ai:8000\n' >> .env.production
+grep -q '^AI_TIMEOUT_MS=' .env.production \
+  || printf 'AI_TIMEOUT_MS=30000\n' >> .env.production
+grep -q '^AI_GPU_DEVICE=' .env.production \
+  || printf 'AI_GPU_DEVICE=0\n' >> .env.production
+grep -q '^PYTORCH_INDEX_URL=' .env.production \
+  || printf 'PYTORCH_INDEX_URL=https://download.pytorch.org/whl/cu126\n' >> .env.production
+
+chmod 600 .env.production
+```
+
+Kiểm tra tên biến mà không in secret:
+
+```sh
+grep -E '^(AI_MODEL_VERSION|AI_SERVICE_URL|AI_TIMEOUT_MS|AI_GPU_DEVICE|PYTORCH_INDEX_URL)=' \
+  .env.production
+grep -q '^AI_API_KEY=.' .env.production && echo 'AI_API_KEY OK'
+```
+
 Nếu frontend nằm trên domain khác, sửa `FRONTEND_ORIGINS` thành origin thật của
 frontend. Lệnh `db:seed` chỉ khởi tạo metadata nền tảng (permission và feature
 flag), không tạo organization, user, bệnh nhân hay dữ liệu lâm sàng mẫu.

@@ -10,3 +10,5 @@ coverage/
 /tmp/
 .devkeys/
 .claude/
+__pycache__/
+*.py[cod]
