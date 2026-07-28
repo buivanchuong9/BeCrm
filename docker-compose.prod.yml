@@ -27,10 +27,15 @@ services:
     volumes:
       - dermahealth_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-app} -d ${POSTGRES_DB:-dermahealth}']
+      test:
+        [
+          'CMD-SHELL',
+          'pg_isready -h 127.0.0.1 -p 5432 -U ${POSTGRES_USER:-app} -d ${POSTGRES_DB:-dermahealth}',
+        ]
       interval: 5s
       timeout: 5s
-      retries: 10
+      retries: 24
+      start_period: 30s
     # No host port published — reachable only from other containers on this
     # network. Use `docker compose -f docker-compose.prod.yml exec postgres psql ...`
     # for ad-hoc access instead of exposing 5432 publicly.
