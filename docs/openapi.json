@@ -41499,7 +41499,64 @@
       },
       "ClientEventRequest": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "action": {
+            "type": "string",
+            "example": "CLIENT_RENDER_ERROR"
+          },
+          "entityType": {
+            "type": "string",
+            "example": "Application"
+          },
+          "entityId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "patientId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "encounterId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "previousState": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true
+          },
+          "newState": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true
+          },
+          "reason": {
+            "type": "string",
+            "example": "Cannot convert object to primitive value"
+          },
+          "sourceModule": {
+            "type": "string",
+            "example": "ErrorBoundary"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "info",
+              "warning",
+              "critical"
+            ],
+            "example": "critical"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "action",
+          "reason",
+          "severity"
+        ]
       },
       "PresignRequest": {
         "type": "object",

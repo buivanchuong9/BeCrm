@@ -28,6 +28,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { AuthenticatedPrincipal } from '../../core/security/auth.types';
 import { CurrentUser } from '../../core/security/current-user.decorator';
 import { RequireIdempotencyKey } from '../../core/idempotency/idempotency-key.decorator';
@@ -73,17 +74,57 @@ class DecisionRequest {
   @IsOptional() @IsString() department?: string;
 }
 class ClientEventRequest {
-  @IsString() action!: string;
-  @IsOptional() @IsString() entityType?: string;
-  @IsOptional() @IsUUID() entityId?: string;
-  @IsOptional() @IsUUID() patientId?: string;
-  @IsOptional() @IsUUID() encounterId?: string;
-  @IsOptional() @IsObject() previousState?: Record<string, unknown> | null;
-  @IsOptional() @IsObject() newState?: Record<string, unknown> | null;
-  @IsString() reason!: string;
-  @IsOptional() @IsString() sourceModule?: string;
-  @IsIn(['info', 'warning', 'critical']) severity!: 'info' | 'warning' | 'critical';
-  @IsOptional() @IsDateString() occurredAt?: string;
+  @ApiProperty({ example: 'CLIENT_RENDER_ERROR' })
+  @IsString()
+  action!: string;
+
+  @ApiPropertyOptional({ example: 'Application' })
+  @IsOptional()
+  @IsString()
+  entityType?: string;
+
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  entityId?: string;
+
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  patientId?: string;
+
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  encounterId?: string;
+
+  @ApiPropertyOptional({ type: 'object', additionalProperties: true, nullable: true })
+  @IsOptional()
+  @IsObject()
+  previousState?: Record<string, unknown> | null;
+
+  @ApiPropertyOptional({ type: 'object', additionalProperties: true, nullable: true })
+  @IsOptional()
+  @IsObject()
+  newState?: Record<string, unknown> | null;
+
+  @ApiProperty({ example: 'Cannot convert object to primitive value' })
+  @IsString()
+  reason!: string;
+
+  @ApiPropertyOptional({ example: 'ErrorBoundary' })
+  @IsOptional()
+  @IsString()
+  sourceModule?: string;
+
+  @ApiProperty({ enum: ['info', 'warning', 'critical'], example: 'critical' })
+  @IsIn(['info', 'warning', 'critical'])
+  severity!: 'info' | 'warning' | 'critical';
+
+  @ApiPropertyOptional({ format: 'date-time' })
+  @IsOptional()
+  @IsDateString()
+  occurredAt?: string;
 }
 class PresignRequest {
   @IsString() fileName!: string;
