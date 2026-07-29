@@ -68,6 +68,18 @@ export class PatientsService {
     return this.getDetail(principal, patient.id, context);
   }
 
+  async updateSelf(
+    principal: AuthenticatedPrincipal,
+    dto: UpdatePatientRequest,
+    context: RequestContext,
+  ) {
+    const patient = await this.patients.findByUserId(principal.userId);
+    if (!patient) {
+      throw new NotFoundAppError('Patient not found.');
+    }
+    return this.update(principal, patient.id, dto, context);
+  }
+
   async getDetail(principal: AuthenticatedPrincipal, patientId: string, context: RequestContext) {
     const patient = await this.patients.findVisibleById(principal, patientId);
     if (!patient) {

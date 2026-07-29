@@ -46,6 +46,20 @@ export class PatientsController {
     });
   }
 
+  @ApiOkEnvelope(PatientResponseDto)
+  @Patch('me')
+  async updateSelf(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Body() dto: UpdatePatientRequest,
+    @Req() req: Request,
+  ) {
+    return this.patientsService.updateSelf(principal, dto, {
+      requestId: req.requestId,
+      ip: req.ip,
+      userAgent: req.header('user-agent'),
+    });
+  }
+
   @ApiOkEnvelope(PatientDetailResponseDto)
   @Get(':patientId')
   async detail(
