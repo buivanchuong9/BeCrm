@@ -3,14 +3,33 @@ import { ForbiddenAppError } from '../../../core/errors/app-error';
 
 const LIST_STAFF_ROLES = ['receptionist', 'medical_administrator', 'doctor', 'nurse'] as const;
 const VIEW_ORG_WIDE_ROLES = ['medical_administrator', 'receptionist'] as const;
-const SELF_EDITABLE_FIELDS = ['phone', 'email', 'address'] as const;
+const SELF_EDITABLE_FIELDS = [
+  'name',
+  'dob',
+  'gender',
+  'phone',
+  'email',
+  'address',
+  'bloodType',
+  'heightCm',
+  'weightKg',
+] as const;
 
 // Every UpdatePatientRequest field except `version`; medical_administrator/
 // super_administrator may set all of them (enforced by early-return below —
 // the DTO's own class-validator whitelist already blocks anything outside
 // this set from reaching the service layer at all).
 export type PatientUpdatableField =
-  'name' | 'dob' | 'gender' | 'phone' | 'email' | 'address' | 'bloodType' | 'primaryDoctorId';
+  | 'name'
+  | 'dob'
+  | 'gender'
+  | 'phone'
+  | 'email'
+  | 'address'
+  | 'bloodType'
+  | 'heightCm'
+  | 'weightKg'
+  | 'primaryDoctorId';
 
 function hasRole(principal: AuthenticatedPrincipal, role: string): boolean {
   return principal.memberships.some((m) => m.role === role);

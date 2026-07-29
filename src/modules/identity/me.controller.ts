@@ -11,6 +11,7 @@ import {
   Req,
 } from '@nestjs/common';
 import { ApiProperty, ApiTags } from '@nestjs/swagger';
+import { ConfigService } from '@nestjs/config';
 import { Throttle } from '@nestjs/throttler';
 import { Request } from 'express';
 import { IsString, Length } from 'class-validator';
@@ -19,13 +20,15 @@ import { AuthenticatedPrincipal } from '../../core/security/auth.types';
 import { ApiOkEnvelope } from '../../core/http/api-envelope.decorator';
 import { UsersRepository } from './users.repository';
 import { UserPreferencesRepository } from './user-preferences.repository';
-import { NotFoundAppError } from '../../core/errors/app-error';
+import { ConflictAppError, NotFoundAppError } from '../../core/errors/app-error';
 import { toCurrentUserResponse } from './user-response.mapper';
 import { CurrentUserResponseDto } from './dto/responses/current-user-response.dto';
 import { UserPreferenceResponseDto } from './dto/responses/user-preference-response.dto';
 import { UpdateCurrentUserRequest } from './dto/update-current-user.dto';
 import { UpsertUserPreferenceRequest } from './dto/upsert-preferences.dto';
 import { MfaService } from './mfa/mfa.service';
+import { PrismaService } from '../../core/database/prisma.service';
+import { AppConfiguration } from '../../core/configuration/configuration';
 
 class MfaCodeRequest {
   @ApiProperty({
@@ -46,7 +49,30 @@ export class MeController {
     private readonly users: UsersRepository,
     private readonly preferences: UserPreferencesRepository,
     private readonly mfa: MfaService,
+    private readonly prisma: PrismaService,
+    private readonly config: ConfigService<AppConfiguration, true>,
   ) {}
+
+  private async responseWithAvatar(
+    user: Awaited<ReturnType<UsersRepository['findByIdWithMemberships']>>,
+  ) {
+    if (!user) throw new NotFoundAppError('User not found.');
+    const upload = user.avatarFileId
+      ? await this.prisma.uploadObject.findFirst({
+          where: {
+            id: user.avatarFileId,
+            ownerId: user.id,
+            context: 'avatar',
+            status: 'confirmed',
+          },
+        })
+      : null;
+    const storage = this.config.get('storage', { infer: true });
+    const avatarUrl = upload
+      ? `${(storage.endpoint ?? '').replace(/\/$/, '')}/${storage.bucket}/${upload.storageKey}`
+      : null;
+    return toCurrentUserResponse(user, this.users.toMembershipScopes(user), avatarUrl);
+  }
 
   @ApiOkEnvelope(CurrentUserResponseDto)
   @Get()
@@ -55,7 +81,7 @@ export class MeController {
     if (!user) {
       throw new NotFoundAppError('User not found.');
     }
-    return { data: toCurrentUserResponse(user, this.users.toMembershipScopes(user)) };
+    return { data: await this.responseWithAvatar(user) };
   }
 
   @ApiOkEnvelope(CurrentUserResponseDto)
@@ -64,6 +90,22 @@ export class MeController {
     @CurrentUser() principal: AuthenticatedPrincipal,
     @Body() dto: UpdateCurrentUserRequest,
   ) {
+    if (dto.avatarFileId !== undefined) {
+      const upload = await this.prisma.uploadObject.findFirst({
+        where: {
+          id: dto.avatarFileId,
+          ownerId: principal.userId,
+          context: 'avatar',
+          status: 'confirmed',
+        },
+      });
+      if (!upload) {
+        throw new ConflictAppError(
+          'INVALID_AVATAR_UPLOAD',
+          'Avatar must reference a confirmed image uploaded by the current user.',
+        );
+      }
+    }
     const updated = await this.users.updateProfile(principal.userId, dto.version, {
       ...(dto.displayName !== undefined || dto.name !== undefined
         ? { displayName: dto.displayName ?? dto.name }
@@ -71,7 +113,7 @@ export class MeController {
       ...(dto.phone !== undefined ? { phone: dto.phone } : {}),
       ...(dto.avatarFileId !== undefined ? { avatarFileId: dto.avatarFileId } : {}),
     });
-    return { data: toCurrentUserResponse(updated, this.users.toMembershipScopes(updated)) };
+    return { data: await this.responseWithAvatar(updated) };
   }
 
   @ApiOkEnvelope(UserPreferenceResponseDto)

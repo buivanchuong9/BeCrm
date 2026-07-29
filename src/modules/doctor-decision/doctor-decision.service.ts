@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, type EncounterStatus } from '@prisma/client';
 import { PrismaService } from '../../core/database/prisma.service';
 import { AuditService } from '../../core/audit/audit.service';
 import { AuthenticatedPrincipal } from '../../core/security/auth.types';
@@ -43,6 +43,31 @@ function assertDoctor(principal: AuthenticatedPrincipal): void {
   if (!principal.memberships.some((m) => m.role === 'doctor')) {
     throw new ForbiddenAppError('AUTH_FORBIDDEN', 'Only a doctor may perform this action.');
   }
+}
+
+/**
+ * A doctor-facing command may start directly from the AI result screen. Keep
+ * the canonical state-machine edges intact while composing that user action
+ * into the shortest valid path to a confirmed diagnosis.
+ */
+function pathToDiagnosed(from: EncounterStatus): EncounterStatus[] | undefined {
+  const paths: Partial<Record<EncounterStatus, EncounterStatus[]>> = {
+    intake_complete: ['under_doctor_review', 'diagnosed'],
+    ai_assessed: ['under_doctor_review', 'diagnosed'],
+    checked_in: ['under_doctor_review', 'diagnosed'],
+    under_doctor_review: ['diagnosed'],
+    awaiting_results: ['diagnosed'],
+    diagnosed: [],
+  };
+  const path = paths[from];
+  if (!path) return undefined;
+
+  let current = from;
+  for (const next of path) {
+    if (!canTransition(current, next)) return undefined;
+    current = next;
+  }
+  return path;
 }
 
 @Injectable()
@@ -138,8 +163,9 @@ export class DoctorDecisionService {
     assertDoctor(principal);
     const encounter = await this.loadEncounter(principal, encounterId);
 
-    const shouldTransition =
-      dto.status === 'confirmed' && canTransition(encounter.status, 'diagnosed');
+    const diagnosisPath =
+      dto.status === 'confirmed' ? pathToDiagnosed(encounter.status) : undefined;
+    const shouldTransition = Boolean(diagnosisPath?.length);
 
     const diagnosis = await this.prisma.$transaction(async (tx) => {
       const created = await this.repo.createDiagnosis(tx, {
@@ -154,10 +180,16 @@ export class DoctorDecisionService {
       });
 
       if (shouldTransition) {
-        await tx.medicalEncounter.update({
-          where: { id: encounterId },
+        const result = await tx.medicalEncounter.updateMany({
+          where: { id: encounterId, version: encounter.version },
           data: { status: 'diagnosed', version: { increment: 1 } },
         });
+        if (result.count === 0) {
+          throw new ConflictAppError(
+            'OPTIMISTIC_LOCK_FAILED',
+            'The encounter was modified by another request.',
+          );
+        }
         await this.encounters.addEvent(
           tx,
           encounterId,
@@ -285,7 +317,9 @@ export class DoctorDecisionService {
         'A clinical plan requires a confirmed diagnosis.',
       );
     }
-    if (!canTransition(encounter.status, 'plan_approved')) {
+    const diagnosisPath = pathToDiagnosed(encounter.status);
+    const canApprove = diagnosisPath !== undefined && canTransition('diagnosed', 'plan_approved');
+    if (!canApprove) {
       throw new ConflictAppError(
         'INVALID_STATE_TRANSITION',
         `Cannot approve a clinical plan while the encounter is "${encounter.status}".`,
@@ -372,10 +406,24 @@ export class DoctorDecisionService {
           },
         },
       });
-      await tx.medicalEncounter.update({
-        where: { id: encounterId },
+      const encounterUpdate = await tx.medicalEncounter.updateMany({
+        where: { id: encounterId, version: encounter.version },
         data: { status: 'plan_approved', version: { increment: 1 } },
       });
+      if (encounterUpdate.count === 0) {
+        throw new ConflictAppError(
+          'OPTIMISTIC_LOCK_FAILED',
+          'The encounter was modified by another request.',
+        );
+      }
+      if (diagnosisPath.length > 0) {
+        await this.encounters.addEvent(
+          tx,
+          encounterId,
+          'Trạng thái lượt khám được đồng bộ theo chẩn đoán đã xác nhận',
+          'info',
+        );
+      }
       await this.encounters.addEvent(tx, encounterId, 'Phác đồ điều trị đã được duyệt', 'success');
       await this.audit.write(
         {

@@ -337,6 +337,8 @@ model Patient {
   // enum-identifier translation layer. Constrained by a CHECK in the SQL
   // migration, not just application validation.
   bloodType       String        @default("unknown") @map("blood_type")
+  heightCm        Decimal?      @map("height_cm") @db.Decimal(5, 2)
+  weightKg        Decimal?      @map("weight_kg") @db.Decimal(5, 2)
   primaryDoctorId String?       @map("primary_doctor_id") @db.Uuid
   version         Int           @default(1)
   createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz

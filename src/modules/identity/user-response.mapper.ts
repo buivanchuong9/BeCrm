@@ -38,6 +38,7 @@ export interface CurrentUserResponse {
 export function toCurrentUserResponse(
   user: UserWithMemberships,
   memberships: MembershipScope[],
+  avatarUrl: string | null = null,
 ): CurrentUserResponse {
   return {
     id: user.id,
@@ -45,9 +46,7 @@ export function toCurrentUserResponse(
     name: user.displayName,
     email: user.email,
     phone: user.phone,
-    // Presigned avatar URL derivation lands with the T09 file service; until then
-    // avatarFileId is stored but never resolved to a public-facing URL.
-    avatarUrl: null,
+    avatarUrl,
     status: toApiUserStatus(user.status),
     activeOrganizationId: memberships[0]?.organizationId ?? null,
     memberships,

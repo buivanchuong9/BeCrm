@@ -18,6 +18,8 @@ export function toPatientResponse(patient: PatientWithDoctor): PatientResponseDt
     email: patient.email,
     address: patient.address,
     bloodType: patient.bloodType as PatientResponseDto['bloodType'],
+    heightCm: patient.heightCm === null ? null : Number(patient.heightCm),
+    weightKg: patient.weightKg === null ? null : Number(patient.weightKg),
     primaryDoctor: patient.primaryDoctor
       ? { id: patient.primaryDoctor.id, name: patient.primaryDoctor.displayName }
       : null,

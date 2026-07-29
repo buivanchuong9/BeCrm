@@ -3,12 +3,15 @@ import {
   IsIn,
   IsInt,
   IsOptional,
+  IsNumber,
   IsString,
   IsUUID,
   Matches,
   Min,
+  Max,
   ValidateIf,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 
 const GENDER_VALUES = ['male', 'female', 'other', 'unknown'] as const;
 const BLOOD_TYPE_VALUES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'unknown'] as const;
@@ -48,6 +51,22 @@ export class UpdatePatientRequest {
   @IsOptional()
   @IsIn(BLOOD_TYPE_VALUES)
   bloodType?: (typeof BLOOD_TYPE_VALUES)[number];
+
+  @ApiProperty({ required: false, nullable: true, minimum: 50, maximum: 250 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(50)
+  @Max(250)
+  heightCm?: number | null;
+
+  @ApiProperty({ required: false, nullable: true, minimum: 2, maximum: 500 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(2)
+  @Max(500)
+  weightKg?: number | null;
 
   @ApiProperty({ required: false, format: 'uuid', nullable: true })
   @IsOptional()

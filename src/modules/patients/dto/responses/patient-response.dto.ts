@@ -38,6 +38,12 @@ export class PatientResponseDto {
   @ApiProperty({ enum: BLOOD_TYPE_VALUES })
   bloodType!: (typeof BLOOD_TYPE_VALUES)[number];
 
+  @ApiProperty({ nullable: true, example: 170 })
+  heightCm!: number | null;
+
+  @ApiProperty({ nullable: true, example: 65.5 })
+  weightKg!: number | null;
+
   @ApiProperty({ type: ReferenceResponseDto, nullable: true })
   primaryDoctor!: ReferenceResponseDto | null;
 

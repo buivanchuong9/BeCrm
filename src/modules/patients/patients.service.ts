@@ -128,6 +128,8 @@ export class PatientsService {
       ...(dto.email !== undefined ? (['email'] as const) : []),
       ...(dto.address !== undefined ? (['address'] as const) : []),
       ...(dto.bloodType !== undefined ? (['bloodType'] as const) : []),
+      ...(dto.heightCm !== undefined ? (['heightCm'] as const) : []),
+      ...(dto.weightKg !== undefined ? (['weightKg'] as const) : []),
       ...(dto.primaryDoctorId !== undefined ? (['primaryDoctorId'] as const) : []),
     ];
     assertUpdateFieldsAllowed(principal, patient, requestedFields);
@@ -140,6 +142,8 @@ export class PatientsService {
       ...(dto.email !== undefined ? { email: dto.email } : {}),
       ...(dto.address !== undefined ? { address: dto.address } : {}),
       ...(dto.bloodType !== undefined ? { bloodType: dto.bloodType } : {}),
+      ...(dto.heightCm !== undefined ? { heightCm: dto.heightCm } : {}),
+      ...(dto.weightKg !== undefined ? { weightKg: dto.weightKg } : {}),
     };
     const changedFields = Object.keys(data);
     const primaryDoctorChanged = dto.primaryDoctorId !== undefined;
