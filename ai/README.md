@@ -1,6 +1,7 @@
 # DermaHealth AI service
 
-Service inference nội bộ cho checkpoint EfficientNet-B0, 31 lớp.
+Service inference nội bộ cho checkpoint đa phương thức EfficientNet-B0 + PhoBERT,
+15 lớp. Mặc định mỗi lần quét trả Top 3 tín hiệu.
 
 Production chạy bằng NVIDIA CUDA và `AI_REQUIRE_CUDA=true`; service sẽ từ chối
 khởi động nếu container không nhìn thấy GPU. `docker-compose.prod.yml` chỉ cấp
@@ -8,19 +9,16 @@ một GPU cho service và không publish port 8000 ra Internet.
 
 ## Điều bắt buộc trước khi dùng lâm sàng
 
-`model/labels.json` hiện chỉ chứa nhãn kỹ thuật `class_00..class_30`, vì checkpoint
-chỉ có `state_dict` và không chứa mapping nhãn. Hãy thay file này bằng đúng thứ tự
-`class_to_idx` lúc train. Không được đoán hoặc sắp xếp tên bệnh theo alphabet nếu
-training dataset đã dùng thứ tự khác.
+Checkpoint `train_combine_ensemble.pth` phải chứa `model_state`, `class_names`,
+`num_classes` và `embed_dim`. Service dùng chính `class_names` đóng gói cùng
+checkpoint, không suy đoán mapping nhãn từ tên thư mục. Tokenizer PhoBERT được
+vendor trong `model/phobert-tokenizer` để production không tải model từ Internet
+khi khởi động.
 
-Vì mapping hiện chưa được xác minh, `/v1/analyze-case` luôn trả
-`status=abstained`, `aggregate.predictions=[]` và không trả field `label`. Dữ liệu
-`classIndex` kỹ thuật trên từng ảnh vẫn được giữ để bác sĩ/ML engineer kiểm tra,
-nhưng không được hiển thị như tên bệnh cho bệnh nhân.
-
-Preprocessing hiện dùng cấu hình eval chuẩn của timm/ImageNet: resize 256, center
-crop 224 và ImageNet normalization. Nếu pipeline train khác, cập nhật
-`app/model.py`; sai preprocessing vẫn cho response hợp lệ nhưng dự đoán sai.
+Preprocessing ảnh hiện dùng resize 256, center crop 224 và ImageNet normalization.
+Text được tokenize bằng PhoBERT tối đa 128 token. Phải đối chiếu hai cấu hình này
+với code train trước khi phê duyệt model; sai preprocessing vẫn có thể cho response
+hợp lệ nhưng dự đoán sai.
 
 API nhận JPEG/PNG/WebP, tối đa 10 MB và 25 triệu pixel theo mặc định. Có thể điều
 chỉnh bằng `AI_MAX_IMAGE_BYTES` và `AI_MAX_IMAGE_PIXELS`, nhưng tăng giới hạn làm
@@ -57,7 +55,8 @@ curl -X POST http://localhost:8000/v1/analyze-case \
   -F 'alternate=@alternate.jpg' \
   -F 'bodyRegion=arm' \
   -F 'durationDays=4' \
-  -F 'symptoms=["fever","rapid_spreading"]'
+  -F 'symptoms=["fever","rapid_spreading"]' \
+  -F 'note=Tổn thương ngứa tăng sau khi đổi thuốc'
 ```
 
 Mỗi ảnh được inference độc lập. Grad-CAM dùng convolution layer cuối được khám
@@ -85,7 +84,9 @@ curl http://localhost:8000/metrics -H 'X-AI-API-Key: dev-secret'
 - `AI_MIN_BRIGHTNESS=0.12`
 - `AI_MAX_BRIGHTNESS=0.95`
 - `AI_MIN_BLUR_VARIANCE=0.001`
-- `AI_APPROVED_PREPROCESSING_VERSION=imagenet-eval-224-v1`
+- `AI_TOP_K=3`
+- `AI_TEXT_MAX_LENGTH=128`
+- `AI_APPROVED_PREPROCESSING_VERSION=imagenet-phobert-eval-224-v1`
 
 Không thay threshold dựa trên cảm tính. Các giá trị phải được hiệu chỉnh bằng bộ
 validation và phê duyệt như một model/config release mới.

@@ -55,6 +55,11 @@ export class SkinAnalysisCaseController {
           type: 'string',
           description: 'JSON string array, e.g. ["fever","rapid_spreading"]',
         },
+        note: {
+          type: 'string',
+          maxLength: 500,
+          description: 'Free-text clinical context consumed by the multimodal text encoder.',
+        },
         patientId: { type: 'string', format: 'uuid' },
       },
     },

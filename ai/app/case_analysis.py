@@ -21,6 +21,17 @@ class CaseContext:
     body_region: str
     duration_days: int | None
     symptoms: list[str]
+    note: str | None = None
+
+    def model_text(self) -> str:
+        parts = [f"Vùng cơ thể: {self.body_region}."]
+        if self.duration_days is not None:
+            parts.append(f"Thời gian xuất hiện: {self.duration_days} ngày.")
+        if self.symptoms:
+            parts.append(f"Triệu chứng: {', '.join(self.symptoms)}.")
+        if self.note:
+            parts.append(f"Mô tả: {self.note}.")
+        return " ".join(parts)
 
 
 def aggregate_case(

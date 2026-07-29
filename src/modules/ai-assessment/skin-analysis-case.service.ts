@@ -68,6 +68,9 @@ export class SkinAnalysisCaseService {
       form.append('durationDays', String(dto.durationDays));
     }
     form.append('symptoms', JSON.stringify(symptoms));
+    if (dto.note?.trim()) {
+      form.append('note', dto.note.trim());
+    }
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), ai.timeoutMs);
@@ -135,6 +138,7 @@ export class SkinAnalysisCaseService {
                   targetLayer: image.heatmap.targetLayer,
                   targetClassIndex: image.heatmap.targetClassIndex,
                   allZero: image.heatmap.allZero,
+                  attention: image.heatmap.attention,
                 }
               : null,
           })) as unknown as Prisma.InputJsonValue,

@@ -20,6 +20,11 @@ export class AnalyzeSkinCaseRequest {
   symptoms?: string;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  note?: string;
+
+  @IsOptional()
   @IsUUID()
   patientId?: string;
 }

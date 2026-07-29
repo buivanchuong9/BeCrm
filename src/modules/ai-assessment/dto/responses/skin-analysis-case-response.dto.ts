@@ -12,6 +12,29 @@ class CasePredictionDto {
   @ApiProperty() probability!: number;
 }
 
+class NormalizedPointDto {
+  @ApiProperty({ minimum: 0, maximum: 1 }) x!: number;
+  @ApiProperty({ minimum: 0, maximum: 1 }) y!: number;
+}
+
+class NormalizedBoundingBoxDto extends NormalizedPointDto {
+  @ApiProperty({ minimum: 0, maximum: 1 }) width!: number;
+  @ApiProperty({ minimum: 0, maximum: 1 }) height!: number;
+}
+
+class GradCamAttentionDto {
+  @ApiProperty({ example: 0.6 }) threshold!: number;
+  @ApiProperty({
+    example: 18.42,
+    description: 'Percent of model-input pixels above the Grad-CAM threshold; not lesion area.',
+  })
+  coveragePercent!: number;
+  @ApiPropertyOptional({ type: NormalizedBoundingBoxDto, nullable: true })
+  boundingBox!: NormalizedBoundingBoxDto | null;
+  @ApiPropertyOptional({ type: NormalizedPointDto, nullable: true })
+  centroid!: NormalizedPointDto | null;
+}
+
 class GradCamDto {
   @ApiProperty({ enum: ['grad_cam'] }) method!: 'grad_cam';
   @ApiProperty() targetLayer!: string;
@@ -22,6 +45,7 @@ class GradCamDto {
   @ApiProperty({ description: 'Sanitized 224x224 PNG overlay, no source EXIF metadata.' })
   dataUrl!: string;
   @ApiProperty() allZero!: boolean;
+  @ApiProperty({ type: GradCamAttentionDto }) attention!: GradCamAttentionDto;
 }
 
 class SanitizedOriginalDto {

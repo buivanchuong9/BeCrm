@@ -53,7 +53,7 @@ def ready(_: None = Depends(authorize)):
         raise HTTPException(status_code=503, detail="Model is not loaded")
     return {
         "status": "ready",
-        "model": "efficientnet_b0",
+        "model": classifier.model_name,
         "modelVersion": classifier.model_version,
         "classes": len(classifier.labels),
         "labelsConfigured": classifier.labels_configured,
@@ -88,7 +88,7 @@ async def analyze(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     return {
-        "model": "efficientnet_b0",
+        "model": classifier.model_name,
         "modelVersion": classifier.model_version,
         "labelsConfigured": classifier.labels_configured,
         "image": {"width": width, "height": height},
@@ -127,6 +127,7 @@ async def analyze_case(
     alternate: Annotated[UploadFile | None, File()] = None,
     duration_days: Annotated[int | None, Form(alias="durationDays")] = None,
     symptoms_json: Annotated[str | None, Form(alias="symptoms")] = None,
+    note: Annotated[str | None, Form()] = None,
     request_id: Annotated[str | None, Header(alias="X-Request-Id")] = None,
     _: None = Depends(authorize),
 ):
@@ -136,6 +137,8 @@ async def analyze_case(
         raise HTTPException(status_code=400, detail="bodyRegion is required and too long")
     if duration_days is not None and (duration_days < 0 or duration_days > 36500):
         raise HTTPException(status_code=400, detail="durationDays is outside the accepted range")
+    if note is not None and len(note.strip()) > 500:
+        raise HTTPException(status_code=400, detail="note exceeds 500 characters")
     try:
         symptoms = json.loads(symptoms_json) if symptoms_json else []
     except json.JSONDecodeError as exc:
@@ -153,11 +156,18 @@ async def analyze_case(
     if alternate is not None:
         files.append(await read_image(alternate, "alternate"))
 
-    context = CaseContext(body_region.strip(), duration_days, symptoms)
+    context = CaseContext(
+        body_region.strip(),
+        duration_days,
+        symptoms,
+        note.strip() if note else None,
+    )
     started_at = monotonic()
     try:
         async with case_semaphore:
-            results = await run_in_threadpool(classifier.analyze_images, files)
+            results = await run_in_threadpool(
+                classifier.analyze_images, files, context.model_text()
+            )
     except InvalidImageError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -173,7 +183,7 @@ async def analyze_case(
     return {
         "caseId": str(uuid4()),
         "status": case_status,
-        "model": "efficientnet_b0",
+        "model": classifier.model_name,
         "modelVersion": classifier.model_version,
         "device": str(classifier.device),
         "labelsVersion": classifier.labels_version,

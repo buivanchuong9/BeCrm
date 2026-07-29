@@ -17,13 +17,16 @@ from PIL import Image, ImageFilter, ImageOps, UnidentifiedImageError
 from torchvision import transforms
 from torchvision.transforms import functional as vision_functional
 
+from .multimodal import LocalPhoBertTokenizer, MultimodalSkinModel
 from .settings import Settings
 from .metrics import metrics
 
 
 EXPECTED_CLASSES = 31
 PLACEHOLDER_PREFIX = "class_"
-PREPROCESSING_VERSION = "imagenet-eval-224-v1"
+LEGACY_PREPROCESSING_VERSION = "imagenet-eval-224-v1"
+MULTIMODAL_PREPROCESSING_VERSION = "imagenet-phobert-eval-224-v1"
+ATTENTION_THRESHOLD = 0.60
 
 
 class ModelConfigurationError(RuntimeError):
@@ -65,28 +68,55 @@ class SkinClassifier:
                 "CUDA is required but PyTorch cannot access an NVIDIA GPU. "
                 "Check the host driver, NVIDIA Container Toolkit and Compose GPU reservation."
             )
-        if config.approved_preprocessing_version != PREPROCESSING_VERSION:
-            raise ModelConfigurationError(
-                "Configured preprocessing version is not approved for this service build."
-            )
-
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self._model_lock = threading.Lock()
         torch.set_num_threads(config.torch_threads)
 
-        labels_bytes = config.labels_path.read_bytes()
-        self.labels = self._load_labels(config.labels_path)
-        self.labels_configured = not any(
-            label == f"{PLACEHOLDER_PREFIX}{index:02d}"
-            for index, label in enumerate(self.labels)
-        )
-        self.labels_version = hashlib.sha256(labels_bytes).hexdigest()[:12]
-        self.model = timm.create_model(
-            "efficientnet_b0", pretrained=False, num_classes=len(self.labels)
-        )
-        state = torch.load(config.model_path, map_location="cpu", weights_only=True)
-        if not isinstance(state, dict):
+        checkpoint = torch.load(config.model_path, map_location="cpu", weights_only=True)
+        if not isinstance(checkpoint, dict):
             raise ModelConfigurationError("Checkpoint must contain a PyTorch state_dict.")
+        self.is_multimodal = (
+            isinstance(checkpoint.get("model_state"), dict)
+            and isinstance(checkpoint.get("class_names"), list)
+        )
+        self.tokenizer: LocalPhoBertTokenizer | None = None
+        if self.is_multimodal:
+            self.labels = self._load_checkpoint_labels(checkpoint)
+            embedding_size = checkpoint.get("embed_dim")
+            if not isinstance(embedding_size, int) or embedding_size <= 0:
+                raise ModelConfigurationError(
+                    "Multimodal checkpoint is missing a valid embed_dim."
+                )
+            self.model = MultimodalSkinModel(len(self.labels), embedding_size)
+            state = checkpoint["model_state"]
+            self.tokenizer = LocalPhoBertTokenizer(
+                config.tokenizer_path, config.text_max_length
+            )
+            self.model_name = "efficientnet_b0_phobert"
+            expected_preprocessing = MULTIMODAL_PREPROCESSING_VERSION
+            self.labels_configured = True
+            labels_bytes = json.dumps(
+                self.labels, ensure_ascii=False, separators=(",", ":")
+            ).encode("utf-8")
+        else:
+            labels_bytes = config.labels_path.read_bytes()
+            self.labels = self._load_labels(config.labels_path)
+            self.labels_configured = not any(
+                label == f"{PLACEHOLDER_PREFIX}{index:02d}"
+                for index, label in enumerate(self.labels)
+            )
+            self.model = timm.create_model(
+                "efficientnet_b0", pretrained=False, num_classes=len(self.labels)
+            )
+            state = checkpoint
+            self.model_name = "efficientnet_b0"
+            expected_preprocessing = LEGACY_PREPROCESSING_VERSION
+        if config.approved_preprocessing_version != expected_preprocessing:
+            raise ModelConfigurationError(
+                f"Checkpoint requires preprocessing '{expected_preprocessing}', "
+                f"but '{config.approved_preprocessing_version}' is configured."
+            )
+        self.labels_version = hashlib.sha256(labels_bytes).hexdigest()[:12]
         self.model.load_state_dict(state, strict=True)
         self.model.to(self.device)
         self.model.eval()
@@ -118,11 +148,27 @@ class SkinClassifier:
             )
         return labels
 
+    @staticmethod
+    def _load_checkpoint_labels(checkpoint: dict[str, object]) -> list[str]:
+        labels = checkpoint.get("class_names")
+        declared_count = checkpoint.get("num_classes")
+        if (
+            not isinstance(labels, list)
+            or not labels
+            or not all(isinstance(label, str) and label.strip() for label in labels)
+            or len(set(labels)) != len(labels)
+            or declared_count != len(labels)
+        ):
+            raise ModelConfigurationError(
+                "Multimodal checkpoint class_names/num_classes metadata is invalid."
+            )
+        return labels
+
     def _find_target_convolution(self) -> tuple[str, torch.nn.Module]:
         candidates = [
             (name, module)
             for name, module in self.model.named_modules()
-            if isinstance(module, torch.nn.Conv2d)
+            if isinstance(module, torch.nn.Conv2d) and module.out_channels > 1
         ]
         if not candidates:
             raise ModelConfigurationError("No convolution layer is available for Grad-CAM.")
@@ -131,9 +177,17 @@ class SkinClassifier:
     def _smoke_test(self) -> None:
         sample = torch.zeros((1, 3, 224, 224), device=self.device)
         with torch.inference_mode():
-            output = self.model(sample)
-        if output.shape != (1, EXPECTED_CLASSES) or not torch.isfinite(output).all():
+            output = self._forward(sample, "tổn thương da")
+        if output.shape != (1, len(self.labels)) or not torch.isfinite(output).all():
             raise ModelConfigurationError("Model startup smoke inference failed.")
+
+    def _forward(self, image: torch.Tensor, context_text: str) -> torch.Tensor:
+        if not self.is_multimodal:
+            return self.model(image)
+        if self.tokenizer is None:
+            raise ModelConfigurationError("Multimodal tokenizer was not initialized.")
+        text = self.tokenizer.encode(context_text, self.device)
+        return self.model(image, text.input_ids, text.attention_mask)
 
     def prepare_image(self, image_bytes: bytes) -> PreparedImage:
         try:
@@ -182,9 +236,13 @@ class SkinClassifier:
         )
         return ImageQuality(score >= self.config.quality_min_score and not issues, score, issues)
 
-    def predict_prepared(self, prepared: PreparedImage) -> list[Prediction]:
+    def predict_prepared(
+        self, prepared: PreparedImage, context_text: str
+    ) -> list[Prediction]:
         with torch.inference_mode():
-            probabilities = torch.softmax(self.model(prepared.tensor), dim=1)[0]
+            probabilities = torch.softmax(
+                self._forward(prepared.tensor, context_text), dim=1
+            )[0]
         if not torch.isfinite(probabilities).all():
             raise ModelConfigurationError("Model output contains NaN or Infinity.")
         count = min(self.config.top_k, len(self.labels))
@@ -199,7 +257,7 @@ class SkinClassifier:
         ]
 
     def generate_grad_cam(
-        self, prepared: PreparedImage, target_class_index: int
+        self, prepared: PreparedImage, target_class_index: int, context_text: str
     ) -> dict[str, object]:
         activation: torch.Tensor | None = None
         gradient: torch.Tensor | None = None
@@ -216,7 +274,7 @@ class SkinClassifier:
         backward_handle = self.target_layer.register_full_backward_hook(capture_gradient)
         try:
             self.model.zero_grad(set_to_none=True)
-            logits = self.model(prepared.tensor)
+            logits = self._forward(prepared.tensor, context_text)
             logits[0, target_class_index].backward()
             if activation is None or gradient is None:
                 raise ModelConfigurationError("Grad-CAM hooks did not capture model tensors.")
@@ -239,6 +297,7 @@ class SkinClassifier:
                 "mimeType": "image/png",
                 "dataUrl": data_url,
                 "allZero": maximum <= 1e-12,
+                "attention": self._attention_metrics(heatmap),
             }
         finally:
             forward_handle.remove()
@@ -246,6 +305,42 @@ class SkinClassifier:
             self.model.zero_grad(set_to_none=True)
             if self.device.type == "cuda":
                 torch.cuda.empty_cache()
+
+    @staticmethod
+    def _attention_metrics(heatmap: torch.Tensor) -> dict[str, object]:
+        """Quantify the Grad-CAM attribution footprint without presenting it as
+        a lesion segmentation. Coordinates are normalized to the 224x224 model
+        input so longitudinal clients can compare captures across devices."""
+        mask = heatmap >= ATTENTION_THRESHOLD
+        coverage_percent = round(float(mask.float().mean()) * 100, 2)
+        points = torch.nonzero(mask, as_tuple=False)
+        if points.numel() == 0:
+            return {
+                "threshold": ATTENTION_THRESHOLD,
+                "coveragePercent": 0.0,
+                "boundingBox": None,
+                "centroid": None,
+            }
+
+        y_min = int(points[:, 0].min())
+        y_max = int(points[:, 0].max())
+        x_min = int(points[:, 1].min())
+        x_max = int(points[:, 1].max())
+        height, width = heatmap.shape
+        return {
+            "threshold": ATTENTION_THRESHOLD,
+            "coveragePercent": coverage_percent,
+            "boundingBox": {
+                "x": round(x_min / width, 4),
+                "y": round(y_min / height, 4),
+                "width": round((x_max - x_min + 1) / width, 4),
+                "height": round((y_max - y_min + 1) / height, 4),
+            },
+            "centroid": {
+                "x": round(float(points[:, 1].float().mean()) / width, 4),
+                "y": round(float(points[:, 0].float().mean()) / height, 4),
+            },
+        }
 
     @staticmethod
     def _overlay_data_url(image: Image.Image, heatmap: torch.Tensor) -> str:
@@ -260,16 +355,20 @@ class SkinClassifier:
         overlay.save(output, format="PNG", optimize=True)
         return "data:image/png;base64," + base64.b64encode(output.getvalue()).decode("ascii")
 
-    def analyze_image(self, image_bytes: bytes, role: str) -> dict[str, object]:
+    def analyze_image(
+        self, image_bytes: bytes, role: str, context_text: str
+    ) -> dict[str, object]:
         started = time.monotonic()
         prepared = self.prepare_image(image_bytes)
         quality = self.assess_quality(prepared)
         metrics.observe_stage("prepare_and_quality", time.monotonic() - started)
         started = time.monotonic()
-        predictions = self.predict_prepared(prepared)
+        predictions = self.predict_prepared(prepared, context_text)
         metrics.observe_stage("inference", time.monotonic() - started)
         started = time.monotonic()
-        heatmap = self.generate_grad_cam(prepared, predictions[0].class_index)
+        heatmap = self.generate_grad_cam(
+            prepared, predictions[0].class_index, context_text
+        )
         metrics.observe_stage("grad_cam", time.monotonic() - started)
         original_output = io.BytesIO()
         prepared.display_image.save(original_output, format="JPEG", quality=88, optimize=True)
@@ -303,14 +402,16 @@ class SkinClassifier:
             "heatmap": heatmap,
         }
 
-    def analyze_images(self, images: list[tuple[str, bytes]]) -> list[dict[str, object]]:
+    def analyze_images(
+        self, images: list[tuple[str, bytes]], context_text: str
+    ) -> list[dict[str, object]]:
         # Hooks and backward passes share a single model instance; serialize cases to
         # prevent cross-request activation/gradient corruption.
         with self._model_lock:
             results: list[dict[str, object]] = []
             for role, payload in images:
                 try:
-                    results.append(self.analyze_image(payload, role))
+                    results.append(self.analyze_image(payload, role, context_text))
                 except (InvalidImageError, ModelConfigurationError) as exc:
                     issue = (
                         "invalid_image"
@@ -334,8 +435,10 @@ class SkinClassifier:
                     )
             return results
 
-    def predict(self, image_bytes: bytes) -> tuple[list[Prediction], int, int]:
+    def predict(
+        self, image_bytes: bytes, context_text: str = "tổn thương da"
+    ) -> tuple[list[Prediction], int, int]:
         prepared = self.prepare_image(image_bytes)
         with self._model_lock:
-            predictions = self.predict_prepared(prepared)
+            predictions = self.predict_prepared(prepared, context_text)
         return predictions, prepared.width, prepared.height

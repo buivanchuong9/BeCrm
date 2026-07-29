@@ -27,11 +27,18 @@ if ! grep -Eq '^DATABASE_URL=.*@postgres:5432/' "$ENV_FILE"; then
   exit 1
 fi
 
-MODEL_FILE="$ROOT_DIR/ai/model/best_efficientnet_b0.pth"
+MODEL_FILE="$ROOT_DIR/ai/model/train_combine_ensemble.pth"
 if [ ! -s "$MODEL_FILE" ]; then
   echo "Missing AI checkpoint: $MODEL_FILE" >&2
   exit 1
 fi
+
+for TOKENIZER_FILE in vocab.txt bpe.codes; do
+  if [ ! -s "$ROOT_DIR/ai/model/phobert-tokenizer/$TOKENIZER_FILE" ]; then
+    echo "Missing PhoBERT tokenizer file: ai/model/phobert-tokenizer/$TOKENIZER_FILE" >&2
+    exit 1
+  fi
+done
 
 if ! command -v nvidia-smi >/dev/null 2>&1; then
   echo "nvidia-smi is unavailable. Install the NVIDIA driver before deployment." >&2
