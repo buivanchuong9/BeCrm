@@ -365,5 +365,10 @@ export function toPatientDto(patient: PatientCore): LifetimeRecordPatientDto {
     dob: patient.dob.toISOString().slice(0, 10),
     gender: patient.gender,
     bloodType: patient.bloodType,
+    phone: patient.phone,
+    email: patient.email,
+    address: patient.address,
+    heightCm: patient.heightCm === null ? null : Number(patient.heightCm),
+    weightKg: patient.weightKg === null ? null : Number(patient.weightKg),
   };
 }

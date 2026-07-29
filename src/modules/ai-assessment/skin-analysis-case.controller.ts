@@ -1,12 +1,14 @@
 import {
   Body,
   Controller,
+  Get,
   HttpCode,
   HttpStatus,
   Post,
   Param,
   ParseUUIDPipe,
   Req,
+  Query,
   UploadedFiles,
   UseInterceptors,
 } from '@nestjs/common';
@@ -23,8 +25,14 @@ import { AnalyzeSkinCaseRequest } from './dto/analyze-skin-case.dto';
 import { SkinAnalysisCaseResponseDto } from './dto/responses/skin-analysis-case-response.dto';
 import { ReviewSkinCaseRequest } from './dto/review-skin-case.dto';
 import { SkinAnalysisCaseService, SkinCaseFiles } from './skin-analysis-case.service';
+import { IsOptional, IsUUID } from 'class-validator';
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+
+class ListSkinCasesQuery {
+  @IsOptional() @IsUUID() patientId?: string;
+  @IsOptional() @IsUUID() encounterId?: string;
+}
 
 @ApiTags('ai-assessment')
 @ApiBearerAuth()
@@ -61,6 +69,7 @@ export class SkinAnalysisCaseController {
           description: 'Free-text clinical context consumed by the multimodal text encoder.',
         },
         patientId: { type: 'string', format: 'uuid' },
+        encounterId: { type: 'string', format: 'uuid' },
       },
     },
   })
@@ -86,6 +95,26 @@ export class SkinAnalysisCaseController {
       ip: req.ip,
       userAgent: req.header('user-agent'),
     });
+  }
+
+  @Get()
+  @Roles('doctor')
+  @ApiOperation({ summary: 'Danh sách ca phân tích da bác sĩ được phép xem' })
+  list(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Query() query: ListSkinCasesQuery,
+  ) {
+    return this.cases.list(principal, query);
+  }
+
+  @Get(':caseId')
+  @Roles('doctor')
+  @ApiOperation({ summary: 'Chi tiết ảnh và kết quả AI phục vụ bác sĩ xem xét' })
+  detail(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Param('caseId', ParseUUIDPipe) caseId: string,
+  ) {
+    return this.cases.detail(principal, caseId);
   }
 
   @Post(':caseId/review')

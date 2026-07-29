@@ -12,6 +12,11 @@ import {
 } from '../../core/errors/app-error';
 import { AuthenticatedPrincipal } from '../../core/security/auth.types';
 import { PatientsRepository } from '../patients/patients.repository';
+import { EncountersRepository } from '../encounters/encounters.repository';
+import {
+  isSuperAdministrator,
+  viewOrgWideOrganizationIds,
+} from '../patients/policies/patient-policies';
 import { AnalyzeSkinCaseRequest } from './dto/analyze-skin-case.dto';
 import { SkinAnalysisCaseResponseDto } from './dto/responses/skin-analysis-case-response.dto';
 import { RequestContext } from './ai-assessment.service';
@@ -30,6 +35,7 @@ export class SkinAnalysisCaseService {
   constructor(
     private readonly config: ConfigService<AppConfiguration, true>,
     private readonly patients: PatientsRepository,
+    private readonly encounters: EncountersRepository,
     private readonly audit: AuditService,
     private readonly prisma: PrismaService,
   ) {}
@@ -53,6 +59,21 @@ export class SkinAnalysisCaseService {
       : null;
     if (dto.patientId && !patient) {
       throw new NotFoundAppError('Patient not found.');
+    }
+    const encounter = dto.encounterId
+      ? await this.encounters.findVisibleById(principal, dto.encounterId)
+      : null;
+    if (dto.encounterId && !encounter) {
+      throw new NotFoundAppError('Encounter not found.');
+    }
+    if (encounter && (!patient || encounter.patientId !== patient.id)) {
+      throw new ValidationAppError([
+        {
+          field: 'encounterId',
+          code: 'VALIDATION_ERROR',
+          message: 'Encounter must belong to the selected patient.',
+        },
+      ]);
     }
 
     const ai = this.config.get('ai', { infer: true });
@@ -115,41 +136,88 @@ export class SkinAnalysisCaseService {
       }
 
       const result = body as unknown as SkinAnalysisCaseResponseDto;
-      await this.prisma.aISkinAnalysisCase.create({
-        data: {
-          id: result.caseId,
-          patientId: patient?.id ?? null,
-          actorId: principal.userId,
-          organizationId:
-            patient?.organizationId ?? principal.memberships[0]?.organizationId ?? null,
-          status: result.status,
-          bodyRegion: dto.bodyRegion,
-          durationDays: dto.durationDays ?? null,
-          symptomSnapshot: symptoms,
-          imageMetadata: result.images.map((image) => ({
+      const artifacts = result.images.flatMap((image) => {
+        const rows: Array<{
+          role: string;
+          kind: string;
+          mimeType: string;
+          width: number;
+          height: number;
+          content: Buffer;
+        }> = [];
+        if (image.original?.dataUrl) {
+          rows.push({
             role: image.role,
-            width: image.width,
-            height: image.height,
-            quality: image.quality,
-            predictions: image.predictions,
-            heatmap: image.heatmap
-              ? {
-                  method: image.heatmap.method,
-                  targetLayer: image.heatmap.targetLayer,
-                  targetClassIndex: image.heatmap.targetClassIndex,
-                  allZero: image.heatmap.allZero,
-                  attention: image.heatmap.attention,
-                }
-              : null,
-          })) as unknown as Prisma.InputJsonValue,
-          aggregateOutput: result.aggregate as unknown as Prisma.InputJsonValue,
-          triageOutput: result.triage as unknown as Prisma.InputJsonValue,
-          modelVersion: result.modelVersion,
-          labelsVersion: result.labelsVersion,
-          preprocessingVersion: result.preprocessingVersion,
-          labelsConfigured: result.labelsConfigured,
-          generatedAt: new Date(result.generatedAt),
-        },
+            kind: 'review_original',
+            mimeType: image.original.mimeType,
+            width: image.original.width,
+            height: image.original.height,
+            content: this.decodeReviewArtifact(image.original.dataUrl, 'image/jpeg'),
+          });
+        }
+        if (image.heatmap?.dataUrl) {
+          rows.push({
+            role: image.role,
+            kind: 'heatmap',
+            mimeType: image.heatmap.mimeType,
+            width: image.heatmap.width,
+            height: image.heatmap.height,
+            content: this.decodeReviewArtifact(image.heatmap.dataUrl, 'image/png'),
+          });
+        }
+        return rows;
+      });
+      const totalArtifactBytes = artifacts.reduce((total, item) => total + item.content.length, 0);
+      if (totalArtifactBytes > 5 * 1024 * 1024) {
+        throw new AppError(
+          'AI_RESPONSE_TOO_LARGE',
+          'AI review artifacts exceeded the configured limit.',
+          HttpStatus.BAD_GATEWAY,
+        );
+      }
+
+      await this.prisma.$transaction(async (tx) => {
+        await tx.aISkinAnalysisCase.create({
+          data: {
+            id: result.caseId,
+            patientId: patient?.id ?? null,
+            encounterId: encounter?.id ?? null,
+            actorId: principal.userId,
+            organizationId:
+              patient?.organizationId ?? principal.memberships[0]?.organizationId ?? null,
+            status: result.status,
+            bodyRegion: dto.bodyRegion,
+            durationDays: dto.durationDays ?? null,
+            symptomSnapshot: symptoms,
+            imageMetadata: result.images.map((image) => ({
+              role: image.role,
+              width: image.width,
+              height: image.height,
+              quality: image.quality,
+              predictions: image.predictions,
+              heatmap: image.heatmap
+                ? {
+                    method: image.heatmap.method,
+                    targetClassIndex: image.heatmap.targetClassIndex,
+                    allZero: image.heatmap.allZero,
+                    attention: image.heatmap.attention,
+                  }
+                : null,
+            })) as unknown as Prisma.InputJsonValue,
+            aggregateOutput: result.aggregate as unknown as Prisma.InputJsonValue,
+            triageOutput: result.triage as unknown as Prisma.InputJsonValue,
+            modelVersion: result.modelVersion,
+            labelsVersion: result.labelsVersion,
+            preprocessingVersion: result.preprocessingVersion,
+            labelsConfigured: result.labelsConfigured,
+            generatedAt: new Date(result.generatedAt),
+          },
+        });
+        if (artifacts.length) {
+          await tx.aISkinAnalysisArtifact.createMany({
+            data: artifacts.map((artifact) => ({ caseId: result.caseId, ...artifact })),
+          });
+        }
       });
       await this.audit.write({
         actorId: principal.userId,
@@ -186,6 +254,138 @@ export class SkinAnalysisCaseService {
     } finally {
       clearTimeout(timeout);
     }
+  }
+
+  async list(
+    principal: AuthenticatedPrincipal,
+    filters: { patientId?: string; encounterId?: string },
+  ) {
+    if (filters.patientId && !(await this.patients.findVisibleById(principal, filters.patientId))) {
+      throw new NotFoundAppError('Patient not found.');
+    }
+    if (filters.encounterId && !(await this.encounters.findVisibleById(principal, filters.encounterId))) {
+      throw new NotFoundAppError('Encounter not found.');
+    }
+
+    const orgWideIds = viewOrgWideOrganizationIds(principal);
+    const patientVisibility: Prisma.PatientWhereInput = isSuperAdministrator(principal)
+      ? {}
+      : {
+          OR: [
+            { userId: principal.userId },
+            { primaryDoctorId: principal.userId },
+            {
+              careTeam: {
+                some: {
+                  userId: principal.userId,
+                  OR: [{ endsAt: null }, { endsAt: { gt: new Date() } }],
+                },
+              },
+            },
+            ...(orgWideIds.length ? [{ organizationId: { in: orgWideIds } }] : []),
+          ],
+        };
+    const rows = await this.prisma.aISkinAnalysisCase.findMany({
+      where: {
+        patientId: { not: null },
+        ...(filters.patientId ? { patientId: filters.patientId } : {}),
+        ...(filters.encounterId ? { encounterId: filters.encounterId } : {}),
+        patient: { is: patientVisibility },
+      },
+      include: {
+        patient: { select: { id: true, code: true, userId: true, name: true } },
+      },
+      orderBy: { generatedAt: 'desc' },
+      take: 100,
+    });
+    return {
+      data: rows.map((row) => ({
+        caseId: row.id,
+        encounterId: row.encounterId,
+        patient: row.patient,
+        status: row.status,
+        bodyRegion: row.bodyRegion,
+        generatedAt: row.generatedAt.toISOString(),
+        triage: row.triageOutput,
+        reviewedAt: row.reviewedAt?.toISOString() ?? null,
+        reviewerDecision: row.reviewerDecision,
+        reviewerDiagnosis: row.reviewerDiagnosis,
+      })),
+    };
+  }
+
+  async detail(principal: AuthenticatedPrincipal, caseId: string) {
+    const row = await this.prisma.aISkinAnalysisCase.findUnique({
+      where: { id: caseId },
+      include: {
+        patient: { select: { id: true, code: true, userId: true, name: true } },
+        artifacts: true,
+      },
+    });
+    if (
+      !row ||
+      !row.patientId ||
+      !(await this.patients.findVisibleById(principal, row.patientId))
+    ) {
+      throw new NotFoundAppError('Skin analysis case not found.');
+    }
+
+    const metadata = Array.isArray(row.imageMetadata)
+      ? (row.imageMetadata as Array<Record<string, unknown>>)
+      : [];
+    const images = metadata.map((image) => {
+      const role = typeof image.role === 'string' ? image.role : '';
+      const original = row.artifacts.find(
+        (artifact) => artifact.role === role && artifact.kind === 'review_original',
+      );
+      const heatmapArtifact = row.artifacts.find(
+        (artifact) => artifact.role === role && artifact.kind === 'heatmap',
+      );
+      const heatmapMetadata =
+        image.heatmap && typeof image.heatmap === 'object'
+          ? (image.heatmap as Record<string, unknown>)
+          : null;
+      return {
+        ...image,
+        original: original
+          ? {
+              width: original.width,
+              height: original.height,
+              mimeType: original.mimeType,
+              dataUrl: this.toDataUrl(original.mimeType, original.content),
+            }
+          : null,
+        heatmap: heatmapArtifact
+          ? {
+              ...heatmapMetadata,
+              width: heatmapArtifact.width,
+              height: heatmapArtifact.height,
+              mimeType: heatmapArtifact.mimeType,
+              dataUrl: this.toDataUrl(heatmapArtifact.mimeType, heatmapArtifact.content),
+            }
+          : heatmapMetadata,
+      };
+    });
+
+    return {
+      data: {
+        caseId: row.id,
+        encounterId: row.encounterId,
+        patient: row.patient,
+        status: row.status,
+        bodyRegion: row.bodyRegion,
+        durationDays: row.durationDays,
+        symptoms: row.symptomSnapshot,
+        generatedAt: row.generatedAt.toISOString(),
+        images,
+        aggregate: row.aggregateOutput,
+        triage: row.triageOutput,
+        reviewedAt: row.reviewedAt?.toISOString() ?? null,
+        reviewerDecision: row.reviewerDecision,
+        reviewerDiagnosis: row.reviewerDiagnosis,
+        reviewerNote: row.reviewerNote,
+      },
+    };
   }
 
   async review(
@@ -296,5 +496,21 @@ export class SkinAnalysisCaseService {
         HttpStatus.BAD_GATEWAY,
       );
     }
+  }
+
+  private decodeReviewArtifact(dataUrl: string, expectedMimeType: string): Buffer {
+    const match = /^data:(image\/(?:jpeg|png));base64,([a-zA-Z0-9+/=]+)$/.exec(dataUrl);
+    if (!match || match[1] !== expectedMimeType) {
+      throw new AppError(
+        'AI_INVALID_RESPONSE',
+        'AI service returned an invalid review image.',
+        HttpStatus.BAD_GATEWAY,
+      );
+    }
+    return Buffer.from(match[2], 'base64');
+  }
+
+  private toDataUrl(mimeType: string, content: Uint8Array): string {
+    return `data:${mimeType};base64,${Buffer.from(content).toString('base64')}`;
   }
 }

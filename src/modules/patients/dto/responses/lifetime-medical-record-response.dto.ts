@@ -9,6 +9,11 @@ export class LifetimeRecordPatientDto {
   @ApiProperty({ format: 'date', nullable: true }) dob!: string | null;
   @ApiProperty() gender!: string;
   @ApiProperty() bloodType!: string;
+  @ApiProperty() phone!: string;
+  @ApiProperty({ nullable: true }) email!: string | null;
+  @ApiProperty({ nullable: true }) address!: string | null;
+  @ApiProperty({ nullable: true }) heightCm!: number | null;
+  @ApiProperty({ nullable: true }) weightKg!: number | null;
 }
 
 export class LifetimeRecordClinicalItemDto {

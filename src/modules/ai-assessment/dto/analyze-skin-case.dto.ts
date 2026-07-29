@@ -27,4 +27,8 @@ export class AnalyzeSkinCaseRequest {
   @IsOptional()
   @IsUUID()
   patientId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  encounterId?: string;
 }

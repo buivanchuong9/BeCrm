@@ -351,6 +351,7 @@ model Patient {
   careTeam      PatientCareTeamMember[]
   appointments  Appointment[]
   encounters    MedicalEncounter[]
+  skinAnalysisCases AISkinAnalysisCase[]
 
   @@unique([organizationId, code])
   @@index([organizationId])
@@ -759,6 +760,7 @@ model MedicalEncounter {
   clinicalPlan     ClinicalPlan?
   clinicalOrders   ClinicalOrder[]
   workflowInstance WorkflowInstance?
+  skinAnalysisCases AISkinAnalysisCase[]
 
   @@index([organizationId, status])
   @@index([patientId, updatedAt])
@@ -1873,11 +1875,13 @@ model PlatformSecuritySetting {
   @@map("platform_security_settings")
 }
 
-// Metadata-only record for a multi-image inference case. Raw images and
-// base64 Grad-CAM artifacts are deliberately not persisted in PostgreSQL.
+// Clinical review record for a multi-image inference case. The raw uploads are
+// never persisted here. Only the AI service's EXIF-stripped, 224px review
+// renderings and derived heatmaps are stored in the child artifact table.
 model AISkinAnalysisCase {
   id                   String    @id @db.Uuid
   patientId            String?   @map("patient_id") @db.Uuid
+  encounterId          String?   @map("encounter_id") @db.Uuid
   actorId              String    @map("actor_id") @db.Uuid
   organizationId       String?   @map("organization_id") @db.Uuid
   status               String
@@ -1899,7 +1903,30 @@ model AISkinAnalysisCase {
   generatedAt          DateTime  @map("generated_at") @db.Timestamptz
   createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
+  patient   Patient?                 @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  encounter MedicalEncounter?        @relation(fields: [encounterId], references: [id], onDelete: Restrict)
+  artifacts AISkinAnalysisArtifact[]
+
   @@index([patientId, generatedAt])
+  @@index([encounterId, generatedAt])
   @@index([actorId, generatedAt])
   @@map("ai_skin_analysis_cases")
+}
+
+model AISkinAnalysisArtifact {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  caseId    String   @map("case_id") @db.Uuid
+  role      String
+  kind      String
+  mimeType  String   @map("mime_type")
+  width     Int
+  height    Int
+  content   Bytes
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  case AISkinAnalysisCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@unique([caseId, role, kind])
+  @@index([caseId])
+  @@map("ai_skin_analysis_artifacts")
 }

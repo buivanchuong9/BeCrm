@@ -103,15 +103,24 @@ export class PatientsRepository {
     search?: string;
     primaryDoctorId?: string;
   }): Promise<{ rows: PatientWithDoctor[]; total: number }> {
+    const normalizedSearch = params.search?.trim();
+    const accountIdSearch =
+      normalizedSearch &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        normalizedSearch,
+      )
+        ? [{ userId: { equals: normalizedSearch } }]
+        : [];
     const where: Prisma.PatientWhereInput = {
       ...(params.organizationIds ? { organizationId: { in: params.organizationIds } } : {}),
       ...(params.primaryDoctorId ? { primaryDoctorId: params.primaryDoctorId } : {}),
-      ...(params.search
+      ...(normalizedSearch
         ? {
             OR: [
-              { name: { contains: params.search, mode: 'insensitive' } },
-              { code: { contains: params.search, mode: 'insensitive' } },
-              { phone: { contains: params.search, mode: 'insensitive' } },
+              { name: { contains: normalizedSearch, mode: 'insensitive' } },
+              { code: { contains: normalizedSearch, mode: 'insensitive' } },
+              { phone: { contains: normalizedSearch, mode: 'insensitive' } },
+              ...accountIdSearch,
             ],
           }
         : {}),

@@ -17,6 +17,11 @@ export class LifetimeMedicalRecordRepository {
         dob: true,
         gender: true,
         bloodType: true,
+        phone: true,
+        email: true,
+        address: true,
+        heightCm: true,
+        weightKg: true,
         primaryDoctorId: true,
       },
     });

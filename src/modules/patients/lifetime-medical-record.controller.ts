@@ -1,4 +1,4 @@
-import { Controller, Get, Param, ParseUUIDPipe, Query, Req } from '@nestjs/common';
+import { Controller, Get, Header, Param, ParseUUIDPipe, Query, Req } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { CurrentUser } from '../../core/security/current-user.decorator';
@@ -19,6 +19,7 @@ export class LifetimeMedicalRecordController {
   })
   @ApiOkEnvelope(LifetimeMedicalRecordResponseDto)
   @Get('lifetime-medical-record')
+  @Header('Cache-Control', 'private, no-store')
   async get(
     @CurrentUser() principal: AuthenticatedPrincipal,
     @Param('patientId', ParseUUIDPipe) patientId: string,

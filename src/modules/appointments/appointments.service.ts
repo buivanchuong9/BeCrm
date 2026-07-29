@@ -136,7 +136,16 @@ export class AppointmentsService {
     context: RequestContext,
   ) {
     assertCanBook(principal);
-    const isPatientCaller = principal.memberships.some((m) => m.role === 'patient');
+    // Multi-role staff/owner accounts can also carry a patient membership for
+    // UAT. Privileged booking roles take precedence; otherwise the supplied
+    // onBehalfOfPatientId would be silently ignored and the appointment could
+    // be attached to the operator's own patient record.
+    const canBookOnBehalf = principal.memberships.some((membership) =>
+      ['super_administrator', 'receptionist'].includes(membership.role),
+    );
+    const isPatientCaller =
+      !canBookOnBehalf &&
+      principal.memberships.some((membership) => membership.role === 'patient');
 
     const patient = isPatientCaller
       ? await this.patients.findByUserId(principal.userId)
