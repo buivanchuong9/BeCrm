@@ -66,7 +66,13 @@ export class MeController {
           },
         })
       : null;
-    const avatarUrl = upload ? await this.storage.presignGet(upload.storageKey) : null;
+    // A missing or temporarily unavailable object store must not take down
+    // GET /me (and therefore the entire authenticated application). Uploads
+    // fail explicitly at their own endpoints; profile reads degrade to no
+    // server avatar so the client can use its local cache.
+    const avatarUrl = upload
+      ? await this.storage.presignGet(upload.storageKey).catch(() => null)
+      : null;
     return toCurrentUserResponse(user, this.users.toMembershipScopes(user), avatarUrl);
   }
 

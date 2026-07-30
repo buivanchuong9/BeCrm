@@ -15,15 +15,18 @@ import { AppError } from '../errors/app-error';
 
 @Injectable()
 export class ObjectStorageService implements OnModuleDestroy {
-  private readonly client: S3Client;
-  private readonly publicClient: S3Client;
-  private readonly bucket: string;
+  private readonly client: S3Client | null;
+  private readonly publicClient: S3Client | null;
+  private readonly bucket: string | null;
   private bucketReady?: Promise<void>;
 
   constructor(config: ConfigService<AppConfiguration, true>) {
     const storage = config.get('storage', { infer: true });
     if (!storage.endpoint || !storage.bucket || !storage.accessKey || !storage.secretKey) {
-      throw new Error('S3 storage endpoint, bucket and credentials must be configured.');
+      this.client = null;
+      this.publicClient = null;
+      this.bucket = null;
+      return;
     }
     this.bucket = storage.bucket;
     this.client = new S3Client({
@@ -48,10 +51,11 @@ export class ObjectStorageService implements OnModuleDestroy {
 
   async presignPut(storageKey: string, contentType: string): Promise<string> {
     await this.ensureBucket();
+    const { publicClient, bucket } = this.configured();
     return getSignedUrl(
-      this.publicClient,
+      publicClient,
       new PutObjectCommand({
-        Bucket: this.bucket,
+        Bucket: bucket,
         Key: storageKey,
         ContentType: contentType,
       }),
@@ -61,19 +65,17 @@ export class ObjectStorageService implements OnModuleDestroy {
 
   async presignGet(storageKey: string): Promise<string> {
     await this.ensureBucket();
-    return getSignedUrl(
-      this.publicClient,
-      new GetObjectCommand({ Bucket: this.bucket, Key: storageKey }),
-      { expiresIn: 60 * 60 },
-    );
+    const { publicClient, bucket } = this.configured();
+    return getSignedUrl(publicClient, new GetObjectCommand({ Bucket: bucket, Key: storageKey }), {
+      expiresIn: 60 * 60,
+    });
   }
 
   async inspectObject(storageKey: string) {
     await this.ensureBucket();
+    const { client, bucket } = this.configured();
     try {
-      const result = await this.client.send(
-        new HeadObjectCommand({ Bucket: this.bucket, Key: storageKey }),
-      );
+      const result = await client.send(new HeadObjectCommand({ Bucket: bucket, Key: storageKey }));
       return {
         contentLength: result.ContentLength ?? 0,
         contentType: result.ContentType ?? null,
@@ -89,9 +91,8 @@ export class ObjectStorageService implements OnModuleDestroy {
 
   async sha256Object(storageKey: string): Promise<string> {
     await this.ensureBucket();
-    const result = await this.client.send(
-      new GetObjectCommand({ Bucket: this.bucket, Key: storageKey }),
-    );
+    const { client, bucket } = this.configured();
+    const result = await client.send(new GetObjectCommand({ Bucket: bucket, Key: storageKey }));
     if (!result.Body) {
       throw new AppError('UPLOAD_OBJECT_MISSING', 'The uploaded object is empty.', 409);
     }
@@ -100,11 +101,12 @@ export class ObjectStorageService implements OnModuleDestroy {
   }
 
   onModuleDestroy() {
-    this.client.destroy();
-    this.publicClient.destroy();
+    this.client?.destroy();
+    this.publicClient?.destroy();
   }
 
   private ensureBucket(): Promise<void> {
+    this.configured();
     if (!this.bucketReady) {
       this.bucketReady = this.ensureBucketExists().catch((error) => {
         this.bucketReady = undefined;
@@ -115,13 +117,33 @@ export class ObjectStorageService implements OnModuleDestroy {
   }
 
   private async ensureBucketExists() {
+    const { client, bucket } = this.configured();
     try {
-      await this.client.send(new HeadBucketCommand({ Bucket: this.bucket }));
+      await client.send(new HeadBucketCommand({ Bucket: bucket }));
     } catch (error) {
       const status = (error as { $metadata?: { httpStatusCode?: number } }).$metadata
         ?.httpStatusCode;
       if (status !== 404) throw error;
-      await this.client.send(new CreateBucketCommand({ Bucket: this.bucket }));
+      await client.send(new CreateBucketCommand({ Bucket: bucket }));
     }
+  }
+
+  private configured(): {
+    client: S3Client;
+    publicClient: S3Client;
+    bucket: string;
+  } {
+    if (!this.client || !this.publicClient || !this.bucket) {
+      throw new AppError(
+        'STORAGE_NOT_CONFIGURED',
+        'Object storage is not configured for this deployment.',
+        503,
+      );
+    }
+    return {
+      client: this.client,
+      publicClient: this.publicClient,
+      bucket: this.bucket,
+    };
   }
 }
