@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  HttpStatus,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -9,8 +10,12 @@ import {
   Query,
   Req,
   Res,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+import { pipeline } from 'stream/promises';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { Type } from 'class-transformer';
 import {
   ArrayMinSize,
@@ -28,10 +33,11 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiBody, ApiConsumes, ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { AuthenticatedPrincipal } from '../../core/security/auth.types';
 import { CurrentUser } from '../../core/security/current-user.decorator';
 import { RequireIdempotencyKey } from '../../core/idempotency/idempotency-key.decorator';
+import { Public } from '../../core/security/public.decorator';
 import { OperationsService } from './operations.service';
 
 const context = (req: Request) => ({
@@ -133,6 +139,10 @@ class PresignRequest {
 }
 class ConfirmUploadRequest {
   @IsString() fileHash!: string;
+}
+class DirectUploadRequest {
+  @IsIn(['clinical-document', 'progress-photo', 'avatar', 'intake-image'])
+  context!: string;
 }
 class SupportRequest {
   @IsString() topic!: string;
@@ -384,6 +394,38 @@ export class DashboardController {
 @Controller({ path: 'uploads', version: '1' })
 export class UploadsController {
   constructor(private readonly service: OperationsService) {}
+
+  @Post()
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['file', 'context'],
+      properties: {
+        file: { type: 'string', format: 'binary' },
+        context: {
+          type: 'string',
+          enum: ['clinical-document', 'progress-photo', 'avatar', 'intake-image'],
+        },
+      },
+    },
+  })
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 25 * 1024 * 1024 } }))
+  upload(
+    @CurrentUser() p: AuthenticatedPrincipal,
+    @Body() d: DirectUploadRequest,
+    @UploadedFile()
+    file: {
+      originalname: string;
+      mimetype: string;
+      size: number;
+      buffer: Buffer;
+    },
+    @Req() r: Request,
+  ) {
+    return this.service.directUpload(p, d.context, file, context(r));
+  }
+
   @Post('presign') presign(
     @CurrentUser() p: AuthenticatedPrincipal,
     @Body() d: PresignRequest,
@@ -398,6 +440,22 @@ export class UploadsController {
     @Req() r: Request,
   ) {
     return this.service.confirmUpload(p, id, d.fileHash, context(r));
+  }
+
+  @Public()
+  @Get(':fileId/content')
+  async content(
+    @Param('fileId', ParseUUIDPipe) id: string,
+    @Query('expires') expiresRaw: string,
+    @Query('signature') signature: string,
+    @Res() response: Response,
+  ) {
+    const file = await this.service.openLocalUpload(id, Number(expiresRaw), signature ?? '');
+    response.status(HttpStatus.OK);
+    response.setHeader('Content-Type', file.contentType);
+    response.setHeader('Content-Length', String(file.contentLength));
+    response.setHeader('Cache-Control', 'private, max-age=3600');
+    await pipeline(file.stream, response);
   }
 }
 

@@ -399,6 +399,14 @@ docker exec dermahealth-ai python -c \
 Nếu user chưa có quyền Docker, thêm `sudo` trước `docker compose` trong các lệnh
 kiểm tra.
 
+Ảnh/tài liệu upload được lưu trong volume `dermahealth_object_storage` khi
+production chưa cấu hình S3. Volume này tồn tại qua recreate/redeploy container
+nhưng phải được đưa vào lịch backup cùng PostgreSQL. Kiểm tra volume:
+
+```sh
+docker volume inspect dermahealth_dermahealth_object_storage
+```
+
 ## 6. Nginx
 
 Nginx phải proxy domain public tới API mới tại `127.0.0.1:43000`, không phải
@@ -424,8 +432,8 @@ https://dermahealth.fitdnu.id.vn/api/docs/openapi.json
 
 ## 7. Xóa database và dựng lại hoàn toàn
 
-Cảnh báo: thao tác này xóa vĩnh viễn PostgreSQL và Redis data của riêng project
-`dermahealth`.
+Cảnh báo: thao tác này xóa vĩnh viễn PostgreSQL, Redis và toàn bộ ảnh/tài liệu
+upload trong volume của project `dermahealth`.
 
 ```sh
 cd ~/BE_Y_Te/BeCrm

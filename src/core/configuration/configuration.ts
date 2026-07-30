@@ -59,6 +59,9 @@ export function buildConfiguration(env: EnvConfig) {
       accessKey: env.S3_ACCESS_KEY,
       secretKey: env.S3_SECRET_KEY,
       forcePathStyle: env.S3_FORCE_PATH_STYLE,
+      localPath: env.LOCAL_STORAGE_PATH,
+      publicUrl: env.APP_PUBLIC_URL.replace(/\/+$/, ''),
+      signingSecret: env.FIELD_ENCRYPTION_KEY,
     },
     mail: {
       from: env.MAIL_FROM,

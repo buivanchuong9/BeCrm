@@ -10,9 +10,10 @@
 # `npm run db:seed` is safe to invoke explicitly: it creates permission/feature
 # metadata only and never inserts tenant, account or clinical records.
 #
-# MinIO/Mailpit are dev-only stand-ins and are deliberately not included here
-# — point S3_*/SMTP_* in .env.production at real object storage and a real
-# mail provider instead (see .env.example).
+# MinIO/Mailpit are dev-only stand-ins and are deliberately not included here.
+# When S3_* is absent, uploads use the persistent dermahealth_object_storage
+# volume mounted at /app/storage. Configure S3_* later for shared multi-node
+# storage; configure SMTP_* when production email delivery is enabled.
 
 name: dermahealth
 
@@ -111,6 +112,9 @@ services:
     environment:
       AI_SERVICE_URL: http://ai:8000
       AI_MAX_RESPONSE_BYTES: ${AI_MAX_RESPONSE_BYTES:-5000000}
+      LOCAL_STORAGE_PATH: /app/storage
+    volumes:
+      - dermahealth_object_storage:/app/storage
     ports:
       # 127.0.0.1-only: nginx on the same host is the public entry point and
       # terminates TLS (see nginx/dermahealth.host.conf.example) — the app
@@ -131,3 +135,4 @@ services:
 volumes:
   dermahealth_postgres_data:
   dermahealth_redis_data:
+  dermahealth_object_storage:

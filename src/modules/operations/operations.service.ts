@@ -498,6 +498,78 @@ export class OperationsService {
     await this.log(p, 'upload.presigned', 'upload_object', row.id, c);
     return { data: { fileId: row.id, uploadUrl, expiresAt } };
   }
+
+  async directUpload(
+    p: AuthenticatedPrincipal,
+    uploadContext: string,
+    file:
+      | {
+          originalname: string;
+          mimetype: string;
+          size: number;
+          buffer: Buffer;
+        }
+      | undefined,
+    c: RequestContext,
+  ) {
+    const allowed = ['clinical-document', 'progress-photo', 'avatar', 'intake-image'];
+    if (!allowed.includes(uploadContext)) {
+      throw new ConflictAppError('VALIDATION_FAILED', 'Unsupported upload context.');
+    }
+    if (!file?.buffer) {
+      throw new ConflictAppError('VALIDATION_FAILED', 'An upload file is required.');
+    }
+    if (
+      uploadContext === 'avatar' &&
+      !['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)
+    ) {
+      throw new ConflictAppError('VALIDATION_FAILED', 'Avatar must be a JPEG, PNG or WebP image.');
+    }
+    const maximumBytes = uploadContext === 'avatar' ? 5 * 1024 * 1024 : 25 * 1024 * 1024;
+    if (file.size > maximumBytes) {
+      throw new ConflictAppError('UPLOAD_TOO_LARGE', 'Uploaded object exceeds the size limit.');
+    }
+
+    const storageKey = `${p.userId}/${uploadContext}/${randomUUID()}`;
+    const fileHash = createHash('sha256').update(file.buffer).digest('hex');
+    await this.storage.putObject(storageKey, file.mimetype, file.buffer);
+
+    const row = await this.prisma.uploadObject
+      .create({
+        data: {
+          ownerId: p.userId,
+          fileName: (file.originalname || 'upload').slice(0, 255),
+          contentType: file.mimetype,
+          context: uploadContext,
+          storageKey,
+          fileHash,
+          status: 'confirmed',
+          expiresAt: new Date(Date.now() + 15 * 60_000),
+          confirmedAt: new Date(),
+        },
+      })
+      .catch(async (error: unknown) => {
+        await this.storage.deleteObject(storageKey).catch(() => undefined);
+        throw error;
+      });
+
+    await this.log(p, 'upload.confirmed', 'upload_object', row.id, c);
+    return { data: { ...row, fileId: row.id, size: file.size } };
+  }
+
+  async openLocalUpload(id: string, expires: number, signature: string) {
+    const row = await this.prisma.uploadObject.findFirst({
+      where: { id, status: 'confirmed' },
+    });
+    if (!row) throw new NotFoundAppError('Upload not found.');
+    this.storage.verifyLocalDownload(row.id, row.storageKey, expires, signature);
+    const object = await this.storage.openLocalObject(row.storageKey);
+    return {
+      ...object,
+      contentType: row.contentType,
+    };
+  }
+
   async confirmUpload(p: AuthenticatedPrincipal, id: string, fileHash: string, c: RequestContext) {
     if (!/^[a-f0-9]{64}$/i.test(fileHash))
       throw new ConflictAppError('VALIDATION_FAILED', 'fileHash must be a SHA-256 hex digest.');

@@ -42,6 +42,7 @@ export const envSchema = z.object({
   S3_ACCESS_KEY: z.string().optional(),
   S3_SECRET_KEY: z.string().optional(),
   S3_FORCE_PATH_STYLE: boolFromString.optional().default('true'),
+  LOCAL_STORAGE_PATH: z.string().min(1).default('/app/storage'),
 
   MAIL_FROM: z.string().optional(),
   SMTP_HOST: z.string().optional(),
