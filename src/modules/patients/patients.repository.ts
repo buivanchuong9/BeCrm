@@ -78,10 +78,26 @@ export class PatientsRepository {
    * invariant beyond the `(organizationId, code)` DB constraint — a retry on
    * collision is acceptable and handled by the caller via the unique
    * constraint's ConflictAppError, same tradeoff already accepted for queue
-   * ticket numbers. */
+   * ticket numbers.
+   *
+   * MAX-based, not COUNT-based: `code` values aren't guaranteed contiguous —
+   * deleted rows, or out-of-band seeded codes (e.g. legacy "BN-000x" rows)
+   * mean the org's row count and its highest "PT-" number can diverge, so
+   * `count() + 1` can land on a slot some unrelated existing row already
+   * occupies. That's a *deterministic* unique-constraint collision, not a
+   * transient race — retrying doesn't help because a failed insert never
+   * changes the count, so every retry recomputes the exact same doomed code.
+   * Taking the current max "PT-" number + 1 always lands above every
+   * existing row in the org, so only a genuine concurrent insert (handled by
+   * `createWithGeneratedCode`'s retry) can still collide. */
   async nextPatientCode(tx: Prisma.TransactionClient, organizationId: string): Promise<string> {
-    const count = await tx.patient.count({ where: { organizationId } });
-    return `PT-${String(1000 + count + 1)}`;
+    const rows = await tx.$queryRaw<Array<{ max: number | null }>>`
+      SELECT MAX((regexp_match(code, '^PT-(\\d+)$'))[1]::int) AS max
+      FROM patients
+      WHERE organization_id = ${organizationId}::uuid
+    `;
+    const next = (rows[0]?.max ?? 1000) + 1;
+    return `PT-${next}`;
   }
 
   create(
