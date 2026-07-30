@@ -1,13 +1,28 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Query, Req } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+  Req,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { Type } from 'class-transformer';
 import { IsInt, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
 import { CurrentUser } from '../../core/security/current-user.decorator';
 import { AuthenticatedPrincipal } from '../../core/security/auth.types';
-import { ApiOkEnvelope, ApiOkListEnvelope } from '../../core/http/api-envelope.decorator';
+import {
+  ApiCreatedEnvelope,
+  ApiOkEnvelope,
+  ApiOkListEnvelope,
+} from '../../core/http/api-envelope.decorator';
 import { PatientResponseDto, PatientDetailResponseDto } from './dto/responses/patient-response.dto';
 import { UpdatePatientRequest } from './dto/update-patient.dto';
+import { CreateSelfPatientRequest } from './dto/create-self-patient.dto';
 import { PatientsService } from './patients.service';
 
 class ListPatientsQuery {
@@ -40,6 +55,20 @@ export class PatientsController {
   @Get('me')
   async self(@CurrentUser() principal: AuthenticatedPrincipal, @Req() req: Request) {
     return this.patientsService.getSelf(principal, {
+      requestId: req.requestId,
+      ip: req.ip,
+      userAgent: req.header('user-agent'),
+    });
+  }
+
+  @ApiCreatedEnvelope(PatientResponseDto)
+  @Post('me')
+  async createSelf(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Body() dto: CreateSelfPatientRequest,
+    @Req() req: Request,
+  ) {
+    return this.patientsService.createSelf(principal, dto, {
       requestId: req.requestId,
       ip: req.ip,
       userAgent: req.header('user-agent'),

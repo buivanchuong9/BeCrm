@@ -14,6 +14,7 @@ import {
 } from './policies/patient-policies';
 import { toPatientDetailResponse, toPatientResponse } from './patient-response.mapper';
 import { UpdatePatientRequest } from './dto/update-patient.dto';
+import { CreateSelfPatientRequest } from './dto/create-self-patient.dto';
 
 export interface RequestContext {
   requestId?: string;
@@ -78,6 +79,92 @@ export class PatientsService {
       throw new NotFoundAppError('Patient not found.');
     }
     return this.update(principal, patient.id, dto, context);
+  }
+
+  /** Self-service "become a patient too": lets an already-authenticated
+   * staff/admin account (created via staff invitation, so it never went
+   * through `RegistrationService.registerPatient`) create its own linked
+   * Patient row without needing a separate anonymous-signup flow. Grants a
+   * `patient` membership in the same step so `roles.includes('patient')`
+   * checks elsewhere (frontend AppStateContext, resolvePatientListScope)
+   * pick this account up correctly once the caller's session is refreshed —
+   * the access token's membership claims are only re-derived from the DB on
+   * the next `/auth/session-refreshes` call, not retroactively. */
+  async createSelf(
+    principal: AuthenticatedPrincipal,
+    dto: CreateSelfPatientRequest,
+    context: RequestContext,
+  ) {
+    const existing = await this.patients.findByUserId(principal.userId);
+    if (existing) {
+      throw new ConflictAppError('CONFLICT', 'This account already has a linked patient record.');
+    }
+
+    const organizationId = principal.memberships[0]?.organizationId;
+    if (!organizationId) {
+      throw new NotFoundAppError('No organization membership found for this account.');
+    }
+
+    const user = await this.prisma.user.findUnique({ where: { id: principal.userId } });
+    if (!user) {
+      throw new NotFoundAppError('User not found.');
+    }
+
+    const created = await this.prisma.$transaction(async (tx) => {
+      const code = await this.patients.nextPatientCode(tx, organizationId);
+      const patient = await this.patients.create(tx, {
+        organizationId,
+        code,
+        userId: user.id,
+        name: user.displayName,
+        dob: new Date(`${dto.dob}T00:00:00.000Z`),
+        gender: dto.gender,
+        phone: dto.phone,
+        email: user.email,
+        address: dto.address ?? null,
+        bloodType: dto.bloodType ?? 'unknown',
+        heightCm: dto.heightCm ?? null,
+        weightKg: dto.weightKg ?? null,
+      });
+
+      await tx.userMembership.create({
+        data: { userId: user.id, organizationId, role: 'patient' },
+      });
+
+      await this.audit.write(
+        {
+          actorId: principal.userId,
+          action: 'patient.created',
+          resourceType: 'patient',
+          resourceId: patient.id,
+          patientId: patient.id,
+          organizationId,
+          result: 'success',
+          requestId: context.requestId ?? null,
+          ip: context.ip ?? null,
+          userAgent: context.userAgent ?? null,
+        },
+        tx,
+      );
+      await this.audit.write(
+        {
+          actorId: principal.userId,
+          action: 'membership.created',
+          resourceType: 'user_membership',
+          resourceId: user.id,
+          organizationId,
+          result: 'success',
+          requestId: context.requestId ?? null,
+          ip: context.ip ?? null,
+          userAgent: context.userAgent ?? null,
+        },
+        tx,
+      );
+
+      return patient;
+    });
+
+    return { data: toPatientResponse(created) };
   }
 
   async getDetail(principal: AuthenticatedPrincipal, patientId: string, context: RequestContext) {
