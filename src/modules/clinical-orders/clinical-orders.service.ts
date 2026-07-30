@@ -121,11 +121,7 @@ export class ClinicalOrdersService {
   }
 
   async listAssigned(principal: AuthenticatedPrincipal) {
-    const operationalRoles: UserRole[] = [
-      'doctor',
-      'lab_technician',
-      'imaging_technician',
-    ];
+    const operationalRoles: UserRole[] = ['doctor', 'lab_technician', 'imaging_technician'];
     const scopes = principal.memberships.filter((membership) =>
       operationalRoles.includes(membership.role),
     );
@@ -221,13 +217,25 @@ export class ClinicalOrdersService {
     }
     if (dto.critical && !dto.abnormal) {
       throw new ValidationAppError(
-        [{ field: 'critical', code: 'VALIDATION_FAILED', message: 'A critical result must also be marked abnormal.' }],
+        [
+          {
+            field: 'critical',
+            code: 'VALIDATION_FAILED',
+            message: 'A critical result must also be marked abnormal.',
+          },
+        ],
         'A critical result must also be marked abnormal.',
       );
     }
     if (dto.critical && !dto.criticalReason?.trim()) {
       throw new ValidationAppError(
-        [{ field: 'criticalReason', code: 'VALIDATION_FAILED', message: 'Critical reason is required.' }],
+        [
+          {
+            field: 'criticalReason',
+            code: 'VALIDATION_FAILED',
+            message: 'Critical reason is required.',
+          },
+        ],
         'Critical reason is required for a critical result.',
       );
     }

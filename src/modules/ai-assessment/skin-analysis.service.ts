@@ -35,9 +35,7 @@ export class SkinAnalysisService {
         signal: controller.signal,
       });
       const body = (await response.json().catch(() => null)) as
-        | SkinAnalysisResponseDto
-        | { detail?: string }
-        | null;
+        SkinAnalysisResponseDto | { detail?: string } | null;
 
       if (!response.ok) {
         const detail =

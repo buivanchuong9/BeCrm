@@ -76,7 +76,8 @@ export class WorkflowGraphPositionRequest {
 
 export class WorkflowGraphLayoutRequest {
   @ApiProperty({
-    description: 'Complete graph position snapshot. Reserved keys __START__ and __END__ are supported.',
+    description:
+      'Complete graph position snapshot. Reserved keys __START__ and __END__ are supported.',
     additionalProperties: { type: 'object' },
   })
   @IsObject()

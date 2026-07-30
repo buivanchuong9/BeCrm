@@ -54,7 +54,13 @@ export function validateTerminalEdgeShape(
       edge.target === WORKFLOW_START_NODE_ID
     ) {
       throw new ValidationAppError(
-        [{ field: 'terminalEdges', code: 'VALIDATION_FAILED', message: `Invalid terminal edge "${key}".` }],
+        [
+          {
+            field: 'terminalEdges',
+            code: 'VALIDATION_FAILED',
+            message: `Invalid terminal edge "${key}".`,
+          },
+        ],
         `Invalid terminal edge "${key}".`,
       );
     }
@@ -72,15 +78,25 @@ export function validatePublishableWorkflowGraph(
   const positions = nodePositions ?? {};
   if (!positions[WORKFLOW_START_NODE_ID] || !positions[WORKFLOW_END_NODE_ID]) {
     throw new ValidationAppError(
-      [{ field: 'nodePositions', code: 'WORKFLOW_BOUNDARY_MISSING', message: 'Start and End nodes are required.' }],
+      [
+        {
+          field: 'nodePositions',
+          code: 'WORKFLOW_BOUNDARY_MISSING',
+          message: 'Start and End nodes are required.',
+        },
+      ],
       'Start and End nodes are required before publishing.',
     );
   }
-  const roots = steps.filter((step) => step.prerequisiteStepCodes.length === 0).map((step) => step.code);
+  const roots = steps
+    .filter((step) => step.prerequisiteStepCodes.length === 0)
+    .map((step) => step.code);
   const referenced = new Set(steps.flatMap((step) => step.prerequisiteStepCodes));
   const leaves = steps.filter((step) => !referenced.has(step.code)).map((step) => step.code);
   const startTargets = new Set(
-    terminalEdges.filter((edge) => edge.source === WORKFLOW_START_NODE_ID).map((edge) => edge.target),
+    terminalEdges
+      .filter((edge) => edge.source === WORKFLOW_START_NODE_ID)
+      .map((edge) => edge.target),
   );
   const endSources = new Set(
     terminalEdges.filter((edge) => edge.target === WORKFLOW_END_NODE_ID).map((edge) => edge.source),
@@ -89,13 +105,20 @@ export function validatePublishableWorkflowGraph(
   const missingLeaves = leaves.filter((code) => !endSources.has(code));
   const invalidStartTargets = [...startTargets].filter((code) => !roots.includes(code));
   const invalidEndSources = [...endSources].filter((code) => !leaves.includes(code));
-  if (missingRoots.length || missingLeaves.length || invalidStartTargets.length || invalidEndSources.length) {
+  if (
+    missingRoots.length ||
+    missingLeaves.length ||
+    invalidStartTargets.length ||
+    invalidEndSources.length
+  ) {
     throw new ValidationAppError(
-      [{
-        field: 'terminalEdges',
-        code: 'WORKFLOW_BOUNDARY_INCOMPLETE',
-        message: `Unconnected roots: ${missingRoots.join(', ') || 'none'}; unconnected leaves: ${missingLeaves.join(', ') || 'none'}.`,
-      }],
+      [
+        {
+          field: 'terminalEdges',
+          code: 'WORKFLOW_BOUNDARY_INCOMPLETE',
+          message: `Unconnected roots: ${missingRoots.join(', ') || 'none'}; unconnected leaves: ${missingLeaves.join(', ') || 'none'}.`,
+        },
+      ],
       'Every root must connect from Start and every leaf must connect to End.',
     );
   }

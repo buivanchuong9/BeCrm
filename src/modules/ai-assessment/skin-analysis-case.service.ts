@@ -263,7 +263,10 @@ export class SkinAnalysisCaseService {
     if (filters.patientId && !(await this.patients.findVisibleById(principal, filters.patientId))) {
       throw new NotFoundAppError('Patient not found.');
     }
-    if (filters.encounterId && !(await this.encounters.findVisibleById(principal, filters.encounterId))) {
+    if (
+      filters.encounterId &&
+      !(await this.encounters.findVisibleById(principal, filters.encounterId))
+    ) {
       throw new NotFoundAppError('Encounter not found.');
     }
 

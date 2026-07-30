@@ -100,10 +100,7 @@ export class SkinAnalysisCaseController {
   @Get()
   @Roles('doctor')
   @ApiOperation({ summary: 'Danh sách ca phân tích da bác sĩ được phép xem' })
-  list(
-    @CurrentUser() principal: AuthenticatedPrincipal,
-    @Query() query: ListSkinCasesQuery,
-  ) {
+  list(@CurrentUser() principal: AuthenticatedPrincipal, @Query() query: ListSkinCasesQuery) {
     return this.cases.list(principal, query);
   }
 

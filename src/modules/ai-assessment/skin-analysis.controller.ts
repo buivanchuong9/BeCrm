@@ -7,13 +7,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import {
-  ApiBearerAuth,
-  ApiBody,
-  ApiConsumes,
-  ApiOperation,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ApiOkEnvelope } from '../../core/http/api-envelope.decorator';
 import { SkinAnalysisResponseDto } from './dto/responses/skin-analysis-response.dto';
 import { SkinAnalysisService } from './skin-analysis.service';

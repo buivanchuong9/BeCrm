@@ -30,7 +30,8 @@ export class WorkflowTemplateVersionResponseDto {
   @ApiProperty({ enum: TEMPLATE_STATUS_VALUES }) status!: (typeof TEMPLATE_STATUS_VALUES)[number];
   @ApiProperty({ type: [WorkflowStepDefinitionDto] }) steps!: WorkflowStepDefinitionDto[];
   @ApiProperty({ nullable: true }) nodePositions!: Record<string, { x: number; y: number }> | null;
-  @ApiProperty({ type: [WorkflowTerminalEdgeRequest] }) terminalEdges!: WorkflowTerminalEdgeRequest[];
+  @ApiProperty({ type: [WorkflowTerminalEdgeRequest] })
+  terminalEdges!: WorkflowTerminalEdgeRequest[];
   @ApiProperty() rowVersion!: number;
   @ApiProperty({ format: 'date-time' }) createdAt!: string;
   @ApiProperty({ format: 'date-time', nullable: true }) publishedAt!: string | null;

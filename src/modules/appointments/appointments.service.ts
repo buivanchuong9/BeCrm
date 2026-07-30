@@ -144,8 +144,7 @@ export class AppointmentsService {
       ['super_administrator', 'receptionist'].includes(membership.role),
     );
     const isPatientCaller =
-      !canBookOnBehalf &&
-      principal.memberships.some((membership) => membership.role === 'patient');
+      !canBookOnBehalf && principal.memberships.some((membership) => membership.role === 'patient');
 
     const patient = isPatientCaller
       ? await this.patients.findByUserId(principal.userId)

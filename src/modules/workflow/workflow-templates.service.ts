@@ -281,9 +281,7 @@ export class WorkflowTemplatesService {
         ([code]) => code === '__START__' || code === '__END__' || nextCodes.has(code),
       ),
     );
-    const nextTerminalEdges = (
-      version.terminalEdges as unknown as WorkflowTerminalEdge[]
-    ).filter(
+    const nextTerminalEdges = (version.terminalEdges as unknown as WorkflowTerminalEdge[]).filter(
       (edge) =>
         (edge.source === '__START__' || nextCodes.has(edge.source)) &&
         (edge.target === '__END__' || nextCodes.has(edge.target)),
