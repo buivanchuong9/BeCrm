@@ -123,6 +123,18 @@ show_service_diagnostics() {
   fi
 }
 
+show_api_port_diagnostics() {
+  echo "Containers publishing host port 43000:" >&2
+  docker_cmd ps \
+    --filter publish=43000 \
+    --format 'container={{.Names}} id={{.ID}} ports={{.Ports}}' >&2 || true
+
+  if command -v ss >/dev/null 2>&1; then
+    echo "Host listeners for port 43000:" >&2
+    ss -ltnp 2>/dev/null | awk '$4 ~ /:43000$/ { print }' >&2 || true
+  fi
+}
+
 # Validate interpolation and the Compose model before changing running services.
 compose config >/dev/null
 
@@ -192,7 +204,47 @@ if [ "${ai_status:-}" != "healthy" ]; then
 fi
 
 compose run --rm api npm run db:migrate
-compose up -d --force-recreate api
+
+# Docker Compose normally replaces the old API container itself, but on hosts
+# using docker-proxy the old listener can outlive that replacement operation
+# briefly. That race leaves the new container created but unable to bind
+# 127.0.0.1:43000. Perform the cut-over explicitly and retry only the start.
+existing_api_id=$(compose ps -a -q api 2>/dev/null || true)
+if [ -n "$existing_api_id" ]; then
+  compose stop api
+  compose rm -f api
+fi
+
+# Once this project's API is gone, any Docker container still publishing the
+# dedicated API port is not ours. Refuse to stop it automatically.
+unexpected_api_port_holder=$(
+  docker_cmd ps --filter publish=43000 --format '{{.Names}}' 2>/dev/null || true
+)
+if [ -n "$unexpected_api_port_holder" ]; then
+  echo "Deployment stopped: host port 43000 is owned by another container." >&2
+  show_api_port_diagnostics
+  exit 1
+fi
+
+api_started=0
+attempt=1
+while [ "$attempt" -le 5 ]; do
+  if compose up -d api; then
+    api_started=1
+    break
+  fi
+
+  echo "API start attempt $attempt failed; waiting for port 43000 to be released." >&2
+  sleep $((attempt * 2))
+  attempt=$((attempt + 1))
+done
+
+if [ "$api_started" -ne 1 ]; then
+  echo "Deployment failed: the API could not bind host port 43000." >&2
+  show_api_port_diagnostics
+  show_service_diagnostics api
+  exit 1
+fi
 
 attempt=0
 while [ "$attempt" -lt 30 ]; do
