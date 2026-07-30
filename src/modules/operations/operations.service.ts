@@ -1,12 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { Prisma, UserRole } from '@prisma/client';
 import { createHash, randomUUID } from 'crypto';
 import { AuthenticatedPrincipal } from '../../core/security/auth.types';
 import { AuditService } from '../../core/audit/audit.service';
 import { ConflictAppError, ForbiddenAppError, NotFoundAppError } from '../../core/errors/app-error';
-import { AppConfiguration } from '../../core/configuration/configuration';
 import { PrismaService } from '../../core/database/prisma.service';
+import { ObjectStorageService } from '../../core/storage/object-storage.service';
 import { EncountersRepository } from '../encounters/encounters.repository';
 import { PatientsRepository } from '../patients/patients.repository';
 
@@ -31,7 +30,7 @@ export class OperationsService {
     private readonly patients: PatientsRepository,
     private readonly encounters: EncountersRepository,
     private readonly audit: AuditService,
-    private readonly config: ConfigService<AppConfiguration, true>,
+    private readonly storage: ObjectStorageService,
   ) {}
 
   private roles(p: AuthenticatedPrincipal) {
@@ -484,13 +483,18 @@ export class OperationsService {
     const allowed = ['clinical-document', 'progress-photo', 'avatar', 'intake-image'];
     if (!allowed.includes(dto.context))
       throw new ConflictAppError('VALIDATION_FAILED', 'Unsupported upload context.');
+    if (
+      dto.context === 'avatar' &&
+      !['image/jpeg', 'image/png', 'image/webp'].includes(dto.contentType)
+    ) {
+      throw new ConflictAppError('VALIDATION_FAILED', 'Avatar must be a JPEG, PNG or WebP image.');
+    }
     const storageKey = `${p.userId}/${dto.context}/${randomUUID()}`;
     const expiresAt = new Date(Date.now() + 15 * 60_000);
     const row = await this.prisma.uploadObject.create({
       data: { ownerId: p.userId, ...dto, storageKey, expiresAt },
     });
-    const storage = this.config.get('storage', { infer: true });
-    const uploadUrl = `${(storage.endpoint ?? '').replace(/\/$/, '')}/${storage.bucket}/${storageKey}`;
+    const uploadUrl = await this.storage.presignPut(storageKey, dto.contentType);
     await this.log(p, 'upload.presigned', 'upload_object', row.id, c);
     return { data: { fileId: row.id, uploadUrl, expiresAt } };
   }
@@ -501,6 +505,24 @@ export class OperationsService {
     if (!row) throw new NotFoundAppError('Upload not found.');
     if (row.expiresAt < new Date())
       throw new ConflictAppError('UPLOAD_EXPIRED', 'Upload URL expired.');
+    const storedObject = await this.storage.inspectObject(row.storageKey);
+    if (storedObject.contentType !== row.contentType) {
+      throw new ConflictAppError(
+        'UPLOAD_CONTENT_TYPE_MISMATCH',
+        'Stored object content type does not match the upload request.',
+      );
+    }
+    const maximumBytes = row.context === 'avatar' ? 5 * 1024 * 1024 : 25 * 1024 * 1024;
+    if (storedObject.contentLength > maximumBytes) {
+      throw new ConflictAppError('UPLOAD_TOO_LARGE', 'Uploaded object exceeds the size limit.');
+    }
+    const actualHash = await this.storage.sha256Object(row.storageKey);
+    if (actualHash !== fileHash.toLowerCase()) {
+      throw new ConflictAppError(
+        'UPLOAD_HASH_MISMATCH',
+        'Uploaded object hash does not match the confirmation.',
+      );
+    }
     const updated = await this.prisma.uploadObject.update({
       where: { id },
       data: { fileHash: fileHash.toLowerCase(), status: 'confirmed', confirmedAt: new Date() },

@@ -41,6 +41,7 @@ export class SkinAnalysisCaseController {
   constructor(private readonly cases: SkinAnalysisCaseService) {}
 
   @Post()
+  @RequireIdempotencyKey({ clinical: true })
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @ApiOperation({
@@ -52,7 +53,7 @@ export class SkinAnalysisCaseController {
   @ApiBody({
     schema: {
       type: 'object',
-      required: ['closeup', 'bodyRegion'],
+      required: ['closeup', 'bodyRegion', 'patientId'],
       properties: {
         overview: { type: 'string', format: 'binary' },
         closeup: { type: 'string', format: 'binary' },

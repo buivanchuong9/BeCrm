@@ -24,9 +24,8 @@ export class AnalyzeSkinCaseRequest {
   @MaxLength(500)
   note?: string;
 
-  @IsOptional()
   @IsUUID()
-  patientId?: string;
+  patientId!: string;
 
   @IsOptional()
   @IsUUID()

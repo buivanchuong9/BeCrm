@@ -11,9 +11,10 @@ import { SkinAnalysisService } from './skin-analysis.service';
 import { PatientsModule } from '../patients/patients.module';
 import { SkinAnalysisCaseController } from './skin-analysis-case.controller';
 import { SkinAnalysisCaseService } from './skin-analysis-case.service';
+import { AiEntitlementsModule } from '../ai-entitlements/ai-entitlements.module';
 
 @Module({
-  imports: [EncountersModule, PatientsModule],
+  imports: [EncountersModule, PatientsModule, AiEntitlementsModule],
   controllers: [
     EncounterAiAssessmentController,
     AiAssessmentDetailController,

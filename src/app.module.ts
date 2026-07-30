@@ -40,6 +40,8 @@ import { OperationsModule } from './modules/operations/operations.module';
 import { OwnerGovernanceModule } from './modules/owner-governance/owner-governance.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { CarePlansModule } from './modules/care-plans/care-plans.module';
+import { AiEntitlementsModule } from './modules/ai-entitlements/ai-entitlements.module';
+import { ObjectStorageModule } from './core/storage/object-storage.module';
 
 @Module({
   imports: [
@@ -98,6 +100,7 @@ import { CarePlansModule } from './modules/care-plans/care-plans.module';
     }),
 
     PrismaModule,
+    ObjectStorageModule,
     RedisModule,
     AuditModule,
     OutboxModule,
@@ -111,6 +114,7 @@ import { CarePlansModule } from './modules/care-plans/care-plans.module';
     EncountersModule,
     AppointmentsModule,
     QueueModule,
+    AiEntitlementsModule,
     AiAssessmentModule,
     DoctorDecisionModule,
     ClinicalOrdersModule,

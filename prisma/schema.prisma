@@ -344,19 +344,137 @@ model Patient {
   createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz
   updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz
 
-  organization  Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  user          User?                   @relation("PatientOwner", fields: [userId], references: [id], onDelete: SetNull)
-  primaryDoctor User?                   @relation("PatientPrimaryDoctor", fields: [primaryDoctorId], references: [id], onDelete: SetNull)
-  consents      Consent[]
-  careTeam      PatientCareTeamMember[]
-  appointments  Appointment[]
-  encounters    MedicalEncounter[]
+  organization      Organization              @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  user              User?                     @relation("PatientOwner", fields: [userId], references: [id], onDelete: SetNull)
+  primaryDoctor     User?                     @relation("PatientPrimaryDoctor", fields: [primaryDoctorId], references: [id], onDelete: SetNull)
+  consents          Consent[]
+  careTeam          PatientCareTeamMember[]
+  appointments      Appointment[]
+  encounters        MedicalEncounter[]
   skinAnalysisCases AISkinAnalysisCase[]
+  aiEntitlement     PatientAiEntitlement?
+  aiUsageEvents     AiUsageEvent[]
+  aiCreditPurchases AiCreditPurchaseRequest[]
+  aiPlanChanges     AiPlanChangeRequest[]
 
   @@unique([organizationId, code])
   @@index([organizationId])
   @@index([primaryDoctorId])
   @@map("patients")
+}
+
+// ---------------------------------------------------------------------------
+// Patient AI plans, quota ledger and purchase workflows
+// ---------------------------------------------------------------------------
+
+enum AiUsageStatus {
+  reserved
+  completed
+  released
+}
+
+enum AiAllowanceKind {
+  included
+  purchased
+}
+
+enum AiPurchaseRequestStatus {
+  pending
+  approved
+  rejected
+  cancelled
+}
+
+model AiPlan {
+  code                    String   @id
+  name                    String
+  annualPriceVnd          Int      @map("annual_price_vnd")
+  monthlyIncludedCredits  Int?     @map("monthly_included_credits")
+  extraCreditUnitPriceVnd Int      @map("extra_credit_unit_price_vnd")
+  description             String
+  features                Json
+  active                  Boolean  @default(true)
+  sortOrder               Int      @default(0) @map("sort_order")
+  createdAt               DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt               DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  entitlements       PatientAiEntitlement[]
+  planChangeRequests AiPlanChangeRequest[]
+
+  @@map("ai_plans")
+}
+
+model PatientAiEntitlement {
+  patientId          String   @id @map("patient_id") @db.Uuid
+  planCode           String   @default("free") @map("plan_code")
+  extraCreditBalance Int      @default(0) @map("extra_credit_balance")
+  version            Int      @default(1)
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  plan    AiPlan  @relation(fields: [planCode], references: [code], onDelete: Restrict)
+
+  @@index([planCode])
+  @@map("patient_ai_entitlements")
+}
+
+model AiUsageEvent {
+  id            String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patientId     String          @map("patient_id") @db.Uuid
+  actorId       String          @map("actor_id") @db.Uuid
+  caseId        String?         @unique @map("case_id") @db.Uuid
+  requestId     String?         @unique @map("request_id")
+  allowanceKind AiAllowanceKind @map("allowance_kind")
+  status        AiUsageStatus   @default(reserved)
+  reservedAt    DateTime        @default(now()) @map("reserved_at") @db.Timestamptz
+  occurredAt    DateTime?       @map("occurred_at") @db.Timestamptz
+  releasedAt    DateTime?       @map("released_at") @db.Timestamptz
+  releaseReason String?         @map("release_reason")
+
+  patient Patient             @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  case    AISkinAnalysisCase? @relation(fields: [caseId], references: [id], onDelete: Restrict)
+
+  @@index([patientId, status, reservedAt])
+  @@map("ai_usage_events")
+}
+
+model AiCreditPurchaseRequest {
+  id            String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patientId     String                  @map("patient_id") @db.Uuid
+  requestedBy   String                  @map("requested_by") @db.Uuid
+  credits       Int
+  unitPriceVnd  Int                     @map("unit_price_vnd")
+  totalPriceVnd Int                     @map("total_price_vnd")
+  status        AiPurchaseRequestStatus @default(pending)
+  decidedBy     String?                 @map("decided_by") @db.Uuid
+  decidedAt     DateTime?               @map("decided_at") @db.Timestamptz
+  createdAt     DateTime                @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime                @updatedAt @map("updated_at") @db.Timestamptz
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Restrict)
+
+  @@index([patientId, status, createdAt])
+  @@map("ai_credit_purchase_requests")
+}
+
+model AiPlanChangeRequest {
+  id                String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patientId         String                  @map("patient_id") @db.Uuid
+  requestedBy       String                  @map("requested_by") @db.Uuid
+  requestedPlanCode String                  @map("requested_plan_code")
+  quotedPriceVnd    Int                     @map("quoted_price_vnd")
+  status            AiPurchaseRequestStatus @default(pending)
+  decidedBy         String?                 @map("decided_by") @db.Uuid
+  decidedAt         DateTime?               @map("decided_at") @db.Timestamptz
+  createdAt         DateTime                @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime                @updatedAt @map("updated_at") @db.Timestamptz
+
+  patient       Patient @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  requestedPlan AiPlan  @relation(fields: [requestedPlanCode], references: [code], onDelete: Restrict)
+
+  @@index([patientId, status, createdAt])
+  @@map("ai_plan_change_requests")
 }
 
 model PatientCareTeamMember {
@@ -744,22 +862,22 @@ model MedicalEncounter {
   createdAt            DateTime        @default(now()) @map("created_at") @db.Timestamptz
   updatedAt            DateTime        @updatedAt @map("updated_at") @db.Timestamptz
 
-  organization     Organization              @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  clinicLocation   ClinicLocation?           @relation(fields: [clinicLocationId], references: [id], onDelete: SetNull)
-  patient          Patient                   @relation(fields: [patientId], references: [id], onDelete: Restrict)
-  appointment      Appointment?              @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
-  parentEncounter  MedicalEncounter?         @relation("EncounterFollowUp", fields: [parentEncounterId], references: [id], onDelete: SetNull)
-  childEncounters  MedicalEncounter[]        @relation("EncounterFollowUp")
-  currentDoctor    User?                     @relation("EncounterCurrentDoctor", fields: [currentDoctorId], references: [id], onDelete: SetNull)
-  events           EncounterEvent[]
-  queueTickets     QueueTicket[]
-  symptomIntakes   SymptomIntake[]
-  aiAssessments    AIPreliminaryAssessment[]
-  doctorReviews    DoctorReview[]
-  diagnoses        DoctorDiagnosis[]
-  clinicalPlan     ClinicalPlan?
-  clinicalOrders   ClinicalOrder[]
-  workflowInstance WorkflowInstance?
+  organization      Organization              @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  clinicLocation    ClinicLocation?           @relation(fields: [clinicLocationId], references: [id], onDelete: SetNull)
+  patient           Patient                   @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  appointment       Appointment?              @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  parentEncounter   MedicalEncounter?         @relation("EncounterFollowUp", fields: [parentEncounterId], references: [id], onDelete: SetNull)
+  childEncounters   MedicalEncounter[]        @relation("EncounterFollowUp")
+  currentDoctor     User?                     @relation("EncounterCurrentDoctor", fields: [currentDoctorId], references: [id], onDelete: SetNull)
+  events            EncounterEvent[]
+  queueTickets      QueueTicket[]
+  symptomIntakes    SymptomIntake[]
+  aiAssessments     AIPreliminaryAssessment[]
+  doctorReviews     DoctorReview[]
+  diagnoses         DoctorDiagnosis[]
+  clinicalPlan      ClinicalPlan?
+  clinicalOrders    ClinicalOrder[]
+  workflowInstance  WorkflowInstance?
   skinAnalysisCases AISkinAnalysisCase[]
 
   @@index([organizationId, status])
@@ -1903,9 +2021,10 @@ model AISkinAnalysisCase {
   generatedAt          DateTime  @map("generated_at") @db.Timestamptz
   createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
-  patient   Patient?                 @relation(fields: [patientId], references: [id], onDelete: Restrict)
-  encounter MedicalEncounter?        @relation(fields: [encounterId], references: [id], onDelete: Restrict)
-  artifacts AISkinAnalysisArtifact[]
+  patient    Patient?                 @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  encounter  MedicalEncounter?        @relation(fields: [encounterId], references: [id], onDelete: Restrict)
+  artifacts  AISkinAnalysisArtifact[]
+  usageEvent AiUsageEvent?
 
   @@index([patientId, generatedAt])
   @@index([encounterId, generatedAt])

@@ -11,7 +11,7 @@ export class PatientResponseDto {
   @ApiProperty()
   code!: string;
 
-  @ApiProperty({ format: 'uuid', nullable: true })
+  @ApiProperty({ type: String, format: 'uuid', nullable: true })
   userId!: string | null;
 
   @ApiProperty({ format: 'uuid' })
@@ -29,19 +29,19 @@ export class PatientResponseDto {
   @ApiProperty()
   phone!: string;
 
-  @ApiProperty({ nullable: true })
+  @ApiProperty({ type: String, nullable: true })
   email!: string | null;
 
-  @ApiProperty({ nullable: true })
+  @ApiProperty({ type: String, nullable: true })
   address!: string | null;
 
   @ApiProperty({ enum: BLOOD_TYPE_VALUES })
   bloodType!: (typeof BLOOD_TYPE_VALUES)[number];
 
-  @ApiProperty({ nullable: true, example: 170 })
+  @ApiProperty({ type: Number, nullable: true, example: 170 })
   heightCm!: number | null;
 
-  @ApiProperty({ nullable: true, example: 65.5 })
+  @ApiProperty({ type: Number, nullable: true, example: 65.5 })
   weightKg!: number | null;
 
   @ApiProperty({ type: ReferenceResponseDto, nullable: true })
@@ -67,10 +67,10 @@ export class PatientDetailResponseDto extends PatientResponseDto {
   @ApiProperty()
   activeAppointmentCount!: number;
 
-  @ApiProperty({ format: 'uuid', nullable: true })
+  @ApiProperty({ type: String, format: 'uuid', nullable: true })
   activeEncounterId!: string | null;
 
-  @ApiProperty({ format: 'uuid', nullable: true })
+  @ApiProperty({ type: String, format: 'uuid', nullable: true })
   activeCarePlanId!: string | null;
 
   @ApiProperty({ type: [ConsentSummaryItemDto] })

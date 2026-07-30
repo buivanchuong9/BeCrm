@@ -11,7 +11,6 @@ import {
   Req,
 } from '@nestjs/common';
 import { ApiProperty, ApiTags } from '@nestjs/swagger';
-import { ConfigService } from '@nestjs/config';
 import { Throttle } from '@nestjs/throttler';
 import { Request } from 'express';
 import { IsString, Length } from 'class-validator';
@@ -28,7 +27,7 @@ import { UpdateCurrentUserRequest } from './dto/update-current-user.dto';
 import { UpsertUserPreferenceRequest } from './dto/upsert-preferences.dto';
 import { MfaService } from './mfa/mfa.service';
 import { PrismaService } from '../../core/database/prisma.service';
-import { AppConfiguration } from '../../core/configuration/configuration';
+import { ObjectStorageService } from '../../core/storage/object-storage.service';
 
 class MfaCodeRequest {
   @ApiProperty({
@@ -50,7 +49,7 @@ export class MeController {
     private readonly preferences: UserPreferencesRepository,
     private readonly mfa: MfaService,
     private readonly prisma: PrismaService,
-    private readonly config: ConfigService<AppConfiguration, true>,
+    private readonly storage: ObjectStorageService,
   ) {}
 
   private async responseWithAvatar(
@@ -67,10 +66,7 @@ export class MeController {
           },
         })
       : null;
-    const storage = this.config.get('storage', { infer: true });
-    const avatarUrl = upload
-      ? `${(storage.endpoint ?? '').replace(/\/$/, '')}/${storage.bucket}/${upload.storageKey}`
-      : null;
+    const avatarUrl = upload ? await this.storage.presignGet(upload.storageKey) : null;
     return toCurrentUserResponse(user, this.users.toMembershipScopes(user), avatarUrl);
   }
 

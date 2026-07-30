@@ -36,6 +36,7 @@ export const envSchema = z.object({
   FIELD_ENCRYPTION_KEY: z.string().min(1),
 
   S3_ENDPOINT: z.string().optional(),
+  S3_PUBLIC_ENDPOINT: z.string().optional(),
   S3_REGION: z.string().optional(),
   S3_BUCKET: z.string().optional(),
   S3_ACCESS_KEY: z.string().optional(),

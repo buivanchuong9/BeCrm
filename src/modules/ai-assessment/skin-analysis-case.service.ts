@@ -21,6 +21,7 @@ import { AnalyzeSkinCaseRequest } from './dto/analyze-skin-case.dto';
 import { SkinAnalysisCaseResponseDto } from './dto/responses/skin-analysis-case-response.dto';
 import { RequestContext } from './ai-assessment.service';
 import { ReviewSkinCaseRequest } from './dto/review-skin-case.dto';
+import { AiEntitlementsService } from '../ai-entitlements/ai-entitlements.service';
 
 export type SkinImageRole = 'overview' | 'closeup' | 'alternate';
 export interface SkinCaseFile {
@@ -38,6 +39,7 @@ export class SkinAnalysisCaseService {
     private readonly encounters: EncountersRepository,
     private readonly audit: AuditService,
     private readonly prisma: PrismaService,
+    private readonly entitlements: AiEntitlementsService,
   ) {}
 
   async analyze(
@@ -54,10 +56,8 @@ export class SkinAnalysisCaseService {
     }
 
     const symptoms = this.parseSymptoms(dto.symptoms);
-    const patient = dto.patientId
-      ? await this.patients.findVisibleById(principal, dto.patientId)
-      : null;
-    if (dto.patientId && !patient) {
+    const patient = await this.patients.findVisibleById(principal, dto.patientId);
+    if (!patient) {
       throw new NotFoundAppError('Patient not found.');
     }
     const encounter = dto.encounterId
@@ -66,7 +66,7 @@ export class SkinAnalysisCaseService {
     if (dto.encounterId && !encounter) {
       throw new NotFoundAppError('Encounter not found.');
     }
-    if (encounter && (!patient || encounter.patientId !== patient.id)) {
+    if (encounter && encounter.patientId !== patient.id) {
       throw new ValidationAppError([
         {
           field: 'encounterId',
@@ -93,6 +93,11 @@ export class SkinAnalysisCaseService {
       form.append('note', dto.note.trim());
     }
 
+    const reservation = await this.entitlements.reserve(
+      patient.id,
+      principal.userId,
+      context.requestId,
+    );
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), ai.timeoutMs);
     try {
@@ -180,11 +185,10 @@ export class SkinAnalysisCaseService {
         await tx.aISkinAnalysisCase.create({
           data: {
             id: result.caseId,
-            patientId: patient?.id ?? null,
+            patientId: patient.id,
             encounterId: encounter?.id ?? null,
             actorId: principal.userId,
-            organizationId:
-              patient?.organizationId ?? principal.memberships[0]?.organizationId ?? null,
+            organizationId: patient.organizationId,
             status: result.status,
             bodyRegion: dto.bodyRegion,
             durationDays: dto.durationDays ?? null,
@@ -218,30 +222,42 @@ export class SkinAnalysisCaseService {
             data: artifacts.map((artifact) => ({ caseId: result.caseId, ...artifact })),
           });
         }
-      });
-      await this.audit.write({
-        actorId: principal.userId,
-        action: 'ai.skin_analysis_case.generated',
-        resourceType: 'ai_skin_analysis_case',
-        resourceId: result.caseId,
-        patientId: patient?.id ?? null,
-        organizationId: patient?.organizationId ?? principal.memberships[0]?.organizationId ?? null,
-        requestId: context.requestId ?? null,
-        ip: context.ip ?? null,
-        userAgent: context.userAgent ?? null,
-        result: 'success',
-        sourceModule: 'ai-assessment',
-        afterRedacted: {
-          status: result.status,
-          imageRoles: result.images.map((image) => image.role),
-          modelVersion: result.modelVersion,
-          labelsVersion: result.labelsVersion,
-          labelsConfigured: result.labelsConfigured,
-          abstainReasons: result.aggregate.abstainReasons,
-        } as Prisma.InputJsonValue,
+        await this.entitlements.completeInTransaction(
+          tx,
+          reservation.id,
+          result.caseId,
+          new Date(),
+        );
+        await this.audit.write(
+          {
+            actorId: principal.userId,
+            action: 'ai.skin_analysis_case.generated',
+            resourceType: 'ai_skin_analysis_case',
+            resourceId: result.caseId,
+            patientId: patient.id,
+            organizationId: patient.organizationId,
+            requestId: context.requestId ?? null,
+            ip: context.ip ?? null,
+            userAgent: context.userAgent ?? null,
+            result: 'success',
+            sourceModule: 'ai-assessment',
+            afterRedacted: {
+              status: result.status,
+              imageRoles: result.images.map((image) => image.role),
+              modelVersion: result.modelVersion,
+              labelsVersion: result.labelsVersion,
+              labelsConfigured: result.labelsConfigured,
+              abstainReasons: result.aggregate.abstainReasons,
+            } as Prisma.InputJsonValue,
+          },
+          tx,
+        );
       });
       return { data: result };
     } catch (error) {
+      await this.entitlements
+        .release(reservation.id, error instanceof AppError ? error.code : 'ai_analysis_failed')
+        .catch(() => undefined);
       if (error instanceof AppError) throw error;
       const timedOut = error instanceof Error && error.name === 'AbortError';
       throw new AppError(

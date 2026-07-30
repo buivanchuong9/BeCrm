@@ -23,7 +23,7 @@ export class CreateSelfPatientRequest {
   @IsString()
   phone!: string;
 
-  @ApiProperty({ required: false, nullable: true })
+  @ApiProperty({ type: String, required: false, nullable: true })
   @IsOptional()
   @IsString()
   address?: string | null;
@@ -33,7 +33,7 @@ export class CreateSelfPatientRequest {
   @IsIn(BLOOD_TYPE_VALUES)
   bloodType?: (typeof BLOOD_TYPE_VALUES)[number];
 
-  @ApiProperty({ required: false, nullable: true, minimum: 50, maximum: 250 })
+  @ApiProperty({ type: Number, required: false, nullable: true, minimum: 50, maximum: 250 })
   @IsOptional()
   @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 2 })
@@ -41,7 +41,7 @@ export class CreateSelfPatientRequest {
   @Max(250)
   heightCm?: number | null;
 
-  @ApiProperty({ required: false, nullable: true, minimum: 2, maximum: 500 })
+  @ApiProperty({ type: Number, required: false, nullable: true, minimum: 2, maximum: 500 })
   @IsOptional()
   @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 2 })
