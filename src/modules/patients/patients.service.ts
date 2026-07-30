@@ -110,59 +110,61 @@ export class PatientsService {
       throw new NotFoundAppError('User not found.');
     }
 
-    const created = await this.prisma.$transaction(async (tx) => {
-      const code = await this.patients.nextPatientCode(tx, organizationId);
-      const patient = await this.patients.create(tx, {
-        organizationId,
-        code,
-        userId: user.id,
-        name: user.displayName,
-        dob: new Date(`${dto.dob}T00:00:00.000Z`),
-        gender: dto.gender,
-        phone: dto.phone,
-        email: user.email,
-        address: dto.address ?? null,
-        bloodType: dto.bloodType ?? 'unknown',
-        heightCm: dto.heightCm ?? null,
-        weightKg: dto.weightKg ?? null,
-      });
-
-      await tx.userMembership.create({
-        data: { userId: user.id, organizationId, role: 'patient' },
-      });
-
-      await this.audit.write(
-        {
-          actorId: principal.userId,
-          action: 'patient.created',
-          resourceType: 'patient',
-          resourceId: patient.id,
-          patientId: patient.id,
+    const created = await this.patients.createWithGeneratedCode(
+      organizationId,
+      async (tx, code) => {
+        const patient = await this.patients.create(tx, {
           organizationId,
-          result: 'success',
-          requestId: context.requestId ?? null,
-          ip: context.ip ?? null,
-          userAgent: context.userAgent ?? null,
-        },
-        tx,
-      );
-      await this.audit.write(
-        {
-          actorId: principal.userId,
-          action: 'membership.created',
-          resourceType: 'user_membership',
-          resourceId: user.id,
-          organizationId,
-          result: 'success',
-          requestId: context.requestId ?? null,
-          ip: context.ip ?? null,
-          userAgent: context.userAgent ?? null,
-        },
-        tx,
-      );
+          code,
+          userId: user.id,
+          name: user.displayName,
+          dob: new Date(`${dto.dob}T00:00:00.000Z`),
+          gender: dto.gender,
+          phone: dto.phone,
+          email: user.email,
+          address: dto.address ?? null,
+          bloodType: dto.bloodType ?? 'unknown',
+          heightCm: dto.heightCm ?? null,
+          weightKg: dto.weightKg ?? null,
+        });
 
-      return patient;
-    });
+        await tx.userMembership.create({
+          data: { userId: user.id, organizationId, role: 'patient' },
+        });
+
+        await this.audit.write(
+          {
+            actorId: principal.userId,
+            action: 'patient.created',
+            resourceType: 'patient',
+            resourceId: patient.id,
+            patientId: patient.id,
+            organizationId,
+            result: 'success',
+            requestId: context.requestId ?? null,
+            ip: context.ip ?? null,
+            userAgent: context.userAgent ?? null,
+          },
+          tx,
+        );
+        await this.audit.write(
+          {
+            actorId: principal.userId,
+            action: 'membership.created',
+            resourceType: 'user_membership',
+            resourceId: user.id,
+            organizationId,
+            result: 'success',
+            requestId: context.requestId ?? null,
+            ip: context.ip ?? null,
+            userAgent: context.userAgent ?? null,
+          },
+          tx,
+        );
+
+        return patient;
+      },
+    );
 
     return { data: toPatientResponse(created) };
   }

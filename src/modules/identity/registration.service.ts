@@ -69,7 +69,7 @@ export class RegistrationService {
 
     let userId: string;
     try {
-      userId = await this.prisma.$transaction(async (tx) => {
+      userId = await this.patients.createWithGeneratedCode(organization.id, async (tx, code) => {
         const user = await this.users.createWithMembership(tx, {
           email: dto.email,
           passwordHash,
@@ -79,7 +79,6 @@ export class RegistrationService {
           role: 'patient',
         });
 
-        const code = await this.patients.nextPatientCode(tx, organization.id);
         const patient = await this.patients.create(tx, {
           organizationId: organization.id,
           code,

@@ -91,6 +91,40 @@ export class PatientsRepository {
     return tx.patient.create({ data, include: withPrimaryDoctor });
   }
 
+  /** Runs `run` inside a fresh transaction seeded with a freshly-generated
+   * `nextPatientCode`, retrying the *whole* transaction (not just the insert)
+   * up to 3x on a `(organizationId, code)` collision. Once a statement inside
+   * a Postgres transaction errors, the transaction is aborted and no further
+   * statement can execute on that `tx` — so a caught P2002 can only be
+   * recovered by starting over with a new code, matching the tradeoff
+   * `nextPatientCode`'s doc comment already accepted (concurrent callers,
+   * e.g. two `createSelf`/`registerPatient` requests in the same org, can
+   * compute the same non-atomic count-based code). */
+  async createWithGeneratedCode<T>(
+    organizationId: string,
+    run: (tx: Prisma.TransactionClient, code: string) => Promise<T>,
+  ): Promise<T> {
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await this.prisma.$transaction(async (tx) => {
+          const code = await this.nextPatientCode(tx, organizationId);
+          return run(tx, code);
+        });
+      } catch (err) {
+        const isCodeCollision =
+          err instanceof Prisma.PrismaClientKnownRequestError &&
+          err.code === 'P2002' &&
+          (err.meta?.target as string[] | undefined)?.some((field) => field === 'code');
+        if (!isCodeCollision || attempt === maxAttempts) {
+          throw err;
+        }
+      }
+    }
+    /* istanbul ignore next -- loop always returns or throws */
+    throw new Error('unreachable');
+  }
+
   async listSelf(userId: string): Promise<PatientWithDoctor[]> {
     const patient = await this.findByUserId(userId);
     return patient ? [patient] : [];
