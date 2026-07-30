@@ -210,7 +210,10 @@ describe('PatientsService — /patients/me identity resolution and update-only i
       patients.createWithGeneratedCode.mockImplementation(async (_orgId: string, run: any) =>
         run(
           {
-            userMembership: { create: jest.fn() },
+            userMembership: {
+              createMany: jest.fn().mockResolvedValue({ count: 1 }),
+              findFirstOrThrow: jest.fn().mockResolvedValue({ id: 'membership-patient' }),
+            },
           },
           'PT-1001',
         ),
@@ -226,6 +229,53 @@ describe('PatientsService — /patients/me identity resolution and update-only i
       );
 
       expect(patients.createWithGeneratedCode).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not fail or duplicate the role when an active patient membership already exists', async () => {
+      patients.findByUserId.mockResolvedValue(null);
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'user-a',
+        displayName: 'User A',
+        email: 'a@example.com',
+      });
+      const createMany = jest.fn().mockResolvedValue({ count: 0 });
+      const findFirstOrThrow = jest.fn().mockResolvedValue({ id: 'existing-patient-membership' });
+      patients.createWithGeneratedCode.mockImplementation(async (_orgId: string, run: any) =>
+        run(
+          {
+            userMembership: { createMany, findFirstOrThrow },
+          },
+          'PT-1001',
+        ),
+      );
+      (service as any).patients.create = jest.fn().mockResolvedValue(patientRow());
+
+      await expect(
+        service.createSelf(
+          principal(),
+          { dob: '1990-01-01', gender: 'male', phone: '0900000000' } as any,
+          {},
+        ),
+      ).resolves.toBeDefined();
+
+      expect(createMany).toHaveBeenCalledWith({
+        data: [{ userId: 'user-a', organizationId: 'org-1', role: 'patient' }],
+        skipDuplicates: true,
+      });
+      expect(findFirstOrThrow).toHaveBeenCalledWith({
+        where: {
+          userId: 'user-a',
+          organizationId: 'org-1',
+          clinicLocationId: null,
+          role: 'patient',
+          status: 'active',
+        },
+        select: { id: true },
+      });
+      expect(audit.write).not.toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'membership.created' }),
+        expect.anything(),
+      );
     });
 
     it('returns 409 and never calls createWithGeneratedCode when a patient already exists for this account', async () => {

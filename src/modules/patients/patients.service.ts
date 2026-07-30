@@ -85,7 +85,7 @@ export class PatientsService {
    * staff/admin account (created via staff invitation, so it never went
    * through `RegistrationService.registerPatient`) create its own linked
    * Patient row without needing a separate anonymous-signup flow. Grants a
-   * `patient` membership in the same step so `roles.includes('patient')`
+   * an active `patient` membership exists in the same step so `roles.includes('patient')`
    * checks elsewhere (frontend AppStateContext, resolvePatientListScope)
    * pick this account up correctly once the caller's session is refreshed —
    * the access token's membership claims are only re-derived from the DB on
@@ -100,7 +100,12 @@ export class PatientsService {
       throw new ConflictAppError('CONFLICT', 'This account already has a linked patient record.');
     }
 
-    const organizationId = principal.memberships[0]?.organizationId;
+    // Prefer the organization where the caller already holds the patient
+    // role. A multi-organization staff account may have an unrelated
+    // membership first in its JWT, and Patient.userId is globally unique.
+    const organizationId =
+      principal.memberships.find((membership) => membership.role === 'patient')?.organizationId ??
+      principal.memberships[0]?.organizationId;
     if (!organizationId) {
       throw new NotFoundAppError('No organization membership found for this account.');
     }
@@ -128,8 +133,27 @@ export class PatientsService {
           weightKg: dto.weightKg ?? null,
         });
 
-        await tx.userMembership.create({
-          data: { userId: user.id, organizationId, role: 'patient' },
+        // The account may already have an active patient membership without
+        // a Patient row (for example, a role was granted independently).
+        // create() used to raise P2002 in that state and roll the whole
+        // transaction back, leaving GET /patients/me at 404 forever.
+        //
+        // createMany(skipDuplicates) maps to INSERT ... ON CONFLICT DO
+        // NOTHING on Postgres, so this is also safe if a concurrent role
+        // assignment creates the membership between our reads.
+        const membershipInsert = await tx.userMembership.createMany({
+          data: [{ userId: user.id, organizationId, role: 'patient' }],
+          skipDuplicates: true,
+        });
+        const patientMembership = await tx.userMembership.findFirstOrThrow({
+          where: {
+            userId: user.id,
+            organizationId,
+            clinicLocationId: null,
+            role: 'patient',
+            status: 'active',
+          },
+          select: { id: true },
         });
 
         await this.audit.write(
@@ -147,20 +171,22 @@ export class PatientsService {
           },
           tx,
         );
-        await this.audit.write(
-          {
-            actorId: principal.userId,
-            action: 'membership.created',
-            resourceType: 'user_membership',
-            resourceId: user.id,
-            organizationId,
-            result: 'success',
-            requestId: context.requestId ?? null,
-            ip: context.ip ?? null,
-            userAgent: context.userAgent ?? null,
-          },
-          tx,
-        );
+        if (membershipInsert.count > 0) {
+          await this.audit.write(
+            {
+              actorId: principal.userId,
+              action: 'membership.created',
+              resourceType: 'user_membership',
+              resourceId: patientMembership.id,
+              organizationId,
+              result: 'success',
+              requestId: context.requestId ?? null,
+              ip: context.ip ?? null,
+              userAgent: context.userAgent ?? null,
+            },
+            tx,
+          );
+        }
 
         return patient;
       },
