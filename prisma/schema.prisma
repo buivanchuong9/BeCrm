@@ -344,18 +344,20 @@ model Patient {
   createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz
   updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz
 
-  organization      Organization              @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  user              User?                     @relation("PatientOwner", fields: [userId], references: [id], onDelete: SetNull)
-  primaryDoctor     User?                     @relation("PatientPrimaryDoctor", fields: [primaryDoctorId], references: [id], onDelete: SetNull)
-  consents          Consent[]
-  careTeam          PatientCareTeamMember[]
-  appointments      Appointment[]
-  encounters        MedicalEncounter[]
-  skinAnalysisCases AISkinAnalysisCase[]
-  aiEntitlement     PatientAiEntitlement?
-  aiUsageEvents     AiUsageEvent[]
-  aiCreditPurchases AiCreditPurchaseRequest[]
-  aiPlanChanges     AiPlanChangeRequest[]
+  organization             Organization              @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  user                     User?                     @relation("PatientOwner", fields: [userId], references: [id], onDelete: SetNull)
+  primaryDoctor            User?                     @relation("PatientPrimaryDoctor", fields: [primaryDoctorId], references: [id], onDelete: SetNull)
+  consents                 Consent[]
+  careTeam                 PatientCareTeamMember[]
+  appointments             Appointment[]
+  encounters               MedicalEncounter[]
+  skinAnalysisCases        AISkinAnalysisCase[]
+  aiEntitlement            PatientAiEntitlement?
+  aiUsageEvents            AiUsageEvent[]
+  aiCreditPurchases        AiCreditPurchaseRequest[]
+  aiPlanChanges            AiPlanChangeRequest[]
+  lesions                  Lesion[]
+  dermatologyAdverseEvents DermatologyAdverseEvent[]
 
   @@unique([organizationId, code])
   @@index([organizationId])
@@ -862,23 +864,24 @@ model MedicalEncounter {
   createdAt            DateTime        @default(now()) @map("created_at") @db.Timestamptz
   updatedAt            DateTime        @updatedAt @map("updated_at") @db.Timestamptz
 
-  organization      Organization              @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  clinicLocation    ClinicLocation?           @relation(fields: [clinicLocationId], references: [id], onDelete: SetNull)
-  patient           Patient                   @relation(fields: [patientId], references: [id], onDelete: Restrict)
-  appointment       Appointment?              @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
-  parentEncounter   MedicalEncounter?         @relation("EncounterFollowUp", fields: [parentEncounterId], references: [id], onDelete: SetNull)
-  childEncounters   MedicalEncounter[]        @relation("EncounterFollowUp")
-  currentDoctor     User?                     @relation("EncounterCurrentDoctor", fields: [currentDoctorId], references: [id], onDelete: SetNull)
-  events            EncounterEvent[]
-  queueTickets      QueueTicket[]
-  symptomIntakes    SymptomIntake[]
-  aiAssessments     AIPreliminaryAssessment[]
-  doctorReviews     DoctorReview[]
-  diagnoses         DoctorDiagnosis[]
-  clinicalPlan      ClinicalPlan?
-  clinicalOrders    ClinicalOrder[]
-  workflowInstance  WorkflowInstance?
-  skinAnalysisCases AISkinAnalysisCase[]
+  organization       Organization              @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  clinicLocation     ClinicLocation?           @relation(fields: [clinicLocationId], references: [id], onDelete: SetNull)
+  patient            Patient                   @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  appointment        Appointment?              @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  parentEncounter    MedicalEncounter?         @relation("EncounterFollowUp", fields: [parentEncounterId], references: [id], onDelete: SetNull)
+  childEncounters    MedicalEncounter[]        @relation("EncounterFollowUp")
+  currentDoctor      User?                     @relation("EncounterCurrentDoctor", fields: [currentDoctorId], references: [id], onDelete: SetNull)
+  events             EncounterEvent[]
+  queueTickets       QueueTicket[]
+  symptomIntakes     SymptomIntake[]
+  aiAssessments      AIPreliminaryAssessment[]
+  doctorReviews      DoctorReview[]
+  diagnoses          DoctorDiagnosis[]
+  clinicalPlan       ClinicalPlan?
+  clinicalOrders     ClinicalOrder[]
+  workflowInstance   WorkflowInstance?
+  skinAnalysisCases  AISkinAnalysisCase[]
+  lesionObservations LesionObservation[]
 
   @@index([organizationId, status])
   @@index([patientId, updatedAt])
@@ -1701,6 +1704,8 @@ model UploadObject {
   confirmedAt DateTime? @map("confirmed_at") @db.Timestamptz
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
+  lesionImageAsset LesionImageAsset?
+
   @@index([ownerId, status])
   @@map("upload_objects")
 }
@@ -1742,6 +1747,452 @@ model ProgressPhoto {
 
   @@index([patientId, takenAt])
   @@map("progress_photos")
+}
+
+// ---------------------------------------------------------------------------
+// Longitudinal dermatology lesion tracking (DermaTimeline)
+// ---------------------------------------------------------------------------
+
+enum LesionLaterality {
+  LEFT
+  RIGHT
+  MIDLINE
+  UNKNOWN
+}
+
+enum LesionStatus {
+  ACTIVE
+  RESOLVED
+  ARCHIVED
+}
+
+enum LesionClinicalAssessment {
+  IMPROVING
+  STABLE
+  WORSENING
+  INDETERMINATE
+}
+
+enum LesionReviewState {
+  AI_SUGGESTION
+  AWAITING_CLINICIAN_REVIEW
+  CLINICIAN_CONFIRMED
+  CLINICIAN_MODIFIED
+  CLINICIAN_REJECTED
+  UNABLE_TO_DETERMINE
+}
+
+enum LesionObservationStatus {
+  DRAFT
+  SUBMITTED
+  PROCESSING
+  READY_FOR_REVIEW
+  VERIFIED
+  REJECTED
+  NEEDS_RECAPTURE
+}
+
+enum LesionImageQualityStatus {
+  ACCEPTABLE
+  CAUTION
+  UNUSABLE
+}
+
+enum LesionImageAssetType {
+  ORIGINAL
+  THUMBNAIL
+  ALIGNED
+  MASK
+  HEATMAP
+  DIFFERENCE_MAP
+}
+
+enum LesionMetricCategory {
+  MORPHOLOGY
+  INFLAMMATION
+  SYMPTOM
+  FUNCTION
+  TREATMENT
+  IMAGE_QUALITY
+  OTHER
+}
+
+enum LesionMetricSource {
+  IMAGE_ANALYSIS
+  PATIENT_REPORTED
+  CLINICIAN_REPORTED
+  DEVICE
+  IMPORTED
+}
+
+enum LesionMetricVerificationStatus {
+  PRELIMINARY
+  VERIFIED
+  AMENDED
+  REJECTED
+  ENTERED_IN_ERROR
+}
+
+enum LesionComparisonStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+  NEEDS_RECAPTURE
+  READY_FOR_REVIEW
+}
+
+enum LesionAnalysisType {
+  CLINICAL_DATA_DELTA
+  IMAGE_ANALYSIS
+  HYBRID
+}
+
+enum LesionRegistrationQuality {
+  GOOD
+  FAIR
+  POOR
+  UNAVAILABLE
+}
+
+enum LesionComparisonDisposition {
+  COMPARABLE
+  CAUTION
+  NOT_COMPARABLE
+  UNAVAILABLE
+}
+
+enum LesionMetricInterpretation {
+  IMPROVED
+  STABLE
+  WORSENED
+  INDETERMINATE
+  NOT_APPLICABLE
+}
+
+enum LesionReviewDecision {
+  CONFIRMED
+  MODIFIED
+  REJECTED
+}
+
+enum DermatologyAdverseEventSeverity {
+  MILD
+  MODERATE
+  SEVERE
+  UNKNOWN
+}
+
+enum DermatologyAdverseEventUrgency {
+  ROUTINE
+  SOON
+  URGENT
+  EMERGENCY
+}
+
+enum DermatologyAdverseEventCausality {
+  UNASSESSED
+  UNLIKELY
+  POSSIBLE
+  PROBABLE
+  INDETERMINATE
+}
+
+enum DermatologyAdverseEventClinicianStatus {
+  PENDING_REVIEW
+  REVIEWED
+}
+
+enum DermatologyAdverseEventStatus {
+  OPEN
+  RESOLVED
+  DISMISSED
+}
+
+model Lesion {
+  id                           String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patientId                    String                   @map("patient_id") @db.Uuid
+  organizationId               String                   @map("organization_id") @db.Uuid
+  code                         String
+  title                        String
+  bodyRegion                   String                   @map("body_region")
+  bodyMapCoordinates           Json?                    @map("body_map_coordinates")
+  laterality                   LesionLaterality         @default(UNKNOWN)
+  diagnosis                    String?
+  diagnosisCode                String?                  @map("diagnosis_code")
+  firstObservedAt              DateTime                 @map("first_observed_at") @db.Timestamptz
+  status                       LesionStatus             @default(ACTIVE)
+  createdById                  String                   @map("created_by_id") @db.Uuid
+  createdByNameSnap            String                   @map("created_by_name_snapshot")
+  responsibleClinicianId       String?                  @map("responsible_clinician_id") @db.Uuid
+  responsibleClinicianNameSnap String?                  @map("responsible_clinician_name_snapshot")
+  currentTreatment             String?                  @map("current_treatment")
+  currentAssessment            LesionClinicalAssessment @default(INDETERMINATE) @map("current_assessment")
+  reviewState                  LesionReviewState        @default(UNABLE_TO_DETERMINE) @map("review_state")
+  clinicianSelectedBaselineId  String?                  @map("clinician_selected_baseline_id") @db.Uuid
+  suspectedAdverseEvent        Boolean                  @default(false) @map("suspected_adverse_event")
+  version                      Int                      @default(1)
+  createdAt                    DateTime                 @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                    DateTime                 @updatedAt @map("updated_at") @db.Timestamptz
+
+  patient                   Patient                   @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  observations              LesionObservation[]       @relation("LesionObservations")
+  clinicianSelectedBaseline LesionObservation?        @relation("LesionSelectedBaseline", fields: [clinicianSelectedBaselineId], references: [id], onDelete: SetNull)
+  comparisons               LesionComparisonSession[]
+  timelineEvents            LesionTimelineEvent[]
+  adverseEvents             DermatologyAdverseEvent[]
+
+  @@unique([patientId, code])
+  @@index([organizationId, status, updatedAt])
+  @@index([patientId, status, updatedAt])
+  @@map("lesions")
+}
+
+model LesionObservation {
+  id                      String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  lesionId                String                   @map("lesion_id") @db.Uuid
+  encounterId             String?                  @map("encounter_id") @db.Uuid
+  revisionOfId            String?                  @unique @map("revision_of_id") @db.Uuid
+  capturedAt              DateTime                 @map("captured_at") @db.Timestamptz
+  capturedById            String                   @map("captured_by_id") @db.Uuid
+  capturedByNameSnap      String                   @map("captured_by_name_snapshot")
+  patientReportedSymptoms String[]                 @default([]) @map("patient_reported_symptoms")
+  clinicianNotes          String?                  @map("clinician_notes")
+  treatmentContext        String?                  @map("treatment_context")
+  imageQualityStatus      LesionImageQualityStatus @default(CAUTION) @map("image_quality_status")
+  imageQualityReasons     String[]                 @default([]) @map("image_quality_reasons")
+  status                  LesionObservationStatus  @default(DRAFT)
+  revision                Int                      @default(1)
+  createdAt               DateTime                 @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt               DateTime                 @updatedAt @map("updated_at") @db.Timestamptz
+
+  lesion             Lesion                    @relation("LesionObservations", fields: [lesionId], references: [id], onDelete: Restrict)
+  encounter          MedicalEncounter?         @relation(fields: [encounterId], references: [id], onDelete: Restrict)
+  revisionOf         LesionObservation?        @relation("LesionObservationRevision", fields: [revisionOfId], references: [id], onDelete: Restrict)
+  revisions          LesionObservation[]       @relation("LesionObservationRevision")
+  selectedForLesions Lesion[]                  @relation("LesionSelectedBaseline")
+  imageAssets        LesionImageAsset[]
+  metrics            LesionObservationMetric[]
+  baselineFor        LesionComparisonSession[] @relation("ComparisonBaseline")
+  targetFor          LesionComparisonSession[] @relation("ComparisonTarget")
+
+  @@index([lesionId, capturedAt])
+  @@index([encounterId])
+  @@index([status, updatedAt])
+  @@map("lesion_observations")
+}
+
+model LesionObservationMetric {
+  id                 String                         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  observationId      String                         @map("observation_id") @db.Uuid
+  supersedesMetricId String?                        @unique @map("supersedes_metric_id") @db.Uuid
+  code               String
+  label              String
+  category           LesionMetricCategory
+  value              Decimal                        @db.Decimal(14, 4)
+  unit               String
+  source             LesionMetricSource
+  measurementMethod  String?                        @map("measurement_method")
+  observedAt         DateTime                       @map("observed_at") @db.Timestamptz
+  confidence         Decimal?                       @db.Decimal(5, 4)
+  verificationStatus LesionMetricVerificationStatus @default(PRELIMINARY) @map("verification_status")
+  performerId        String                         @map("performer_id") @db.Uuid
+  verifiedById       String?                        @map("verified_by_id") @db.Uuid
+  verifiedAt         DateTime?                      @map("verified_at") @db.Timestamptz
+  createdAt          DateTime                       @default(now()) @map("created_at") @db.Timestamptz
+
+  observation LesionObservation        @relation(fields: [observationId], references: [id], onDelete: Restrict)
+  supersedes  LesionObservationMetric? @relation("MetricAmendment", fields: [supersedesMetricId], references: [id], onDelete: Restrict)
+  amendment   LesionObservationMetric? @relation("MetricAmendment")
+
+  @@unique([observationId, code])
+  @@index([code, observedAt])
+  @@map("lesion_observation_metrics")
+}
+
+model LesionImageAsset {
+  id              String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patientId       String               @map("patient_id") @db.Uuid
+  observationId   String               @map("observation_id") @db.Uuid
+  uploadObjectId  String               @unique @map("upload_object_id") @db.Uuid
+  originalAssetId String?              @map("original_asset_id") @db.Uuid
+  type            LesionImageAssetType @default(ORIGINAL)
+  mimeType        String               @map("mime_type")
+  width           Int?
+  height          Int?
+  fileSize        Int?                 @map("file_size")
+  checksum        String?
+  capturedAt      DateTime             @map("captured_at") @db.Timestamptz
+  qualityMetadata Json?                @map("quality_metadata")
+  createdAt       DateTime             @default(now()) @map("created_at") @db.Timestamptz
+
+  observation LesionObservation  @relation(fields: [observationId], references: [id], onDelete: Restrict)
+  upload      UploadObject       @relation(fields: [uploadObjectId], references: [id], onDelete: Restrict)
+  original    LesionImageAsset?  @relation("DerivedLesionAsset", fields: [originalAssetId], references: [id], onDelete: Restrict)
+  derived     LesionImageAsset[] @relation("DerivedLesionAsset")
+
+  @@index([patientId, capturedAt])
+  @@index([observationId, type])
+  @@map("lesion_image_assets")
+}
+
+model LesionComparisonSession {
+  id                    String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  lesionId              String                 @map("lesion_id") @db.Uuid
+  baselineObservationId String                 @map("baseline_observation_id") @db.Uuid
+  targetObservationId   String                 @map("target_observation_id") @db.Uuid
+  status                LesionComparisonStatus @default(QUEUED)
+  requestedById         String                 @map("requested_by_id") @db.Uuid
+  requestedByNameSnap   String                 @map("requested_by_name_snapshot")
+  requestedAt           DateTime               @default(now()) @map("requested_at") @db.Timestamptz
+  processingStartedAt   DateTime?              @map("processing_started_at") @db.Timestamptz
+  completedAt           DateTime?              @map("completed_at") @db.Timestamptz
+  failureReason         String?                @map("failure_reason")
+  analysisVersion       String?                @map("analysis_version")
+  idempotencyKey        String                 @unique @map("idempotency_key")
+  attemptCount          Int                    @default(0) @map("attempt_count")
+  maxAttempts           Int                    @default(3) @map("max_attempts")
+  timeoutAt             DateTime?              @map("timeout_at") @db.Timestamptz
+  createdAt             DateTime               @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt             DateTime               @updatedAt @map("updated_at") @db.Timestamptz
+
+  lesion   Lesion                    @relation(fields: [lesionId], references: [id], onDelete: Restrict)
+  baseline LesionObservation         @relation("ComparisonBaseline", fields: [baselineObservationId], references: [id], onDelete: Restrict)
+  target   LesionObservation         @relation("ComparisonTarget", fields: [targetObservationId], references: [id], onDelete: Restrict)
+  analysis LesionComparisonAnalysis?
+  reviews  LesionClinicianReview[]
+
+  @@index([lesionId, requestedAt])
+  @@index([status, updatedAt])
+  @@index([baselineObservationId, targetObservationId])
+  @@map("lesion_comparison_sessions")
+}
+
+model LesionComparisonAnalysis {
+  id                    String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  comparisonSessionId   String                      @unique @map("comparison_session_id") @db.Uuid
+  analysisType          LesionAnalysisType          @map("analysis_type")
+  modelName             String                      @map("model_name")
+  modelVersion          String                      @map("model_version")
+  algorithmVersion      String                      @map("algorithm_version")
+  confidence            Decimal?                    @db.Decimal(5, 4)
+  assessment            LesionClinicalAssessment
+  visualChangeSummary   String                      @map("visual_change_summary")
+  limitations           String[]                    @default([])
+  comparabilityScore    Int?                        @map("comparability_score")
+  sharpness             Int?
+  lightingConsistency   Int?                        @map("lighting_consistency")
+  angleConsistency      Int?                        @map("angle_consistency")
+  scaleConsistency      Int?                        @map("scale_consistency")
+  occlusion             Int?
+  registrationQuality   LesionRegistrationQuality   @default(UNAVAILABLE) @map("registration_quality")
+  comparisonDisposition LesionComparisonDisposition @default(UNAVAILABLE) @map("comparison_disposition")
+  qualityPolicyVersion  String?                     @map("quality_policy_version")
+  qualityReasons        String[]                    @default([]) @map("quality_reasons")
+  evidence              Json                        @default("[]")
+  generatedAt           DateTime                    @default(now()) @map("generated_at") @db.Timestamptz
+
+  comparison LesionComparisonSession  @relation(fields: [comparisonSessionId], references: [id], onDelete: Restrict)
+  metrics    LesionComparisonMetric[]
+
+  @@map("lesion_comparison_analyses")
+}
+
+model LesionComparisonMetric {
+  id                          String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  analysisId                  String                     @map("analysis_id") @db.Uuid
+  key                         String
+  label                       String
+  category                    LesionMetricCategory
+  baseline                    Decimal?                   @db.Decimal(14, 4)
+  current                     Decimal?                   @db.Decimal(14, 4)
+  delta                       Decimal?                   @db.Decimal(14, 4)
+  unit                        String
+  source                      LesionMetricSource
+  baselineSource              LesionMetricSource?        @map("baseline_source")
+  currentSource               LesionMetricSource?        @map("current_source")
+  baselineObservedAt          DateTime?                  @map("baseline_observed_at") @db.Timestamptz
+  currentObservedAt           DateTime?                  @map("current_observed_at") @db.Timestamptz
+  measurementMethod           String?                    @map("measurement_method")
+  missingReason               String?                    @map("missing_reason")
+  confidence                  Decimal?                   @db.Decimal(5, 4)
+  interpretation              LesionMetricInterpretation @default(INDETERMINATE)
+  interpretationPolicyId      String?                    @map("interpretation_policy_id")
+  interpretationPolicyVersion String?                    @map("interpretation_policy_version")
+  clinicianVerified           Boolean                    @default(false) @map("clinician_verified")
+  createdAt                   DateTime                   @default(now()) @map("created_at") @db.Timestamptz
+
+  analysis LesionComparisonAnalysis @relation(fields: [analysisId], references: [id], onDelete: Restrict)
+
+  @@unique([analysisId, key])
+  @@map("lesion_comparison_metrics")
+}
+
+model LesionClinicianReview {
+  id                  String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  comparisonSessionId String                   @map("comparison_session_id") @db.Uuid
+  reviewerId          String                   @map("reviewer_id") @db.Uuid
+  reviewerNameSnap    String                   @map("reviewer_name_snapshot")
+  decision            LesionReviewDecision
+  clinicalAssessment  LesionClinicalAssessment @map("clinical_assessment")
+  correctedMetrics    Json                     @default("{}") @map("corrected_metrics")
+  comment             String
+  reason              String
+  imageLimitations    String[]                 @default([]) @map("image_limitations")
+  recaptureRequested  Boolean                  @default(false) @map("recapture_requested")
+  reviewedAt          DateTime                 @default(now()) @map("reviewed_at") @db.Timestamptz
+
+  comparison LesionComparisonSession @relation(fields: [comparisonSessionId], references: [id], onDelete: Restrict)
+
+  @@index([comparisonSessionId, reviewedAt])
+  @@map("lesion_clinician_reviews")
+}
+
+model LesionTimelineEvent {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  lesionId   String   @map("lesion_id") @db.Uuid
+  occurredAt DateTime @default(now()) @map("occurred_at") @db.Timestamptz
+  type       String
+  title      String
+  summary    String
+  source     String
+  relatedId  String?  @map("related_id") @db.Uuid
+  warning    Boolean  @default(false)
+  payload    Json?
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  lesion Lesion @relation(fields: [lesionId], references: [id], onDelete: Restrict)
+
+  @@index([lesionId, occurredAt, id])
+  @@map("lesion_timeline_events")
+}
+
+model DermatologyAdverseEvent {
+  id                     String                                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patientId              String                                 @map("patient_id") @db.Uuid
+  organizationId         String                                 @map("organization_id") @db.Uuid
+  lesionId               String?                                @map("lesion_id") @db.Uuid
+  suspectedMedicationIds String[]                               @default([]) @map("suspected_medication_ids") @db.Uuid
+  onsetAt                DateTime                               @map("onset_at") @db.Timestamptz
+  symptoms               String[]
+  severity               DermatologyAdverseEventSeverity        @default(UNKNOWN)
+  urgencyLevel           DermatologyAdverseEventUrgency         @default(ROUTINE) @map("urgency_level")
+  causalityStatus        DermatologyAdverseEventCausality       @default(UNASSESSED) @map("causality_status")
+  clinicianStatus        DermatologyAdverseEventClinicianStatus @default(PENDING_REVIEW) @map("clinician_status")
+  status                 DermatologyAdverseEventStatus          @default(OPEN)
+  createdById            String                                 @map("created_by_id") @db.Uuid
+  reviewedById           String?                                @map("reviewed_by_id") @db.Uuid
+  reviewedAt             DateTime?                              @map("reviewed_at") @db.Timestamptz
+  version                Int                                    @default(1)
+  createdAt              DateTime                               @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt              DateTime                               @updatedAt @map("updated_at") @db.Timestamptz
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  lesion  Lesion? @relation(fields: [lesionId], references: [id], onDelete: Restrict)
+
+  @@index([patientId, status, onsetAt])
+  @@index([organizationId, clinicianStatus, urgencyLevel])
+  @@map("dermatology_adverse_events")
 }
 
 model PrescriptionRefillRequest {

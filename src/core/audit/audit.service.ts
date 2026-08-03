@@ -49,6 +49,13 @@ const NEVER_SUPPRESSED_PREFIXES = [
   'staff_invitation.',
   'auth.login',
   'auth.password_reset',
+  // Longitudinal lesion records and suspected adverse events are clinical
+  // evidence. Their audit trail must remain available even while routine
+  // operational auditing is temporarily suspended.
+  'lesion.',
+  'lesion_observation.',
+  'lesion_comparison.',
+  'dermatology_adverse_event.',
 ];
 
 const SUSPENSION_CACHE_TTL_MS = 5_000;

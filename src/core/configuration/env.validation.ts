@@ -60,6 +60,11 @@ export const envSchema = z.object({
   AI_TIMEOUT_MS: z.coerce.number().int().positive().max(120_000).default(30_000),
   AI_MAX_RESPONSE_BYTES: z.coerce.number().int().positive().max(20_000_000).default(5_000_000),
 
+  /** Selects which ImageAnalysisAdapter backs lesion-comparison image analysis.
+   * 'demo' additionally requires the seeded demo lesion AND the
+   * derma_timeline_demo_analysis feature flag — see DemoImageAnalysisAdapter. */
+  DERMA_TIMELINE_ANALYSIS_ADAPTER: z.enum(['unavailable', 'demo']).default('unavailable'),
+
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
   SENTRY_DSN: z.string().optional(),
   OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional(),
@@ -104,6 +109,14 @@ export function validateEnv(raw: Record<string, unknown>): EnvConfig {
   if (parsed.data.NODE_ENV === 'production' && !parsed.data.COOKIE_SECURE) {
     throw new Error(
       'Invalid environment configuration: COOKIE_SECURE must be true in production — the refresh_token cookie must never be sent over plain HTTP.',
+    );
+  }
+  if (
+    parsed.data.NODE_ENV === 'production' &&
+    parsed.data.DERMA_TIMELINE_ANALYSIS_ADAPTER === 'demo'
+  ) {
+    throw new Error(
+      'Invalid environment configuration: DERMA_TIMELINE_ANALYSIS_ADAPTER=demo must never be forced in production — simulated analysis must stay confined to the seeded demo lesion.',
     );
   }
   return parsed.data;

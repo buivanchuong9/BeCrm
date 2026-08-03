@@ -192,10 +192,14 @@ export class ObjectStorageService implements OnModuleDestroy {
   }
 
   async sha256Object(storageKey: string): Promise<string> {
+    const bytes = await this.readObjectBytes(storageKey);
+    return createHash('sha256').update(bytes).digest('hex');
+  }
+
+  async readObjectBytes(storageKey: string): Promise<Uint8Array> {
     if (this.usesLocalStorage()) {
       try {
-        const bytes = await readFile(this.localObjectPath(storageKey));
-        return createHash('sha256').update(bytes).digest('hex');
+        return await readFile(this.localObjectPath(storageKey));
       } catch {
         throw new AppError(
           'UPLOAD_OBJECT_MISSING',
@@ -211,8 +215,7 @@ export class ObjectStorageService implements OnModuleDestroy {
     if (!result.Body) {
       throw new AppError('UPLOAD_OBJECT_MISSING', 'The uploaded object is empty.', 409);
     }
-    const bytes = await result.Body.transformToByteArray();
-    return createHash('sha256').update(bytes).digest('hex');
+    return result.Body.transformToByteArray();
   }
 
   verifyLocalDownload(

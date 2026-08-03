@@ -11,6 +11,42 @@ import { PatientsRepository } from '../patients/patients.repository';
 
 type RequestContext = { requestId?: string; ip?: string; userAgent?: string };
 
+const UPLOAD_CONTEXTS = [
+  'clinical-document',
+  'progress-photo',
+  'avatar',
+  'intake-image',
+  'lesion-image',
+] as const;
+const IMAGE_UPLOAD_CONTEXTS = new Set(['progress-photo', 'avatar', 'intake-image', 'lesion-image']);
+const ALLOWED_IMAGE_CONTENT_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+
+const uploadLimitBytes = (context: string): number => {
+  if (context === 'avatar') return 5 * 1024 * 1024;
+  if (context === 'lesion-image') return 10 * 1024 * 1024;
+  return 25 * 1024 * 1024;
+};
+
+const hasExpectedImageSignature = (bytes: Uint8Array, contentType: string): boolean => {
+  if (contentType === 'image/jpeg') {
+    return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  }
+  if (contentType === 'image/png') {
+    const signature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+    return (
+      bytes.length >= signature.length && signature.every((value, index) => bytes[index] === value)
+    );
+  }
+  if (contentType === 'image/webp') {
+    return (
+      bytes.length >= 12 &&
+      Buffer.from(bytes.subarray(0, 4)).toString('ascii') === 'RIFF' &&
+      Buffer.from(bytes.subarray(8, 12)).toString('ascii') === 'WEBP'
+    );
+  }
+  return false;
+};
+
 const ALERT_RULES = {
   new_red_flag_symptom: ['critical', 'on_call_doctor', 1, true],
   worsening_symptoms: ['high', 'care_coordinator', 4, true],
@@ -480,14 +516,13 @@ export class OperationsService {
     dto: { fileName: string; contentType: string; context: string },
     c: RequestContext,
   ) {
-    const allowed = ['clinical-document', 'progress-photo', 'avatar', 'intake-image'];
-    if (!allowed.includes(dto.context))
+    if (!UPLOAD_CONTEXTS.includes(dto.context as (typeof UPLOAD_CONTEXTS)[number]))
       throw new ConflictAppError('VALIDATION_FAILED', 'Unsupported upload context.');
     if (
-      dto.context === 'avatar' &&
-      !['image/jpeg', 'image/png', 'image/webp'].includes(dto.contentType)
+      IMAGE_UPLOAD_CONTEXTS.has(dto.context) &&
+      !ALLOWED_IMAGE_CONTENT_TYPES.has(dto.contentType)
     ) {
-      throw new ConflictAppError('VALIDATION_FAILED', 'Avatar must be a JPEG, PNG or WebP image.');
+      throw new ConflictAppError('VALIDATION_FAILED', 'Clinical images must be JPEG, PNG or WebP.');
     }
     const storageKey = `${p.userId}/${dto.context}/${randomUUID()}`;
     const expiresAt = new Date(Date.now() + 15 * 60_000);
@@ -496,7 +531,15 @@ export class OperationsService {
     });
     const uploadUrl = await this.storage.presignPut(storageKey, dto.contentType);
     await this.log(p, 'upload.presigned', 'upload_object', row.id, c);
-    return { data: { fileId: row.id, uploadUrl, expiresAt } };
+    return {
+      data: {
+        fileId: row.id,
+        uploadUrl,
+        expiresAt,
+        method: 'PUT' as const,
+        headers: { 'Content-Type': dto.contentType },
+      },
+    };
   }
 
   async directUpload(
@@ -512,20 +555,28 @@ export class OperationsService {
       | undefined,
     c: RequestContext,
   ) {
-    const allowed = ['clinical-document', 'progress-photo', 'avatar', 'intake-image'];
-    if (!allowed.includes(uploadContext)) {
+    if (!UPLOAD_CONTEXTS.includes(uploadContext as (typeof UPLOAD_CONTEXTS)[number])) {
       throw new ConflictAppError('VALIDATION_FAILED', 'Unsupported upload context.');
     }
     if (!file?.buffer) {
       throw new ConflictAppError('VALIDATION_FAILED', 'An upload file is required.');
     }
     if (
-      uploadContext === 'avatar' &&
-      !['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)
+      IMAGE_UPLOAD_CONTEXTS.has(uploadContext) &&
+      !ALLOWED_IMAGE_CONTENT_TYPES.has(file.mimetype)
     ) {
-      throw new ConflictAppError('VALIDATION_FAILED', 'Avatar must be a JPEG, PNG or WebP image.');
+      throw new ConflictAppError('VALIDATION_FAILED', 'Clinical images must be JPEG, PNG or WebP.');
     }
-    const maximumBytes = uploadContext === 'avatar' ? 5 * 1024 * 1024 : 25 * 1024 * 1024;
+    if (
+      IMAGE_UPLOAD_CONTEXTS.has(uploadContext) &&
+      !hasExpectedImageSignature(file.buffer, file.mimetype)
+    ) {
+      throw new ConflictAppError(
+        'UPLOAD_SIGNATURE_MISMATCH',
+        'Image bytes do not match the declared content type.',
+      );
+    }
+    const maximumBytes = uploadLimitBytes(uploadContext);
     if (file.size > maximumBytes) {
       throw new ConflictAppError('UPLOAD_TOO_LARGE', 'Uploaded object exceeds the size limit.');
     }
@@ -554,7 +605,16 @@ export class OperationsService {
       });
 
     await this.log(p, 'upload.confirmed', 'upload_object', row.id, c);
-    return { data: { ...row, fileId: row.id, size: file.size } };
+    return {
+      data: {
+        fileId: row.id,
+        fileName: row.fileName,
+        contentType: row.contentType,
+        size: file.size,
+        status: row.status,
+        confirmedAt: row.confirmedAt,
+      },
+    };
   }
 
   async openLocalUpload(id: string, expires: number, signature: string) {
@@ -584,11 +644,22 @@ export class OperationsService {
         'Stored object content type does not match the upload request.',
       );
     }
-    const maximumBytes = row.context === 'avatar' ? 5 * 1024 * 1024 : 25 * 1024 * 1024;
+    const maximumBytes = uploadLimitBytes(row.context);
     if (storedObject.contentLength > maximumBytes) {
       throw new ConflictAppError('UPLOAD_TOO_LARGE', 'Uploaded object exceeds the size limit.');
     }
-    const actualHash = await this.storage.sha256Object(row.storageKey);
+    const storedBytes = await this.storage.readObjectBytes(row.storageKey);
+    if (
+      IMAGE_UPLOAD_CONTEXTS.has(row.context) &&
+      (!ALLOWED_IMAGE_CONTENT_TYPES.has(row.contentType) ||
+        !hasExpectedImageSignature(storedBytes, row.contentType))
+    ) {
+      throw new ConflictAppError(
+        'UPLOAD_SIGNATURE_MISMATCH',
+        'Image bytes do not match the declared content type.',
+      );
+    }
+    const actualHash = createHash('sha256').update(storedBytes).digest('hex');
     if (actualHash !== fileHash.toLowerCase()) {
       throw new ConflictAppError(
         'UPLOAD_HASH_MISMATCH',
@@ -600,7 +671,16 @@ export class OperationsService {
       data: { fileHash: fileHash.toLowerCase(), status: 'confirmed', confirmedAt: new Date() },
     });
     await this.log(p, 'upload.confirmed', 'upload_object', id, c);
-    return { data: updated };
+    return {
+      data: {
+        fileId: updated.id,
+        fileName: updated.fileName,
+        contentType: updated.contentType,
+        size: storedObject.contentLength,
+        status: updated.status,
+        confirmedAt: updated.confirmedAt,
+      },
+    };
   }
   async supportTicket(
     p: AuthenticatedPrincipal,

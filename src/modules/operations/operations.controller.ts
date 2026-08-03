@@ -135,13 +135,14 @@ class ClientEventRequest {
 class PresignRequest {
   @IsString() fileName!: string;
   @IsString() contentType!: string;
-  @IsIn(['clinical-document', 'progress-photo', 'avatar', 'intake-image']) context!: string;
+  @IsIn(['clinical-document', 'progress-photo', 'avatar', 'intake-image', 'lesion-image'])
+  context!: string;
 }
 class ConfirmUploadRequest {
   @IsString() fileHash!: string;
 }
 class DirectUploadRequest {
-  @IsIn(['clinical-document', 'progress-photo', 'avatar', 'intake-image'])
+  @IsIn(['clinical-document', 'progress-photo', 'avatar', 'intake-image', 'lesion-image'])
   context!: string;
 }
 class SupportRequest {
@@ -395,6 +396,7 @@ export class DashboardController {
 export class UploadsController {
   constructor(private readonly service: OperationsService) {}
 
+  @RequireIdempotencyKey({ clinical: true })
   @Post()
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -405,7 +407,7 @@ export class UploadsController {
         file: { type: 'string', format: 'binary' },
         context: {
           type: 'string',
-          enum: ['clinical-document', 'progress-photo', 'avatar', 'intake-image'],
+          enum: ['clinical-document', 'progress-photo', 'avatar', 'intake-image', 'lesion-image'],
         },
       },
     },

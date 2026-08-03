@@ -44,8 +44,8 @@ describe('OperationsService direct uploads', () => {
     const file = {
       originalname: 'avatar.png',
       mimetype: 'image/png',
-      size: 4,
-      buffer: Buffer.from('test'),
+      size: 8,
+      buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
     };
 
     const result = await service.directUpload(principal, 'avatar', file, {});
@@ -68,7 +68,7 @@ describe('OperationsService direct uploads', () => {
     expect(result.data).toEqual(
       expect.objectContaining({
         fileId: '33333333-3333-4333-8333-333333333333',
-        size: 4,
+        size: 8,
       }),
     );
   });
@@ -89,5 +89,24 @@ describe('OperationsService direct uploads', () => {
     ).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
 
     expect(storage.putObject).not.toHaveBeenCalled();
+  });
+
+  it('rejects a disguised lesion image before protected storage is written', async () => {
+    await expect(
+      service.directUpload(
+        principal,
+        'lesion-image',
+        {
+          originalname: 'not-really-a-photo.png',
+          mimetype: 'image/png',
+          size: 8,
+          buffer: Buffer.from('notimage'),
+        },
+        {},
+      ),
+    ).rejects.toMatchObject({ code: 'UPLOAD_SIGNATURE_MISMATCH' });
+
+    expect(storage.putObject).not.toHaveBeenCalled();
+    expect(prisma.uploadObject.create).not.toHaveBeenCalled();
   });
 });

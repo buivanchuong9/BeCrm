@@ -42,6 +42,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { CarePlansModule } from './modules/care-plans/care-plans.module';
 import { AiEntitlementsModule } from './modules/ai-entitlements/ai-entitlements.module';
 import { ObjectStorageModule } from './core/storage/object-storage.module';
+import { LesionTrackingModule } from './modules/lesion-tracking/lesion-tracking.module';
 
 @Module({
   imports: [
@@ -124,6 +125,7 @@ import { ObjectStorageModule } from './core/storage/object-storage.module';
     OwnerGovernanceModule,
     NotificationsModule,
     CarePlansModule,
+    LesionTrackingModule,
     HealthModule,
   ],
   providers: [

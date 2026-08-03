@@ -80,6 +80,9 @@ export function buildConfiguration(env: EnvConfig) {
       maxResponseBytes: env.AI_MAX_RESPONSE_BYTES,
     },
     logLevel: env.LOG_LEVEL,
+    lesionTracking: {
+      analysisAdapter: env.DERMA_TIMELINE_ANALYSIS_ADAPTER,
+    },
   };
 }
 

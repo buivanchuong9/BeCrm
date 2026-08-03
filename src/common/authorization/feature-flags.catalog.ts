@@ -16,6 +16,11 @@ export const FEATURE_FLAGS = {
   WORKFLOW_BPM: 'workflow_bpm',
   BREAK_GLASS_ACCESS: 'break_glass_access',
   KIOSK_SELF_CHECKIN: 'kiosk_self_checkin',
+  DERMA_TIMELINE: 'derma_timeline',
+  DERMA_TIMELINE_CLINICIAN_REVIEW: 'derma_timeline_clinician_review',
+  DERMA_TIMELINE_ADVERSE_EVENT_SCREENING: 'derma_timeline_adverse_event_screening',
+  DERMA_TIMELINE_COMPARISON_HEATMAP: 'derma_timeline_comparison_heatmap',
+  DERMA_TIMELINE_DEMO_ANALYSIS: 'derma_timeline_demo_analysis',
 } as const;
 
 export const FEATURE_FLAG_CATALOG: FeatureFlagDefinition[] = [
@@ -44,5 +49,31 @@ export const FEATURE_FLAG_CATALOG: FeatureFlagDefinition[] = [
     key: FEATURE_FLAGS.KIOSK_SELF_CHECKIN,
     description: 'QR self check-in via reception kiosk devices.',
     enabledDefault: true,
+  },
+  {
+    key: FEATURE_FLAGS.DERMA_TIMELINE,
+    description: 'Longitudinal dermatology lesion tracking in the lifetime medical record.',
+    enabledDefault: true,
+  },
+  {
+    key: FEATURE_FLAGS.DERMA_TIMELINE_CLINICIAN_REVIEW,
+    description: 'Doctor confirmation, modification and rejection of lesion comparisons.',
+    enabledDefault: true,
+  },
+  {
+    key: FEATURE_FLAGS.DERMA_TIMELINE_ADVERSE_EVENT_SCREENING,
+    description: 'Suspected dermatology adverse-event recording and clinician review workflow.',
+    enabledDefault: true,
+  },
+  {
+    key: FEATURE_FLAGS.DERMA_TIMELINE_COMPARISON_HEATMAP,
+    description: 'Display validated server-generated lesion comparison heatmaps.',
+    enabledDefault: false,
+  },
+  {
+    key: FEATURE_FLAGS.DERMA_TIMELINE_DEMO_ANALYSIS,
+    description:
+      'Serve deterministic simulated image-analysis results for the approved seeded demo lesion only. Never affects real patient uploads.',
+    enabledDefault: false,
   },
 ];
