@@ -14,7 +14,6 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
-import { pipeline } from 'stream/promises';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Type } from 'class-transformer';
 import {
@@ -457,7 +456,7 @@ export class UploadsController {
     response.setHeader('Content-Type', file.contentType);
     response.setHeader('Content-Length', String(file.contentLength));
     response.setHeader('Cache-Control', 'private, max-age=3600');
-    await pipeline(file.stream, response);
+    response.end(Buffer.from(file.bytes));
   }
 }
 

@@ -152,6 +152,17 @@ export class ObjectStorageService implements OnModuleDestroy {
     });
   }
 
+  /**
+   * A same-origin URL signed by the API. Unlike a direct S3/MinIO presigned
+   * URL it remains usable when the frontend is HTTPS but the storage endpoint
+   * is private, on a different origin, or only reachable from the API.
+   */
+  signApiDownload(fileId: string, storageKey: string, expiresInSeconds = 60 * 60): string {
+    const expires = Math.floor(Date.now() / 1000) + expiresInSeconds;
+    const signature = this.localSignature('GET', fileId, storageKey, expires);
+    return `${this.publicUrl}/api/v1/uploads/${encodeURIComponent(fileId)}/content?expires=${expires}&signature=${signature}`;
+  }
+
   async inspectObject(storageKey: string) {
     if (this.usesLocalStorage()) {
       const objectPath = this.localObjectPath(storageKey);
@@ -257,6 +268,12 @@ export class ObjectStorageService implements OnModuleDestroy {
     } catch {
       throw new AppError('UPLOAD_OBJECT_MISSING', 'The uploaded object was not found.', 404);
     }
+  }
+
+  async openObject(storageKey: string): Promise<{
+    bytes: Uint8Array;
+  }> {
+    return { bytes: await this.readObjectBytes(storageKey) };
   }
 
   onModuleDestroy() {

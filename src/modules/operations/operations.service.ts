@@ -623,10 +623,11 @@ export class OperationsService {
     });
     if (!row) throw new NotFoundAppError('Upload not found.');
     this.storage.verifyLocalDownload(row.id, row.storageKey, expires, signature);
-    const object = await this.storage.openLocalObject(row.storageKey);
+    const object = await this.storage.openObject(row.storageKey);
     return {
       ...object,
       contentType: row.contentType,
+      contentLength: object.bytes.byteLength,
     };
   }
 
