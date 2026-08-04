@@ -456,6 +456,12 @@ export class UploadsController {
     response.setHeader('Content-Type', file.contentType);
     response.setHeader('Content-Length', String(file.contentLength));
     response.setHeader('Cache-Control', 'private, max-age=3600');
+    // helmet's default Cross-Origin-Resource-Policy is "same-origin", which
+    // blocks the frontend (a different origin from this API) from rendering
+    // this signed, access-controlled URL in an <img> tag. The signature
+    // query param is already the access control for this route, so it's
+    // safe to relax CORP specifically here.
+    response.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     response.end(Buffer.from(file.bytes));
   }
 }
