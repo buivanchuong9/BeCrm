@@ -120,8 +120,12 @@ export class LesionTrackingService {
     const firstObservedAt = new Date(dto.firstObservedAt);
     this.assertNotFuture(firstObservedAt, 'firstObservedAt');
 
+    // A super_administrator's own bypass doesn't make them a real treating
+    // clinician — only default to self for an actually assigned doctor.
+    // Admins may still explicitly name a real assigned doctor via
+    // dto.clinicianId, which loadAssignedDoctor validates below.
     const responsibleClinicianId = access.doctorAssigned
-      ? (dto.clinicianId ?? principal.userId)
+      ? (dto.clinicianId ?? (access.superAdmin ? null : principal.userId))
       : null;
     const responsibleClinician = responsibleClinicianId
       ? await this.loadAssignedDoctor(patientId, access.organizationId, responsibleClinicianId)
@@ -1195,6 +1199,7 @@ export class LesionTrackingService {
       doctorAssigned,
       nurseAssigned,
       medicalAdminRead,
+      superAdmin,
     };
   }
 

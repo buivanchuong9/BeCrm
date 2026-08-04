@@ -210,6 +210,54 @@ describe('LesionTrackingService — authorization, trusted input, and idempotenc
 
       expect(prisma.$transaction).not.toHaveBeenCalled();
     });
+
+    it('lets a super_administrator author a diagnosis without being a registered/assigned doctor themself', async () => {
+      prisma.patient.findUnique.mockResolvedValue(patientRow());
+      prisma.userMembership = { findFirst: jest.fn() };
+      const createdLesion = {
+        id: 'new-lesion',
+        patientId: PATIENT_ID,
+        code: 'L-TEST0001',
+        title: 'Tổn thương cẳng tay',
+        bodyRegion: 'Cẳng tay',
+        laterality: 'LEFT',
+        diagnosis: 'Chẩn đoán do admin nhập',
+        diagnosisCode: null,
+        firstObservedAt: new Date('2026-01-01T00:00:00.000Z'),
+        status: 'ACTIVE',
+        createdByNameSnap: 'super_administrator',
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+        updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+        currentAssessment: 'INDETERMINATE',
+        reviewState: 'AI_SUGGESTION',
+        responsibleClinicianNameSnap: null,
+        responsibleClinicianId: null,
+        currentTreatment: null,
+        clinicianSelectedBaselineId: null,
+        suspectedAdverseEvent: false,
+      };
+      prisma.$transaction.mockImplementation(async (callback: any) =>
+        callback({
+          lesion: { create: jest.fn().mockResolvedValue(createdLesion) },
+          lesionTimelineEvent: { create: jest.fn().mockResolvedValue({}) },
+        }),
+      );
+
+      await expect(
+        service.createLesion(
+          principal('super_administrator'),
+          PATIENT_ID,
+          createLesionDto({ diagnosis: 'Chẩn đoán do admin nhập' }) as any,
+          {},
+        ),
+      ).resolves.toMatchObject({ data: { diagnosis: 'Chẩn đoán do admin nhập', clinicianId: null } });
+
+      // Regression guard: a super_administrator isn't auto-assigned as the
+      // lesion's responsible clinician, so loadAssignedDoctor's re-validation
+      // (which would reject them for not actually being an assigned doctor)
+      // must never run.
+      expect(prisma.userMembership.findFirst).not.toHaveBeenCalled();
+    });
   });
 
   describe('trusted clinical metric provenance', () => {
