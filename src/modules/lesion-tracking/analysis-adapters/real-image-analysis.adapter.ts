@@ -1,11 +1,14 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
+  LesionClinicalAssessment,
   LesionComparisonDisposition,
   LesionImageAssetType,
   LesionMetricCategory,
   LesionMetricSource,
   LesionRegistrationQuality,
 } from '@prisma/client';
+import { AppConfiguration } from '../../../core/configuration/configuration';
 import { PrismaService } from '../../../core/database/prisma.service';
 import { ObjectStorageService } from '../../../core/storage/object-storage.service';
 import { SkinAnalysisCaseService } from '../../ai-assessment/skin-analysis-case.service';
@@ -48,6 +51,49 @@ interface CaseSnapshot {
   triageLevel: string;
 }
 
+interface ProgressDerivedAsset {
+  role: 'baseline' | 'followup';
+  type: 'ALIGNED' | 'MASK' | 'DIFFERENCE_MAP';
+  dataUrl: string;
+  width: number;
+  height: number;
+}
+
+interface ProgressComparisonResponse {
+  model: string;
+  modelVersion: string;
+  algorithmVersion: string;
+  assessment: LesionClinicalAssessment;
+  visualChangeSummary: string;
+  limitations: string[];
+  quality: {
+    comparabilityScore: number | null;
+    sharpness: number | null;
+    lightingConsistency: number | null;
+    angleConsistency: number | null;
+    scaleConsistency: number | null;
+    occlusion: number | null;
+    registrationQuality: 'GOOD' | 'FAIR' | 'POOR' | 'UNAVAILABLE';
+    comparisonDisposition: 'COMPARABLE' | 'CAUTION' | 'NOT_COMPARABLE' | 'UNAVAILABLE';
+    qualityPolicyVersion: string | null;
+    qualityReasons: string[];
+  };
+  derivedAssets: ProgressDerivedAsset[];
+  metrics: Array<{
+    key: string;
+    label: string;
+    category: LesionMetricCategory;
+    baseline: number | null;
+    current: number | null;
+    unit: string;
+    source: LesionMetricSource;
+    confidence: number | null;
+    measurementMethod: string | null;
+    missingReason: string | null;
+  }>;
+  newRegionDetected: boolean | null;
+}
+
 const DATA_URL_PATTERN = /^data:image\/png;base64,([a-zA-Z0-9+/=]+)$/;
 
 /**
@@ -70,6 +116,7 @@ export class RealImageAnalysisAdapter implements ImageAnalysisAdapter {
   readonly name = 'real';
 
   constructor(
+    private readonly config: ConfigService<AppConfiguration, true>,
     private readonly prisma: PrismaService,
     private readonly storage: ObjectStorageService,
     private readonly skinAnalysisCase: SkinAnalysisCaseService,
@@ -85,52 +132,133 @@ export class RealImageAnalysisAdapter implements ImageAnalysisAdapter {
       throw new Error('Lesion is missing organizationId; cannot run AI case analysis.');
     }
 
-    const [baselineCase, targetCase] = await Promise.all([
+    const [baselineOriginal, targetOriginal] = await Promise.all([
+      this.originalFile(context.baseline),
+      this.originalFile(context.target),
+    ]);
+    const [baselineCase, targetCase, progress] = await Promise.all([
       this.ensureCase(context, context.baseline, organizationId),
       this.ensureCase(context, context.target, organizationId),
+      this.compareProgress(context, baselineOriginal, targetOriginal),
     ]);
 
     const derivedAssets: DerivedAssetRequest[] = [];
     this.pushHeatmapAsset(derivedAssets, context.baseline, baselineCase);
     this.pushHeatmapAsset(derivedAssets, context.target, targetCase);
-
-    const bothUsable = baselineCase.quality.usable && targetCase.quality.usable;
-    const eitherUsable = baselineCase.quality.usable || targetCase.quality.usable;
-    const comparisonDisposition = bothUsable
-      ? LesionComparisonDisposition.COMPARABLE
-      : eitherUsable
-        ? LesionComparisonDisposition.CAUTION
-        : LesionComparisonDisposition.NOT_COMPARABLE;
-    const comparabilityScore = Math.round(
-      ((baselineCase.quality.score + targetCase.quality.score) / 2) * 100,
+    this.pushProgressAssets(
+      derivedAssets,
+      context,
+      baselineOriginal.assetId,
+      targetOriginal.assetId,
+      progress.derivedAssets,
     );
 
     return {
       isSimulated: false,
-      modelName: targetCase.model,
-      modelVersion: targetCase.modelVersion,
-      algorithmVersion: `ai-assessment-case/${targetCase.modelVersion}`,
-      visualChangeSummary: this.summarize(baselineCase, targetCase),
+      modelName: `${progress.model} + ${targetCase.model}`,
+      modelVersion: progress.modelVersion,
+      algorithmVersion: progress.algorithmVersion,
+      assessment: progress.assessment,
+      visualChangeSummary: `${progress.visualChangeSummary} ${this.summarize(baselineCase, targetCase)}`,
       limitations: [
-        'Mô hình phân loại từng ảnh độc lập, không đăng ký/căn chỉnh hai ảnh với nhau — chưa thể kết luận thay đổi hình thái giữa hai mốc.',
-        'Đây là hỗ trợ phân loại, không phải mô hình chấm điểm mức độ nặng đã được thẩm định lâm sàng và không phải chẩn đoán.',
+        ...progress.limitations,
+        'Grad-CAM chỉ hiển thị vùng mô hình phân loại chú ý; không phải bản đồ thay đổi tổn thương.',
       ],
       quality: {
-        comparabilityScore,
-        sharpness: null,
-        lightingConsistency: null,
-        angleConsistency: null,
-        scaleConsistency: null,
-        occlusion: null,
-        registrationQuality: LesionRegistrationQuality.UNAVAILABLE,
-        comparisonDisposition,
-        qualityPolicyVersion: 'ai-assessment-case-quality/1.0.0',
-        qualityReasons: [...baselineCase.quality.issues, ...targetCase.quality.issues],
+        ...progress.quality,
+        registrationQuality: progress.quality.registrationQuality as LesionRegistrationQuality,
+        comparisonDisposition: progress.quality.comparisonDisposition as LesionComparisonDisposition,
+        qualityReasons: [
+          ...new Set([
+            ...progress.quality.qualityReasons,
+            ...baselineCase.quality.issues,
+            ...targetCase.quality.issues,
+          ]),
+        ],
       },
       derivedAssets,
-      metrics: [this.confidenceMetric(baselineCase, targetCase)],
-      newRegionDetected: null,
+      metrics: [
+        ...progress.metrics,
+        this.confidenceMetric(baselineCase, targetCase),
+      ],
+      newRegionDetected: progress.newRegionDetected,
     };
+  }
+
+  private async originalFile(observation: ObservationForAnalysis) {
+    const original = observation.imageAssets.find(
+      (asset) => asset.type === LesionImageAssetType.ORIGINAL,
+    );
+    if (!original) {
+      throw new Error(`Observation ${observation.id} has no ORIGINAL image asset.`);
+    }
+    const upload = await this.prisma.uploadObject.findUniqueOrThrow({
+      where: { id: original.uploadObjectId },
+    });
+    return {
+      assetId: original.id,
+      bytes: Buffer.from(await this.storage.readObjectBytes(upload.storageKey)),
+      mimeType: upload.contentType,
+      fileName: upload.fileName,
+    };
+  }
+
+  private async compareProgress(
+    context: ImageAnalysisContext,
+    baseline: Awaited<ReturnType<RealImageAnalysisAdapter['originalFile']>>,
+    followup: Awaited<ReturnType<RealImageAnalysisAdapter['originalFile']>>,
+  ): Promise<ProgressComparisonResponse> {
+    const ai = this.config.get('ai', { infer: true });
+    const form = new FormData();
+    form.append('baseline', new Blob([baseline.bytes], { type: baseline.mimeType }), baseline.fileName);
+    form.append('followup', new Blob([followup.bytes], { type: followup.mimeType }), followup.fileName);
+    form.append('bodyRegion', context.lesionBodyRegion);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), ai.timeoutMs);
+    try {
+      const response = await fetch(`${ai.serviceUrl}/v1/compare-lesion`, {
+        method: 'POST',
+        headers: ai.apiKey ? { 'X-AI-API-Key': ai.apiKey } : {},
+        body: form,
+        signal: controller.signal,
+      });
+      const text = await response.text();
+      if (Buffer.byteLength(text) > ai.maxResponseBytes) {
+        throw new Error('AI comparison response exceeded configured size limit.');
+      }
+      const parsed = JSON.parse(text) as ProgressComparisonResponse | { detail?: string };
+      if (!response.ok) {
+        throw new Error('detail' in parsed && parsed.detail ? parsed.detail : 'AI comparison failed.');
+      }
+      return parsed as ProgressComparisonResponse;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  private pushProgressAssets(
+    destination: DerivedAssetRequest[],
+    context: ImageAnalysisContext,
+    baselineOriginalId: string,
+    targetOriginalId: string,
+    assets: ProgressDerivedAsset[],
+  ): void {
+    for (const asset of assets) {
+      const match = DATA_URL_PATTERN.exec(asset.dataUrl);
+      if (!match) continue;
+      const baseline = asset.role === 'baseline';
+      const observation = baseline ? context.baseline : context.target;
+      destination.push({
+        forObservationId: observation.id,
+        originalAssetId: baseline ? baselineOriginalId : targetOriginalId,
+        type: asset.type,
+        mimeType: 'image/png',
+        width: asset.width,
+        height: asset.height,
+        bytes: Buffer.from(match[1], 'base64'),
+        contentKey: `${context.comparisonId}:${observation.id}:${asset.type}`,
+      });
+    }
   }
 
   private async ensureCase(
@@ -185,11 +313,13 @@ export class RealImageAnalysisAdapter implements ImageAnalysisAdapter {
       modelVersion: result.modelVersion,
       labelsConfigured: result.labelsConfigured,
       predictions: closeup?.predictions ?? [],
-      quality: closeup?.quality ?? { usable: false, score: 0, issues: ['Không nhận được đánh giá chất lượng từ AI.'] },
+      quality: closeup?.quality ?? {
+        usable: false,
+        score: 0,
+        issues: ['Không nhận được đánh giá chất lượng từ AI.'],
+      },
       heatmap:
-        closeup?.heatmap && !closeup.heatmap.allZero
-          ? this.decodeHeatmap(closeup.heatmap)
-          : null,
+        closeup?.heatmap && !closeup.heatmap.allZero ? this.decodeHeatmap(closeup.heatmap) : null,
       triageLevel: result.triage.level,
     };
   }
@@ -289,11 +419,15 @@ export class RealImageAnalysisAdapter implements ImageAnalysisAdapter {
    * treats two different classes' probabilities as one measurement. */
   private confidenceMetric(baseline: CaseSnapshot, target: CaseSnapshot): ImageAnalysisMetric {
     const referenceClass = baseline.predictions[0];
-    const baselineValue = referenceClass ? Math.round(referenceClass.probability * 100 * 100) / 100 : null;
+    const baselineValue = referenceClass
+      ? Math.round(referenceClass.probability * 100 * 100) / 100
+      : null;
     const matchInTarget = referenceClass
       ? target.predictions.find((prediction) => prediction.classIndex === referenceClass.classIndex)
       : undefined;
-    const currentValue = matchInTarget ? Math.round(matchInTarget.probability * 100 * 100) / 100 : null;
+    const currentValue = matchInTarget
+      ? Math.round(matchInTarget.probability * 100 * 100) / 100
+      : null;
     return {
       key: 'ai-classification-confidence',
       label: 'Độ tin cậy phân loại AI cho nhóm ban đầu',
@@ -304,12 +438,11 @@ export class RealImageAnalysisAdapter implements ImageAnalysisAdapter {
       source: LesionMetricSource.IMAGE_ANALYSIS,
       confidence: matchInTarget?.probability ?? referenceClass?.probability ?? null,
       measurementMethod: 'Xác suất phân loại của mô hình AI (không phải điểm mức độ nặng)',
-      missingReason:
-        !referenceClass
-          ? 'Không có kết quả phân loại tại mốc ban đầu.'
-          : !matchInTarget
-            ? 'Mô hình không xếp hạng nhóm này trong lần chụp hiện tại.'
-            : null,
+      missingReason: !referenceClass
+        ? 'Không có kết quả phân loại tại mốc ban đầu.'
+        : !matchInTarget
+          ? 'Mô hình không xếp hạng nhóm này trong lần chụp hiện tại.'
+          : null,
     };
   }
 
@@ -317,7 +450,8 @@ export class RealImageAnalysisAdapter implements ImageAnalysisAdapter {
     const sameLabelsConfigured = baseline.labelsConfigured && target.labelsConfigured;
     const topBaseline = baseline.predictions[0];
     const topTarget = target.predictions[0];
-    const classChanged = topBaseline && topTarget && topBaseline.classIndex !== topTarget.classIndex;
+    const classChanged =
+      topBaseline && topTarget && topBaseline.classIndex !== topTarget.classIndex;
     const triageChanged = baseline.triageLevel !== target.triageLevel;
     const parts: string[] = [];
     if (topBaseline && topTarget) {
@@ -332,7 +466,9 @@ export class RealImageAnalysisAdapter implements ImageAnalysisAdapter {
       parts.push('Không đủ dữ liệu phân loại ở một trong hai mốc.');
     }
     if (triageChanged) {
-      parts.push(`Mức độ ưu tiên gợi ý thay đổi từ "${baseline.triageLevel}" sang "${target.triageLevel}".`);
+      parts.push(
+        `Mức độ ưu tiên gợi ý thay đổi từ "${baseline.triageLevel}" sang "${target.triageLevel}".`,
+      );
     }
     parts.push('Đây là gợi ý phân loại từ AI, chưa phải kết luận đáp ứng điều trị.');
     return parts.join(' ');

@@ -4,6 +4,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import {
   LesionAnalysisType,
   LesionClinicalAssessment,
+  LesionComparisonDisposition,
   LesionComparisonStatus,
   LesionMetricSource,
   LesionMetricVerificationStatus,
@@ -202,12 +203,15 @@ export class ComparisonAnalysisService {
         comparison.target as ObservationForAnalysis,
         imageAnalysis.derivedAssets,
       );
+      const needsRecapture =
+        imageAnalysis.quality.comparisonDisposition ===
+        LesionComparisonDisposition.NOT_COMPARABLE;
 
       await this.prisma.$transaction(async (tx) => {
         await tx.lesionComparisonAnalysis.create({
           data: {
             comparisonSessionId: comparison.id,
-            analysisType: imageAnalysis.isSimulated
+            analysisType: imageAnalysis.derivedAssets.length
               ? LesionAnalysisType.HYBRID
               : LesionAnalysisType.CLINICAL_DATA_DELTA,
             modelName: imageAnalysis.modelName,
@@ -216,7 +220,7 @@ export class ComparisonAnalysisService {
               ? imageAnalysis.algorithmVersion
               : ANALYSIS_VERSION,
             confidence: null,
-            assessment: LesionClinicalAssessment.INDETERMINATE,
+            assessment: imageAnalysis.assessment ?? LesionClinicalAssessment.INDETERMINATE,
             visualChangeSummary: imageAnalysis.visualChangeSummary,
             limitations: imageAnalysis.limitations,
             comparabilityScore: imageAnalysis.quality.comparabilityScore,
@@ -236,9 +240,15 @@ export class ComparisonAnalysisService {
         await tx.lesionComparisonSession.update({
           where: { id: comparison.id },
           data: {
-            status: LesionComparisonStatus.READY_FOR_REVIEW,
+            status: needsRecapture
+              ? LesionComparisonStatus.NEEDS_RECAPTURE
+              : LesionComparisonStatus.READY_FOR_REVIEW,
             completedAt: new Date(),
             timeoutAt: null,
+            failureReason: needsRecapture
+              ? imageAnalysis.quality.qualityReasons.join(' ') ||
+                'Hai ảnh chưa đủ điều kiện kỹ thuật để so sánh.'
+              : null,
             analysisVersion: imageAnalysis.isSimulated
               ? imageAnalysis.algorithmVersion
               : ANALYSIS_VERSION,
@@ -247,7 +257,9 @@ export class ComparisonAnalysisService {
         await tx.lesion.update({
           where: { id: comparison.lesionId },
           data: {
-            reviewState: LesionReviewState.AWAITING_CLINICIAN_REVIEW,
+            reviewState: needsRecapture
+              ? LesionReviewState.UNABLE_TO_DETERMINE
+              : LesionReviewState.AWAITING_CLINICIAN_REVIEW,
             version: { increment: 1 },
           },
         });
@@ -255,10 +267,14 @@ export class ComparisonAnalysisService {
           data: {
             lesionId: comparison.lesionId,
             type: 'ANALYSIS',
-            title: imageAnalysis.isSimulated
-              ? 'Đã tính đối chiếu mô phỏng (demo)'
-              : 'Đã tính chênh lệch dữ liệu lâm sàng',
-            summary: `Đã đối chiếu ${metricRows.length} chỉ số; chưa có kết luận hình ảnh tự động và đang chờ bác sĩ review.`,
+            title: needsRecapture
+              ? 'Ảnh chưa đủ điều kiện để phân tích tiến triển'
+              : imageAnalysis.isSimulated
+                ? 'Đã tính đối chiếu mô phỏng (demo)'
+                : 'Đã phân tích tiến triển tổn thương',
+            summary: needsRecapture
+              ? 'Không tạo chỉ số tiến triển giả; hệ thống yêu cầu chụp lại ảnh có góc, ánh sáng và khoảng cách tương đồng.'
+              : `Đã đối chiếu ${metricRows.length} chỉ số và đang chờ bác sĩ xác nhận bằng chứng.`,
             source: 'SYSTEM',
             relatedId: comparison.id,
           },
@@ -275,9 +291,9 @@ export class ComparisonAnalysisService {
             result: 'success',
             sourceModule: 'lesion-tracking',
             afterRedacted: {
-              analysisType: imageAnalysis.isSimulated ? 'HYBRID' : 'CLINICAL_DATA_DELTA',
+              analysisType: imageAnalysis.derivedAssets.length ? 'HYBRID' : 'CLINICAL_DATA_DELTA',
               metricCount: metricRows.length,
-              assessment: LesionClinicalAssessment.INDETERMINATE,
+              assessment: imageAnalysis.assessment ?? LesionClinicalAssessment.INDETERMINATE,
               simulated: imageAnalysis.isSimulated,
               derivedAssetIds: persistedAssetIds,
             },
@@ -352,9 +368,9 @@ export class ComparisonAnalysisService {
   /**
    * Idempotent: re-running analyze() for the same comparison (a bounded
    * retry after FAILED, per MAX_ATTEMPTS) must never create duplicate
-   * derived assets. Existence is checked by the natural
-   * (observationId, originalAssetId, type) identity before writing bytes
-   * or creating any row.
+   * derived assets. A derivation key includes the comparison identity, so a
+   * follow-up image aligned against two different baselines does not
+   * accidentally reuse the wrong transform while retries remain idempotent.
    */
   private async persistDerivedAssets(
     patientId: string,
@@ -368,12 +384,8 @@ export class ComparisonAnalysisService {
     ]);
     const createdIds: string[] = [];
     for (const request of requests) {
-      const existing = await this.prisma.lesionImageAsset.findFirst({
-        where: {
-          observationId: request.forObservationId,
-          originalAssetId: request.originalAssetId,
-          type: request.type,
-        },
+      const existing = await this.prisma.lesionImageAsset.findUnique({
+        where: { derivationKey: request.contentKey },
         select: { id: true },
       });
       if (existing) {
@@ -407,6 +419,7 @@ export class ComparisonAnalysisService {
             observationId: request.forObservationId,
             uploadObjectId: upload.id,
             originalAssetId: request.originalAssetId,
+            derivationKey: request.contentKey,
             type: request.type,
             mimeType: request.mimeType,
             width: request.width,
@@ -414,6 +427,10 @@ export class ComparisonAnalysisService {
             fileSize: request.bytes.length,
             checksum,
             capturedAt: observation.capturedAt,
+            qualityMetadata: {
+              provenance: request.type === 'MASK' ? 'AI_PROPOSED' : 'SYSTEM_DERIVED',
+              derivationKey: request.contentKey,
+            },
           },
           select: { id: true },
         });

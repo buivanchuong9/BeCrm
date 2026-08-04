@@ -1,5 +1,6 @@
 import {
   LesionComparisonDisposition,
+  LesionClinicalAssessment,
   LesionImageAsset,
   LesionMetricCategory,
   LesionMetricSource,
@@ -83,6 +84,9 @@ export interface ImageAnalysisResult {
   modelName: string;
   modelVersion: string;
   algorithmVersion: string;
+  /** Preliminary evidence-based state. The coordinator persists it as an
+   * immutable AI suggestion; a clinician review remains authoritative. */
+  assessment?: LesionClinicalAssessment;
   visualChangeSummary: string;
   limitations: string[];
   quality: ImageQualityAssessment;

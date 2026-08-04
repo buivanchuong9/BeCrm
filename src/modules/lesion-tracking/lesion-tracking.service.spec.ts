@@ -344,6 +344,45 @@ describe('LesionTrackingService — authorization, trusted input, and idempotenc
       expect(prisma.$transaction).not.toHaveBeenCalled();
       expect(comparisonAnalysis.analyze).not.toHaveBeenCalled();
     });
+
+    it('rejects observations whose immutable original checksums are identical', async () => {
+      const checksum = 'a'.repeat(64);
+      prisma.lesionComparisonSession.findUnique.mockResolvedValue(null);
+      prisma.lesionObservation.findMany.mockResolvedValue([
+        {
+          id: BASELINE_ID,
+          capturedAt: new Date('2026-01-01T00:00:00.000Z'),
+          status: LesionObservationStatus.READY_FOR_REVIEW,
+          imageQualityStatus: LesionImageQualityStatus.CAUTION,
+          imageAssets: [{ checksum }],
+        },
+        {
+          id: TARGET_ID,
+          capturedAt: new Date('2026-01-02T00:00:00.000Z'),
+          status: LesionObservationStatus.READY_FOR_REVIEW,
+          imageQualityStatus: LesionImageQualityStatus.CAUTION,
+          imageAssets: [{ checksum }],
+        },
+      ]);
+
+      await expect(
+        service.createComparison(
+          principal('doctor', DOCTOR_ID),
+          LESION_ID,
+          { baselineObservationId: BASELINE_ID, targetObservationId: TARGET_ID },
+          IDEMPOTENCY_KEY,
+          {},
+        ),
+      ).rejects.toMatchObject({
+        code: 'VALIDATION_ERROR',
+        details: expect.arrayContaining([
+          expect.objectContaining({ code: 'DUPLICATE_ORIGINAL_IMAGE' }),
+        ]),
+      });
+
+      expect(comparisonAnalysis.analyze).not.toHaveBeenCalled();
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
   });
 
   describe('comparison idempotency', () => {

@@ -33,5 +33,6 @@ import { OperationsService } from './operations.service';
     UserOperationsController,
   ],
   providers: [OperationsService],
+  exports: [OperationsService],
 })
 export class OperationsModule {}

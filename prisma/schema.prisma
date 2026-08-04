@@ -2018,6 +2018,7 @@ model LesionImageAsset {
   observationId   String               @map("observation_id") @db.Uuid
   uploadObjectId  String               @unique @map("upload_object_id") @db.Uuid
   originalAssetId String?              @map("original_asset_id") @db.Uuid
+  derivationKey   String?              @unique @map("derivation_key")
   type            LesionImageAssetType @default(ORIGINAL)
   mimeType        String               @map("mime_type")
   width           Int?

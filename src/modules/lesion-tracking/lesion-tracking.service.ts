@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import {
   LesionComparisonStatus,
+  LesionImageAssetType,
   LesionImageQualityStatus,
   LesionMetricSource,
   LesionMetricVerificationStatus,
@@ -22,7 +23,7 @@ import {
 } from '../../core/errors/app-error';
 import { AuthenticatedPrincipal } from '../../core/security/auth.types';
 import { ObjectStorageService } from '../../core/storage/object-storage.service';
-import { isSuperAdministrator } from '../patients/policies/patient-policies';
+import { isSuperAdministrator } from '../patients/patient-access';
 import { CLINICAL_METRIC_CATALOG, requireMetricDefinition } from './clinical-metric.catalog';
 import { ComparisonAnalysisService } from './comparison-analysis.service';
 import {
@@ -588,6 +589,11 @@ export class LesionTrackingService {
         capturedAt: true,
         status: true,
         imageQualityStatus: true,
+        imageAssets: {
+          where: { type: LesionImageAssetType.ORIGINAL },
+          select: { checksum: true },
+          take: 1,
+        },
       },
     });
     if (observations.length !== 2) {
@@ -626,6 +632,18 @@ export class LesionTrackingService {
           field: 'targetObservationId',
           code: 'TARGET_MUST_BE_LATER',
           message: 'The target observation must be later than the baseline.',
+        },
+      ]);
+    }
+    const baselineChecksum = baseline.imageAssets[0]?.checksum?.toLowerCase();
+    const targetChecksum = target.imageAssets[0]?.checksum?.toLowerCase();
+    if (baselineChecksum && targetChecksum && baselineChecksum === targetChecksum) {
+      throw new ValidationAppError([
+        {
+          field: 'targetObservationId',
+          code: 'DUPLICATE_ORIGINAL_IMAGE',
+          message:
+            'Ảnh theo dõi trùng hoàn toàn với ảnh ban đầu. Vui lòng chọn ảnh được chụp tại thời điểm khác.',
         },
       ]);
     }

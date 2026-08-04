@@ -9,6 +9,7 @@ from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Respons
 from starlette.concurrency import run_in_threadpool
 
 from .case_analysis import CaseContext, aggregate_case, triage
+from .comparison import ComparisonImageError, DuplicateImageError, compare_lesion_images
 from .model import InvalidImageError, SkinClassifier
 from .metrics import metrics, monotonic
 from .settings import settings
@@ -117,6 +118,30 @@ async def read_image(file: UploadFile, role: str) -> tuple[str, bytes]:
     if len(payload) > settings.max_image_bytes:
         raise HTTPException(status_code=413, detail=f"{role}: image exceeds size limit")
     return role, payload
+
+
+@app.post("/v1/compare-lesion")
+async def compare_lesion(
+    baseline: Annotated[UploadFile, File()],
+    followup: Annotated[UploadFile, File()],
+    body_region: Annotated[str, Form(alias="bodyRegion")],
+    _: None = Depends(authorize),
+):
+    if not body_region.strip() or len(body_region) > 100:
+        raise HTTPException(status_code=400, detail="bodyRegion is required and too long")
+    _, baseline_payload = await read_image(baseline, "baseline")
+    _, followup_payload = await read_image(followup, "followup")
+    try:
+        async with case_semaphore:
+            return await run_in_threadpool(
+                compare_lesion_images,
+                baseline_payload,
+                followup_payload,
+            )
+    except DuplicateImageError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ComparisonImageError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.post("/v1/analyze-case")

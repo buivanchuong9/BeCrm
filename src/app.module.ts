@@ -42,6 +42,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { CarePlansModule } from './modules/care-plans/care-plans.module';
 import { AiEntitlementsModule } from './modules/ai-entitlements/ai-entitlements.module';
 import { ObjectStorageModule } from './core/storage/object-storage.module';
+import { DomainEventsModule } from './core/domain-events/domain-events.module';
 import { LesionTrackingModule } from './modules/lesion-tracking/lesion-tracking.module';
 
 @Module({
@@ -102,6 +103,7 @@ import { LesionTrackingModule } from './modules/lesion-tracking/lesion-tracking.
 
     PrismaModule,
     ObjectStorageModule,
+    DomainEventsModule,
     RedisModule,
     AuditModule,
     OutboxModule,

@@ -16,12 +16,13 @@ import { EncountersRepository } from '../encounters/encounters.repository';
 import {
   isSuperAdministrator,
   viewOrgWideOrganizationIds,
-} from '../patients/policies/patient-policies';
+} from '../patients/patient-access';
 import { AnalyzeSkinCaseRequest } from './dto/analyze-skin-case.dto';
 import { SkinAnalysisCaseResponseDto } from './dto/responses/skin-analysis-case-response.dto';
 import { RequestContext } from './ai-assessment.service';
 import { ReviewSkinCaseRequest } from './dto/review-skin-case.dto';
 import { AiEntitlementsService } from '../ai-entitlements/ai-entitlements.service';
+import { DOMAIN_EVENTS, DomainEventsService } from '../../core/domain-events/domain-events.service';
 
 export type SkinImageRole = 'overview' | 'closeup' | 'alternate';
 export interface SkinCaseFile {
@@ -53,6 +54,7 @@ export class SkinAnalysisCaseService {
     private readonly audit: AuditService,
     private readonly prisma: PrismaService,
     private readonly entitlements: AiEntitlementsService,
+    private readonly events: DomainEventsService,
   ) {}
 
   async analyze(
@@ -89,7 +91,7 @@ export class SkinAnalysisCaseService {
       ]);
     }
 
-    return this.runCaseAnalysis({
+    const result = await this.runCaseAnalysis({
       patientId: patient.id,
       organizationId: patient.organizationId,
       actorId: principal.userId,
@@ -101,6 +103,32 @@ export class SkinAnalysisCaseService {
       note: dto.note,
       context,
     });
+
+    // Every screening submission becomes its own tracked lesion with this
+    // photo as the baseline observation, so the recovery/comparison screen
+    // only ever needs a follow-up photo — never a second "baseline" upload
+    // (see ScreeningLesionAutotrackListener in lesion-tracking, which
+    // actually does the work). Emitted rather than called directly: this
+    // module must not import lesion-tracking, which would close a cycle
+    // back through it (see DomainEventsService's doc comment). A listener
+    // failure is this event's problem, not this request's — it must never
+    // turn an otherwise-successful screening response into an error.
+    this.events.emit(DOMAIN_EVENTS.SKIN_ANALYSIS_CASE_CREATED, {
+      principal,
+      patientId: patient.id,
+      organizationId: patient.organizationId,
+      bodyRegion: dto.bodyRegion,
+      symptoms,
+      caseId: result.data.caseId,
+      closeup: {
+        buffer: closeup.buffer,
+        mimetype: closeup.mimetype,
+        originalname: closeup.originalname,
+      },
+      context,
+    });
+
+    return result;
   }
 
   /**
@@ -111,9 +139,21 @@ export class SkinAnalysisCaseService {
    * background job. Never call this directly from a controller — it skips
    * patients.findVisibleById.
    */
-  async runCaseAnalysis(params: RunCaseAnalysisParams): Promise<{ data: SkinAnalysisCaseResponseDto }> {
-    const { patientId, organizationId, actorId, encounterId, files, bodyRegion, durationDays, symptoms, note, context } =
-      params;
+  async runCaseAnalysis(
+    params: RunCaseAnalysisParams,
+  ): Promise<{ data: SkinAnalysisCaseResponseDto }> {
+    const {
+      patientId,
+      organizationId,
+      actorId,
+      encounterId,
+      files,
+      bodyRegion,
+      durationDays,
+      symptoms,
+      note,
+      context,
+    } = params;
     const ai = this.config.get('ai', { infer: true });
     const form = new FormData();
     for (const role of ['overview', 'closeup', 'alternate'] as const) {
