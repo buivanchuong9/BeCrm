@@ -6,6 +6,7 @@ import {
   LesionClinicalAssessment,
   LesionComparisonDisposition,
   LesionComparisonStatus,
+  LesionMaskProvenance,
   LesionMetricSource,
   LesionMetricVerificationStatus,
   LesionReviewState,
@@ -204,14 +205,23 @@ export class ComparisonAnalysisService {
         imageAnalysis.derivedAssets,
       );
       const needsRecapture =
-        imageAnalysis.quality.comparisonDisposition ===
-        LesionComparisonDisposition.NOT_COMPARABLE;
+        imageAnalysis.quality.comparisonDisposition === LesionComparisonDisposition.NOT_COMPARABLE;
+      const hasImageAnalysis = imageAnalysis.derivedAssets.length > 0;
+      const isRegisteredPipeline =
+        imageAnalysis.modelName.includes('semi-automatic-lesion-progress') &&
+        (imageAnalysis.quality.qualityPolicyVersion?.startsWith('lesion-comparability/') ?? false);
+      // Persisted mirror of the frontend's isRegisteredProgressAnalysis()
+      // heuristic (src/domain/skinProgress.ts). Only true when image analysis
+      // actually ran outside the current registered pipeline — never true for
+      // "no image analysis attempted" (unavailable adapter) or demo results.
+      const isLegacyClassification =
+        hasImageAnalysis && !imageAnalysis.isSimulated && !isRegisteredPipeline;
 
       await this.prisma.$transaction(async (tx) => {
         await tx.lesionComparisonAnalysis.create({
           data: {
             comparisonSessionId: comparison.id,
-            analysisType: imageAnalysis.derivedAssets.length
+            analysisType: hasImageAnalysis
               ? LesionAnalysisType.HYBRID
               : LesionAnalysisType.CLINICAL_DATA_DELTA,
             modelName: imageAnalysis.modelName,
@@ -233,6 +243,10 @@ export class ComparisonAnalysisService {
             comparisonDisposition: imageAnalysis.quality.comparisonDisposition,
             qualityPolicyVersion: imageAnalysis.quality.qualityPolicyVersion,
             qualityReasons: imageAnalysis.quality.qualityReasons,
+            registrationProvenance:
+              (imageAnalysis.quality.registrationProvenance as unknown as Prisma.InputJsonValue) ??
+              Prisma.JsonNull,
+            isLegacyClassification,
             evidence,
             metrics: { create: metricRows },
           },
@@ -431,6 +445,7 @@ export class ComparisonAnalysisService {
               provenance: request.type === 'MASK' ? 'AI_PROPOSED' : 'SYSTEM_DERIVED',
               derivationKey: request.contentKey,
             },
+            maskProvenance: request.type === 'MASK' ? LesionMaskProvenance.MODEL_PROPOSED : null,
           },
           select: { id: true },
         });

@@ -178,6 +178,7 @@ export class DemoImageAnalysisAdapter implements ImageAnalysisAdapter {
         comparisonDisposition: LesionComparisonDisposition.COMPARABLE,
         qualityPolicyVersion: 'demo-quality-policy/1.0.0',
         qualityReasons: [],
+        registrationProvenance: null,
       },
       derivedAssets,
       metrics: [

@@ -215,6 +215,21 @@ const definitions: ClinicalMetricDefinition[] = [
     allowedSources: [LesionMetricSource.IMAGE_ANALYSIS],
     interpretation: 'LOWER_IS_BETTER',
   },
+  // Recomputed after a clinician confirms/corrects an AI-proposed mask (see
+  // LesionTrackingService.correctMask). A distinct code from lesion-area-index
+  // because LesionComparisonMetric enforces @@unique([analysisId, key]) and
+  // is append-only — a correction is always a new row under a new key, never
+  // an edit of the AI-proposed metric it supersedes.
+  {
+    code: 'lesion-area-index-clinician-verified',
+    label: 'Diện tích tổn thương (đã bác sĩ xác nhận/chỉnh sửa mask, so với mốc = 100%)',
+    category: LesionMetricCategory.MORPHOLOGY,
+    unit: '%',
+    minimum: 0,
+    maximum: 500,
+    allowedSources: [LesionMetricSource.CLINICIAN_REPORTED],
+    interpretation: 'LOWER_IS_BETTER',
+  },
   {
     code: 'erythema-index',
     label: 'Mức ban đỏ (chỉ số so với mốc = 100%)',

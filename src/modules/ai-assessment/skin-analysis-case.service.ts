@@ -13,10 +13,7 @@ import {
 import { AuthenticatedPrincipal } from '../../core/security/auth.types';
 import { PatientsRepository } from '../patients/patients.repository';
 import { EncountersRepository } from '../encounters/encounters.repository';
-import {
-  isSuperAdministrator,
-  viewOrgWideOrganizationIds,
-} from '../patients/patient-access';
+import { isSuperAdministrator, viewOrgWideOrganizationIds } from '../patients/patient-access';
 import { AnalyzeSkinCaseRequest } from './dto/analyze-skin-case.dto';
 import { SkinAnalysisCaseResponseDto } from './dto/responses/skin-analysis-case-response.dto';
 import { RequestContext } from './ai-assessment.service';

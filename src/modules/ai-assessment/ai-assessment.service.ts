@@ -8,13 +8,7 @@ import { ConflictAppError, ForbiddenAppError, NotFoundAppError } from '../../cor
 import { EncountersRepository } from '../encounters/encounters.repository';
 import { canTransition } from '../encounters/encounter-state-machine';
 import { AiAssessmentRepository } from './ai-assessment.repository';
-import {
-  evaluateRedFlag,
-  isDataSufficient,
-  scoreConditions,
-  MODEL_VERSION,
-  SymptomKey,
-} from './ai-scoring.util';
+import { evaluateRedFlag, isDataSufficient, MODEL_VERSION, SymptomKey } from './ai-scoring.util';
 import { toAIAssessmentResponse, toSymptomIntakeResponse } from './ai-assessment-response.mapper';
 import { SubmitIntakeRequest } from './dto/submit-intake.dto';
 
@@ -70,7 +64,8 @@ export class AiAssessmentService {
     const redFlag = sufficient
       ? evaluateRedFlag(dto.severity, symptoms)
       : { triggered: false, urgency: 'routine' as const, reasons: [] };
-    const candidates = sufficient ? scoreConditions(dto.severity, symptoms) : [];
+    // No validated differential-diagnosis model exists — never fabricate
+    // candidate conditions. See NO_VALIDATED_MODEL_REASON below.
     const finalStatus: EncounterStatus = redFlag.triggered ? 'escalated' : 'ai_assessed';
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -89,7 +84,7 @@ export class AiAssessmentService {
         encounterId,
         intakeId: intake.id,
         status: sufficient ? 'completed' : 'insufficient_data',
-        candidateConditions: candidates as unknown as Prisma.InputJsonValue,
+        candidateConditions: [] as unknown as Prisma.InputJsonValue,
         redFlagTriggered: redFlag.triggered,
         redFlagUrgency: redFlag.triggered ? redFlag.urgency : null,
         redFlagReasons: redFlag.reasons,
@@ -185,7 +180,8 @@ export class AiAssessmentService {
     const redFlag = sufficient
       ? evaluateRedFlag(dto.severity, symptoms)
       : { triggered: false, urgency: 'routine' as const, reasons: [] };
-    const candidates = sufficient ? scoreConditions(dto.severity, symptoms) : [];
+    // No validated differential-diagnosis model exists — never fabricate
+    // candidate conditions. See NO_VALIDATED_MODEL_REASON below.
 
     // Only re-drive the encounter's status if a legal edge exists from its
     // current state (docs/api.md AI-4) — advanced encounters (diagnosed and
@@ -213,7 +209,7 @@ export class AiAssessmentService {
         encounterId,
         intakeId: intake.id,
         status: sufficient ? 'completed' : 'insufficient_data',
-        candidateConditions: candidates as unknown as Prisma.InputJsonValue,
+        candidateConditions: [] as unknown as Prisma.InputJsonValue,
         redFlagTriggered: redFlag.triggered,
         redFlagUrgency: redFlag.triggered ? redFlag.urgency : null,
         redFlagReasons: redFlag.reasons,

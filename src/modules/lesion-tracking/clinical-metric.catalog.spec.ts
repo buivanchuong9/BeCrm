@@ -28,6 +28,7 @@ const EXPECTED_CODES = [
   'prescribed-dose-count',
   'reported-taken-dose-count',
   'lesion-area-index',
+  'lesion-area-index-clinician-verified',
   'erythema-index',
   'lesion-count-estimate',
   'new-lesion-region-detected',

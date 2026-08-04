@@ -121,6 +121,7 @@ describe('LesionTrackingService — authorization, trusted input, and idempotenc
   let audit: any;
   let comparisonAnalysis: any;
   let featureFlags: any;
+  let realAdapter: any;
   let service: LesionTrackingService;
 
   beforeEach(() => {
@@ -145,6 +146,7 @@ describe('LesionTrackingService — authorization, trusted input, and idempotenc
     audit = { write: jest.fn() };
     comparisonAnalysis = { analyze: jest.fn().mockResolvedValue(undefined) };
     featureFlags = { assertEnabled: jest.fn().mockResolvedValue(undefined) };
+    realAdapter = { countMaskPixels: jest.fn() };
     service = new LesionTrackingService(
       prisma,
       repository,
@@ -152,6 +154,7 @@ describe('LesionTrackingService — authorization, trusted input, and idempotenc
       audit,
       comparisonAnalysis,
       featureFlags,
+      realAdapter,
     );
   });
 
@@ -250,7 +253,9 @@ describe('LesionTrackingService — authorization, trusted input, and idempotenc
           createLesionDto({ diagnosis: 'Chẩn đoán do admin nhập' }) as any,
           {},
         ),
-      ).resolves.toMatchObject({ data: { diagnosis: 'Chẩn đoán do admin nhập', clinicianId: null } });
+      ).resolves.toMatchObject({
+        data: { diagnosis: 'Chẩn đoán do admin nhập', clinicianId: null },
+      });
 
       // Regression guard: a super_administrator isn't auto-assigned as the
       // lesion's responsible clinician, so loadAssignedDoctor's re-validation
@@ -497,5 +502,94 @@ describe('LesionTrackingService — authorization, trusted input, and idempotenc
         expect(prisma.$transaction).not.toHaveBeenCalled();
       },
     );
+  });
+
+  describe('mask correction', () => {
+    beforeEach(() => {
+      prisma.patient.findUnique.mockResolvedValue(patientRow({ primaryDoctorId: DOCTOR_ID }));
+      repository.findComparisonAccess.mockResolvedValue({
+        id: COMPARISON_ID,
+        lesionId: LESION_ID,
+        status: LesionComparisonStatus.READY_FOR_REVIEW,
+        requestedById: DOCTOR_ID,
+        lesion: {
+          patientId: PATIENT_ID,
+          organizationId: ORGANIZATION_ID,
+          responsibleClinicianId: DOCTOR_ID,
+        },
+      });
+      repository.findComparison.mockResolvedValue(
+        comparisonRow({
+          status: LesionComparisonStatus.READY_FOR_REVIEW,
+          failureReason: null,
+          analysis: { id: 'analysis-1', metrics: [] },
+        }),
+      );
+      prisma.lesionImageAsset = { findUnique: jest.fn(), findFirst: jest.fn(), create: jest.fn() };
+      prisma.uploadObject.create = jest.fn();
+      prisma.uploadObject.findFirst = jest.fn();
+    });
+
+    it('rejects a non-doctor caller before touching storage or the AI service', async () => {
+      await expect(
+        service.correctMask(
+          principal('nurse', NURSE_ID),
+          COMPARISON_ID,
+          '00000000-0000-4000-8000-000000000011',
+          { action: 'CONFIRM' as any, reason: 'Kiểm tra lại vùng tổn thương' },
+          {},
+        ),
+      ).rejects.toBeDefined();
+
+      expect(prisma.lesionImageAsset.findUnique).not.toHaveBeenCalled();
+      expect(realAdapter.countMaskPixels).not.toHaveBeenCalled();
+    });
+
+    it('rejects action=CORRECT without an uploaded replacement mask', async () => {
+      prisma.lesionImageAsset.findUnique.mockResolvedValue({
+        id: '00000000-0000-4000-8000-000000000011',
+        type: 'MASK',
+        observationId: BASELINE_ID,
+        upload: { storageKey: 'k', contentType: 'image/png' },
+      });
+
+      await expect(
+        service.correctMask(
+          principal('doctor', DOCTOR_ID),
+          COMPARISON_ID,
+          '00000000-0000-4000-8000-000000000011',
+          { action: 'CORRECT' as any, reason: 'Chỉnh sửa lại vùng tổn thương' },
+          {},
+        ),
+      ).rejects.toMatchObject({
+        code: 'VALIDATION_ERROR',
+        details: expect.arrayContaining([
+          expect.objectContaining({ code: 'UPLOAD_REQUIRED_FOR_CORRECTION' }),
+        ]),
+      });
+
+      expect(realAdapter.countMaskPixels).not.toHaveBeenCalled();
+    });
+
+    it('rejects an asset that is not a MASK belonging to this comparison', async () => {
+      prisma.lesionImageAsset.findUnique.mockResolvedValue({
+        id: '00000000-0000-4000-8000-000000000011',
+        type: 'ORIGINAL',
+        observationId: BASELINE_ID,
+        upload: { storageKey: 'k', contentType: 'image/jpeg' },
+      });
+
+      await expect(
+        service.correctMask(
+          principal('doctor', DOCTOR_ID),
+          COMPARISON_ID,
+          '00000000-0000-4000-8000-000000000011',
+          { action: 'CONFIRM' as any, reason: 'Xác nhận mask' },
+          {},
+        ),
+      ).rejects.toBeDefined();
+
+      expect(realAdapter.countMaskPixels).not.toHaveBeenCalled();
+    });
   });
 });

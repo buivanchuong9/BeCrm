@@ -3,6 +3,7 @@ import {
   LesionComparisonStatus,
   LesionImageAssetType,
   LesionImageQualityStatus,
+  LesionMaskProvenance,
   LesionMetricSource,
   LesionMetricVerificationStatus,
   LesionObservationStatus,
@@ -10,7 +11,7 @@ import {
   LesionReviewState,
   Prisma,
 } from '@prisma/client';
-import { randomUUID } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import { FEATURE_FLAGS } from '../../common/authorization/feature-flags.catalog';
 import { FeatureFlagsService } from '../../common/authorization/feature-flags.service';
 import { AuditService } from '../../core/audit/audit.service';
@@ -24,15 +25,22 @@ import {
 import { AuthenticatedPrincipal } from '../../core/security/auth.types';
 import { ObjectStorageService } from '../../core/storage/object-storage.service';
 import { isSuperAdministrator } from '../patients/patient-access';
-import { CLINICAL_METRIC_CATALOG, requireMetricDefinition } from './clinical-metric.catalog';
-import { ComparisonAnalysisService } from './comparison-analysis.service';
 import {
+  CLINICAL_METRIC_CATALOG,
+  interpretMetricChange,
+  requireMetricDefinition,
+} from './clinical-metric.catalog';
+import { ComparisonAnalysisService } from './comparison-analysis.service';
+import { RealImageAnalysisAdapter } from './analysis-adapters/real-image-analysis.adapter';
+import {
+  CorrectLesionMaskRequest,
   CreateDermatologyAdverseEventRequest,
   CreateLesionComparisonRequest,
   CreateLesionObservationRequest,
   CreateLesionRequest,
   CreateLesionReviewRequest,
   LesionListQuery,
+  LesionMaskCorrectionAction,
   LesionTimelineQuery,
 } from './dto/lesion-tracking.dto';
 import {
@@ -77,6 +85,7 @@ export class LesionTrackingService {
     private readonly audit: AuditService,
     private readonly comparisonAnalysis: ComparisonAnalysisService,
     private readonly featureFlags: FeatureFlagsService,
+    private readonly realAdapter: RealImageAnalysisAdapter,
   ) {}
 
   async listLesions(principal: AuthenticatedPrincipal, patientId: string, query: LesionListQuery) {
@@ -907,6 +916,298 @@ export class LesionTrackingService {
     });
 
     return { data: await this.buildBundle(comparison.lesionId, false) };
+  }
+
+  /**
+   * Doctor-only. lesion_image_assets is append-only, so confirming or
+   * correcting an AI-proposed MASK never edits it — it always inserts a new
+   * row (maskProvenance CLINICIAN_CONFIRMED/CLINICIAN_CORRECTED,
+   * correctsAssetId pointing back at the row it supersedes). The relative
+   * area is always recomputed from real, freshly-read pixel bytes via the AI
+   * service's /v1/mask-pixel-count (never trusted from a stale cached
+   * number, never fabricated) and persisted under a new metric key —
+   * lesion_comparison_metrics is unique on (analysisId, key) and append-only,
+   * so a correction is a new row under lesion-area-index-clinician-verified,
+   * never an edit of the AI's lesion-area-index row.
+   */
+  async correctMask(
+    principal: AuthenticatedPrincipal,
+    comparisonId: string,
+    assetId: string,
+    dto: CorrectLesionMaskRequest,
+    context: RequestContext,
+  ) {
+    const access = await this.repository.findComparisonAccess(comparisonId);
+    if (!access) throw new NotFoundAppError('Comparison not found.');
+    await this.assertPatientAccess(principal, access.lesion.patientId, 'review');
+    await this.assertTimelineEnabled(access.lesion.organizationId);
+    await this.featureFlags.assertEnabled(
+      FEATURE_FLAGS.DERMA_TIMELINE_CLINICIAN_REVIEW,
+      access.lesion.organizationId,
+      'Clinician review for DermaTimeline is disabled for this organization.',
+    );
+
+    const comparison = await this.repository.findComparison(comparisonId);
+    if (!comparison || !comparison.analysis) {
+      throw new NotFoundAppError('Comparison analysis not found.');
+    }
+
+    const targetAsset = await this.prisma.lesionImageAsset.findUnique({
+      where: { id: assetId },
+      include: { upload: true },
+    });
+    if (
+      !targetAsset ||
+      targetAsset.type !== LesionImageAssetType.MASK ||
+      ![comparison.baselineObservationId, comparison.targetObservationId].includes(
+        targetAsset.observationId,
+      )
+    ) {
+      throw new NotFoundAppError('Mask asset not found for this comparison.');
+    }
+    const side: 'baseline' | 'target' =
+      targetAsset.observationId === comparison.baselineObservationId ? 'baseline' : 'target';
+
+    let newAsset: { id: string; pixelArea: number };
+    if (dto.action === LesionMaskCorrectionAction.CONFIRM) {
+      newAsset = await this.confirmMaskAsset(access.lesion.patientId, comparisonId, targetAsset);
+    } else {
+      if (!dto.uploadObjectId) {
+        throw new ValidationAppError([
+          {
+            field: 'uploadObjectId',
+            code: 'UPLOAD_REQUIRED_FOR_CORRECTION',
+            message: 'A corrected mask upload is required for action=CORRECT.',
+          },
+        ]);
+      }
+      newAsset = await this.attachCorrectedMaskAsset(
+        principal,
+        access.lesion.patientId,
+        targetAsset,
+        dto.uploadObjectId,
+      );
+    }
+
+    const otherObservationId =
+      side === 'baseline' ? comparison.targetObservationId : comparison.baselineObservationId;
+    const otherMask = await this.currentMaskPixelArea(otherObservationId);
+    if (!otherMask) {
+      throw new ConflictAppError(
+        'OTHER_SIDE_MASK_MISSING',
+        'Không thể tính lại diện tích: mốc còn lại chưa có mask để đối chiếu.',
+      );
+    }
+    const baselinePixels = side === 'baseline' ? newAsset.pixelArea : otherMask.pixelArea;
+    const targetPixels = side === 'target' ? newAsset.pixelArea : otherMask.pixelArea;
+    const relativeArea = Math.round((targetPixels / Math.max(baselinePixels, 1)) * 1000) / 10;
+
+    const definition = requireMetricDefinition('lesion-area-index-clinician-verified');
+    const interpretation = interpretMetricChange(definition, 100, relativeArea);
+
+    await this.prisma.$transaction(async (tx) => {
+      const metric = await tx.lesionComparisonMetric.create({
+        data: {
+          analysisId: comparison.analysis!.id,
+          key: definition.code,
+          label: definition.label,
+          category: definition.category,
+          baseline: 100,
+          current: relativeArea,
+          delta: relativeArea - 100,
+          unit: definition.unit,
+          source: LesionMetricSource.CLINICIAN_REPORTED,
+          baselineSource: LesionMetricSource.CLINICIAN_REPORTED,
+          currentSource: LesionMetricSource.CLINICIAN_REPORTED,
+          measurementMethod:
+            dto.action === LesionMaskCorrectionAction.CONFIRM
+              ? 'Đếm pixel trong mask AI đề xuất, đã bác sĩ xác nhận không chỉnh sửa'
+              : 'Đếm pixel trong mask đã bác sĩ chỉnh sửa lại',
+          confidence: null,
+          interpretation: interpretation.interpretation,
+          interpretationPolicyId: interpretation.policyId,
+          interpretationPolicyVersion: interpretation.policyVersion,
+          clinicianVerified: true,
+        },
+      });
+      await tx.lesionTimelineEvent.create({
+        data: {
+          lesionId: comparison.lesionId,
+          type: 'CLINICIAN_REVIEW',
+          title:
+            dto.action === LesionMaskCorrectionAction.CONFIRM
+              ? 'Bác sĩ đã xác nhận vùng tổn thương (mask) do AI đề xuất'
+              : 'Bác sĩ đã chỉnh sửa lại vùng tổn thương (mask)',
+          summary: `Diện tích tương đối đã tính lại từ mask ${dto.action === LesionMaskCorrectionAction.CONFIRM ? 'đã xác nhận' : 'đã chỉnh sửa'}: ${relativeArea}% so với mốc.`,
+          source: LesionMetricSource.CLINICIAN_REPORTED,
+          relatedId: newAsset.id,
+        },
+      });
+      await this.audit.write(
+        {
+          ...this.auditActor(principal, context),
+          action: 'lesion_comparison.mask_corrected',
+          resourceType: 'lesion_image_asset',
+          resourceId: newAsset.id,
+          patientId: access.lesion.patientId,
+          organizationId: access.lesion.organizationId,
+          result: 'success',
+          sourceModule: 'lesion-tracking',
+          reason: dto.reason.trim(),
+          changedFields: ['maskProvenance', 'comparisonMetric'],
+          afterRedacted: {
+            action: dto.action,
+            correctsAssetId: assetId,
+            newAssetId: newAsset.id,
+            newMetricId: metric.id,
+            relativeArea,
+          },
+        },
+        tx,
+      );
+    });
+
+    return { data: await this.buildBundle(comparison.lesionId, false) };
+  }
+
+  private async confirmMaskAsset(
+    patientId: string,
+    comparisonId: string,
+    source: Prisma.LesionImageAssetGetPayload<{ include: { upload: true } }>,
+  ): Promise<{ id: string; pixelArea: number }> {
+    const bytes = Buffer.from(await this.storage.readObjectBytes(source.upload.storageKey));
+    const contentKey = `${comparisonId}:${source.observationId}:MASK:${randomUUID()}`;
+    const storageKey = `derived/lesion-tracking/mask-corrections/${contentKey.replace(/[:]/g, '/')}`;
+    const checksum = createHash('sha256').update(bytes).digest('hex');
+    await this.storage.putObject(storageKey, source.upload.contentType, bytes);
+    const upload = await this.prisma.uploadObject.create({
+      data: {
+        ownerId: source.upload.ownerId,
+        fileName: `${contentKey}.png`,
+        contentType: source.upload.contentType,
+        context: 'lesion-image-derived',
+        storageKey,
+        fileHash: checksum,
+        status: 'confirmed',
+        expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60_000),
+        confirmedAt: new Date(),
+      },
+    });
+    const { pixelArea } = await this.realAdapter.countMaskPixels(
+      bytes,
+      source.upload.contentType,
+      upload.fileName,
+    );
+    const asset = await this.prisma.lesionImageAsset.create({
+      data: {
+        patientId,
+        observationId: source.observationId,
+        uploadObjectId: upload.id,
+        originalAssetId: source.originalAssetId,
+        type: LesionImageAssetType.MASK,
+        mimeType: source.upload.contentType,
+        width: source.width,
+        height: source.height,
+        fileSize: bytes.length,
+        checksum,
+        capturedAt: source.capturedAt,
+        maskProvenance: LesionMaskProvenance.CLINICIAN_CONFIRMED,
+        correctsAssetId: source.id,
+      },
+      select: { id: true },
+    });
+    return { id: asset.id, pixelArea };
+  }
+
+  private async attachCorrectedMaskAsset(
+    principal: AuthenticatedPrincipal,
+    patientId: string,
+    source: Prisma.LesionImageAssetGetPayload<{ include: { upload: true } }>,
+    uploadObjectId: string,
+  ): Promise<{ id: string; pixelArea: number }> {
+    const upload = await this.prisma.uploadObject.findFirst({
+      where: {
+        id: uploadObjectId,
+        ownerId: principal.userId,
+        status: 'confirmed',
+        context: 'lesion-image',
+      },
+      include: { lesionImageAsset: { select: { id: true } } },
+    });
+    if (
+      !upload ||
+      upload.lesionImageAsset ||
+      !upload.confirmedAt ||
+      !ALLOWED_IMAGE_MIME_TYPES.has(upload.contentType) ||
+      !upload.fileHash ||
+      !SHA_256.test(upload.fileHash)
+    ) {
+      throw new ValidationAppError([
+        {
+          field: 'uploadObjectId',
+          code: 'INVALID_MASK_CORRECTION_UPLOAD',
+          message:
+            'The corrected mask must be an unattached, confirmed lesion-image upload owned by the caller.',
+        },
+      ]);
+    }
+    const stored = await this.storage.inspectObject(upload.storageKey);
+    if (stored.contentType !== upload.contentType || stored.contentLength <= 0) {
+      throw new ValidationAppError([
+        {
+          field: 'uploadObjectId',
+          code: 'INVALID_MASK_CORRECTION_UPLOAD',
+          message: 'Stored file no longer matches the confirmed upload metadata.',
+        },
+      ]);
+    }
+    const bytes = Buffer.from(await this.storage.readObjectBytes(upload.storageKey));
+    const { pixelArea, width, height } = await this.realAdapter.countMaskPixels(
+      bytes,
+      upload.contentType,
+      upload.fileName,
+    );
+    const asset = await this.prisma.lesionImageAsset.create({
+      data: {
+        patientId,
+        observationId: source.observationId,
+        uploadObjectId: upload.id,
+        originalAssetId: source.originalAssetId,
+        type: LesionImageAssetType.MASK,
+        mimeType: upload.contentType,
+        width,
+        height,
+        fileSize: stored.contentLength,
+        checksum: upload.fileHash,
+        capturedAt: source.capturedAt,
+        maskProvenance: LesionMaskProvenance.CLINICIAN_CORRECTED,
+        correctsAssetId: source.id,
+      },
+      select: { id: true },
+    });
+    return { id: asset.id, pixelArea };
+  }
+
+  /** Latest MASK asset for an observation (whatever a comparison's other side
+   * currently considers authoritative — clinician-confirmed/corrected if one
+   * exists, else the AI proposal), re-counted from its real, current bytes.
+   * Never returns a cached/stale pixel count. */
+  private async currentMaskPixelArea(
+    observationId: string,
+  ): Promise<{ assetId: string; pixelArea: number } | null> {
+    const asset = await this.prisma.lesionImageAsset.findFirst({
+      where: { observationId, type: LesionImageAssetType.MASK },
+      include: { upload: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!asset) return null;
+    const bytes = Buffer.from(await this.storage.readObjectBytes(asset.upload.storageKey));
+    const { pixelArea } = await this.realAdapter.countMaskPixels(
+      bytes,
+      asset.upload.contentType,
+      asset.upload.fileName,
+    );
+    return { assetId: asset.id, pixelArea };
   }
 
   async getTimeline(

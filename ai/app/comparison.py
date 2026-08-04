@@ -208,6 +208,38 @@ def _difference_map(baseline: np.ndarray, target: np.ndarray) -> Image.Image:
     return Image.fromarray(rgba, mode="RGBA")
 
 
+def count_mask_pixels(payload: bytes) -> dict[str, object]:
+    """Real pixel-counting for a clinician-supplied mask correction/confirmation
+    image. Contract: any pixel with alpha > 0 (RGBA/LA/palette-with-transparency
+    sources) is inside the mask; otherwise any pixel with luminance > 127 (no
+    alpha channel) is inside the mask. Never fabricates an area — an all-background
+    upload is rejected rather than silently reported as a zero-area mask."""
+    try:
+        with Image.open(io.BytesIO(payload)) as source:
+            source.verify()
+        with Image.open(io.BytesIO(payload)) as source:
+            oriented = ImageOps.exif_transpose(source)
+            has_alpha = oriented.mode in ("RGBA", "LA") or (
+                oriented.mode == "P" and "transparency" in oriented.info
+            )
+            if has_alpha:
+                alpha = np.asarray(oriented.convert("RGBA"))[..., 3]
+                mask = alpha > 0
+            else:
+                gray = np.asarray(oriented.convert("L"))
+                mask = gray > 127
+            width, height = oriented.size
+    except (UnidentifiedImageError, OSError, Image.DecompressionBombError) as exc:
+        raise ComparisonImageError("Tệp mask tải lên không phải ảnh hợp lệ.") from exc
+
+    pixel_area = int(mask.sum())
+    if pixel_area == 0:
+        raise ComparisonImageError(
+            "Mask tải lên không chứa vùng tổn thương nào (toàn bộ nền)."
+        )
+    return {"pixelArea": pixel_area, "width": width, "height": height}
+
+
 def compare_lesion_images(baseline_bytes: bytes, followup_bytes: bytes) -> dict[str, object]:
     if hashlib.sha256(baseline_bytes).digest() == hashlib.sha256(followup_bytes).digest():
         raise DuplicateImageError(
@@ -271,6 +303,10 @@ def compare_lesion_images(baseline_bytes: bytes, followup_bytes: bytes) -> dict[
         quality_reasons.append("Chưa xác nhận được cùng vùng cơ thể hoặc cùng tổn thương.")
     if not masks_ready:
         quality_reasons.append("Không tạo được vùng tổn thương đề xuất ổn định trên cả hai ảnh.")
+    if exposure_score < 0.55:
+        quality_reasons.append(
+            "Một trong hai ảnh bị cháy sáng hoặc thiếu sáng nghiêm trọng, có thể che khuất vùng tổn thương."
+        )
 
     derived_assets: list[dict[str, object]] = []
     metrics: list[dict[str, object]] = []
@@ -338,7 +374,10 @@ def compare_lesion_images(baseline_bytes: bytes, followup_bytes: bytes) -> dict[
             "lightingConsistency": round(lighting_consistency * 100),
             "angleConsistency": None,
             "scaleConsistency": round(scale_consistency * 100) if masks_ready else None,
-            "occlusion": round((1.0 - exposure_score) * 100),
+            # No real occlusion detector (foreign object / hair / bandage) exists yet.
+            # Never derive this from exposure clipping — that is a distinct signal
+            # already captured honestly by `exposure_score` and `quality_reasons` above.
+            "occlusion": None,
             "registrationQuality": "GOOD" if registration_score >= 0.72 else "FAIR" if registration_score >= MIN_REGISTRATION_SCORE else "POOR",
             "comparisonDisposition": "COMPARABLE" if comparable else "NOT_COMPARABLE",
             "qualityPolicyVersion": "lesion-comparability/1.0.0",

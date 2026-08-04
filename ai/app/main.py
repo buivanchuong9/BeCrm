@@ -9,7 +9,12 @@ from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Respons
 from starlette.concurrency import run_in_threadpool
 
 from .case_analysis import CaseContext, aggregate_case, triage
-from .comparison import ComparisonImageError, DuplicateImageError, compare_lesion_images
+from .comparison import (
+    ComparisonImageError,
+    DuplicateImageError,
+    compare_lesion_images,
+    count_mask_pixels,
+)
 from .model import InvalidImageError, SkinClassifier
 from .metrics import metrics, monotonic
 from .settings import settings
@@ -140,6 +145,18 @@ async def compare_lesion(
             )
     except DuplicateImageError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ComparisonImageError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/v1/mask-pixel-count")
+async def mask_pixel_count(
+    file: Annotated[UploadFile, File()],
+    _: None = Depends(authorize),
+):
+    _, payload = await read_image(file, "mask")
+    try:
+        return await run_in_threadpool(count_mask_pixels, payload)
     except ComparisonImageError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

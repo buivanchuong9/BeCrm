@@ -175,6 +175,27 @@ export class CreateLesionReviewRequest {
   requestRecapture?: boolean;
 }
 
+export enum LesionMaskCorrectionAction {
+  CONFIRM = 'CONFIRM',
+  CORRECT = 'CORRECT',
+}
+
+export class CorrectLesionMaskRequest {
+  @IsEnum(LesionMaskCorrectionAction)
+  action!: LesionMaskCorrectionAction;
+
+  /** Required when action = CORRECT: the already-uploaded (POST /uploads)
+   * replacement mask image. Ignored for CONFIRM. */
+  @IsOptional()
+  @IsUUID()
+  uploadObjectId?: string;
+
+  @IsString()
+  @MinLength(2)
+  @MaxLength(1000)
+  reason!: string;
+}
+
 export class CreateDermatologyAdverseEventRequest {
   @IsOptional()
   @IsUUID()

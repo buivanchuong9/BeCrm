@@ -21,6 +21,12 @@ export class AIAssessmentResponseDto {
   @ApiProperty({ format: 'uuid' }) intakeId!: string;
   @ApiProperty({ enum: STATUS_VALUES }) status!: (typeof STATUS_VALUES)[number];
   @ApiProperty({ type: [CandidateConditionDto] }) candidateConditions!: CandidateConditionDto[];
+  @ApiProperty({
+    nullable: true,
+    description:
+      'Set only when intake data was sufficient to run a differential-diagnosis model but none is validated yet — candidateConditions is empty rather than fabricated.',
+  })
+  candidateConditionsUnavailableReason!: string | null;
   @ApiProperty() redFlagTriggered!: boolean;
   @ApiProperty({ enum: URGENCY_VALUES, nullable: true }) redFlagUrgency!:
     (typeof URGENCY_VALUES)[number] | null;

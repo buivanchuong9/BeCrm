@@ -1862,6 +1862,16 @@ enum LesionComparisonDisposition {
   UNAVAILABLE
 }
 
+// Provenance of a MASK LesionImageAsset row. MODEL_PROPOSED is written only
+// by an ImageAnalysisAdapter (never by a clinician action); the other three
+// are written only by the clinician mask-correction endpoint.
+enum LesionMaskProvenance {
+  MODEL_PROPOSED
+  CLINICIAN_DRAWN
+  CLINICIAN_CORRECTED
+  CLINICIAN_CONFIRMED
+}
+
 enum LesionMetricInterpretation {
   IMPROVED
   STABLE
@@ -2027,15 +2037,28 @@ model LesionImageAsset {
   checksum        String?
   capturedAt      DateTime             @map("captured_at") @db.Timestamptz
   qualityMetadata Json?                @map("quality_metadata")
+  // Provenance for MASK assets only: who/what produced this exact row. Null
+  // for non-MASK types and for pre-existing MASK rows written before this
+  // column existed (treated as unknown provenance, not AI-proposed).
+  maskProvenance  LesionMaskProvenance? @map("mask_provenance")
+  // Self-reference to the prior asset this row confirms or corrects (e.g. a
+  // CLINICIAN_CORRECTED mask points back at the MODEL_PROPOSED mask it
+  // supersedes). Distinct from originalAssetId, which always points at the
+  // source photo. The table is append-only, so a correction is always a new
+  // row, never an edit of the row it corrects.
+  correctsAssetId String?              @map("corrects_asset_id") @db.Uuid
   createdAt       DateTime             @default(now()) @map("created_at") @db.Timestamptz
 
   observation LesionObservation  @relation(fields: [observationId], references: [id], onDelete: Restrict)
   upload      UploadObject       @relation(fields: [uploadObjectId], references: [id], onDelete: Restrict)
   original    LesionImageAsset?  @relation("DerivedLesionAsset", fields: [originalAssetId], references: [id], onDelete: Restrict)
   derived     LesionImageAsset[] @relation("DerivedLesionAsset")
+  corrects    LesionImageAsset?  @relation("LesionMaskCorrection", fields: [correctsAssetId], references: [id], onDelete: Restrict)
+  correctedBy LesionImageAsset[] @relation("LesionMaskCorrection")
 
   @@index([patientId, capturedAt])
   @@index([observationId, type])
+  @@index([correctsAssetId])
   @@map("lesion_image_assets")
 }
 
@@ -2092,6 +2115,17 @@ model LesionComparisonAnalysis {
   comparisonDisposition LesionComparisonDisposition @default(UNAVAILABLE) @map("comparison_disposition")
   qualityPolicyVersion  String?                     @map("quality_policy_version")
   qualityReasons        String[]                    @default([]) @map("quality_reasons")
+  // Raw registration-provenance payload from the analysis adapter (dx/dy,
+  // phase-correlation score, likelySameBodyRegion/likelySameLesion,
+  // requiresClinicianMaskReview). Null when the adapter performed no
+  // registration (demo/unavailable paths) — never fabricated.
+  registrationProvenance Json?                      @map("registration_provenance")
+  // True only for analyses produced outside the current registered-pair
+  // pipeline (pre-pipeline classifier snapshots). Distinct from isSimulated
+  // (demo data) — a row is never both. Defaults false; new rows from the
+  // real/unavailable adapters are never legacy. See isRegisteredProgressAnalysis
+  // in the frontend for the equivalent read-time heuristic this backs up.
+  isLegacyClassification Boolean                    @default(false) @map("is_legacy_classification")
   evidence              Json                        @default("[]")
   generatedAt           DateTime                    @default(now()) @map("generated_at") @db.Timestamptz
 

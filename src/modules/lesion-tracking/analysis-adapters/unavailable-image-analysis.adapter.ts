@@ -45,6 +45,7 @@ export class UnavailableImageAnalysisAdapter implements ImageAnalysisAdapter {
         comparisonDisposition: LesionComparisonDisposition.UNAVAILABLE,
         qualityPolicyVersion: null,
         qualityReasons: ['Chưa có bộ phân tích chất lượng và đăng ký ảnh được phê duyệt.'],
+        registrationProvenance: null,
       },
       derivedAssets: [],
       metrics: [],

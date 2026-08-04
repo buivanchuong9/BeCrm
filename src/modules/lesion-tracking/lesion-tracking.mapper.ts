@@ -65,6 +65,42 @@ function jsonDisplay(value: Prisma.JsonValue | null): string | null {
   }
 }
 
+function mapRegistrationProvenance(value: Prisma.JsonValue | null) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const {
+    kind,
+    dx,
+    dy,
+    score,
+    phasePeakStrength,
+    likelySameBodyRegion,
+    likelySameLesion,
+    requiresClinicianMaskReview,
+  } = value as Record<string, unknown>;
+  if (
+    typeof kind !== 'string' ||
+    typeof dx !== 'number' ||
+    typeof dy !== 'number' ||
+    typeof score !== 'number' ||
+    typeof phasePeakStrength !== 'number' ||
+    typeof likelySameBodyRegion !== 'number' ||
+    typeof likelySameLesion !== 'number' ||
+    typeof requiresClinicianMaskReview !== 'boolean'
+  ) {
+    return null;
+  }
+  return {
+    kind,
+    dx,
+    dy,
+    score,
+    phasePeakStrength,
+    likelySameBodyRegion,
+    likelySameLesion,
+    requiresClinicianMaskReview,
+  };
+}
+
 function mapEvidence(value: Prisma.JsonValue) {
   if (!Array.isArray(value)) return [];
   return value.flatMap((entry) => {
@@ -138,6 +174,8 @@ export function mapObservation(
       height: asset.height,
       fileSize: asset.fileSize,
       checksum: asset.checksum,
+      maskProvenance: asset.maskProvenance,
+      correctsAssetId: asset.correctsAssetId,
       capturedAt: asset.capturedAt.toISOString(),
       createdAt: asset.createdAt.toISOString(),
     })),
@@ -198,6 +236,7 @@ export function mapComparison(comparison: ComparisonRecord) {
           assessment: analysis.assessment,
           visualChangeSummary: analysis.visualChangeSummary,
           limitations: analysis.limitations,
+          isLegacyClassification: analysis.isLegacyClassification,
           quality: {
             comparabilityScore: analysis.comparabilityScore,
             sharpness: analysis.sharpness,
@@ -209,6 +248,7 @@ export function mapComparison(comparison: ComparisonRecord) {
             comparisonDisposition: analysis.comparisonDisposition,
             policyVersion: analysis.qualityPolicyVersion,
             reasons: analysis.qualityReasons,
+            registrationProvenance: mapRegistrationProvenance(analysis.registrationProvenance),
           },
           metrics: analysis.metrics.map((metric) => ({
             key: metric.key,

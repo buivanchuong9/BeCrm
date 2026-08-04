@@ -77,7 +77,19 @@ interface ProgressComparisonResponse {
     comparisonDisposition: 'COMPARABLE' | 'CAUTION' | 'NOT_COMPARABLE' | 'UNAVAILABLE';
     qualityPolicyVersion: string | null;
     qualityReasons: string[];
+    registration: {
+      kind: string;
+      dx: number;
+      dy: number;
+      score: number;
+      phasePeakStrength: number;
+    } | null;
+    likelySameBodyRegion: number | null;
+    likelySameLesion: number | null;
   };
+  // Sibling to `quality`, not nested in it — matches be/ai/app/comparison.py's
+  // actual return shape (`result["requiresClinicianMaskReview"]`).
+  requiresClinicianMaskReview: boolean | null;
   derivedAssets: ProgressDerivedAsset[];
   metrics: Array<{
     key: string;
@@ -165,9 +177,16 @@ export class RealImageAnalysisAdapter implements ImageAnalysisAdapter {
         'Grad-CAM chỉ hiển thị vùng mô hình phân loại chú ý; không phải bản đồ thay đổi tổn thương.',
       ],
       quality: {
-        ...progress.quality,
+        comparabilityScore: progress.quality.comparabilityScore,
+        sharpness: progress.quality.sharpness,
+        lightingConsistency: progress.quality.lightingConsistency,
+        angleConsistency: progress.quality.angleConsistency,
+        scaleConsistency: progress.quality.scaleConsistency,
+        occlusion: progress.quality.occlusion,
         registrationQuality: progress.quality.registrationQuality as LesionRegistrationQuality,
-        comparisonDisposition: progress.quality.comparisonDisposition as LesionComparisonDisposition,
+        comparisonDisposition: progress.quality
+          .comparisonDisposition as LesionComparisonDisposition,
+        qualityPolicyVersion: progress.quality.qualityPolicyVersion,
         qualityReasons: [
           ...new Set([
             ...progress.quality.qualityReasons,
@@ -175,12 +194,21 @@ export class RealImageAnalysisAdapter implements ImageAnalysisAdapter {
             ...targetCase.quality.issues,
           ]),
         ],
+        registrationProvenance: progress.quality.registration
+          ? {
+              kind: progress.quality.registration.kind,
+              dx: progress.quality.registration.dx,
+              dy: progress.quality.registration.dy,
+              score: progress.quality.registration.score,
+              phasePeakStrength: progress.quality.registration.phasePeakStrength,
+              likelySameBodyRegion: progress.quality.likelySameBodyRegion ?? 0,
+              likelySameLesion: progress.quality.likelySameLesion ?? 0,
+              requiresClinicianMaskReview: progress.requiresClinicianMaskReview ?? false,
+            }
+          : null,
       },
       derivedAssets,
-      metrics: [
-        ...progress.metrics,
-        this.confidenceMetric(baselineCase, targetCase),
-      ],
+      metrics: [...progress.metrics, this.confidenceMetric(baselineCase, targetCase)],
       newRegionDetected: progress.newRegionDetected,
     };
   }
@@ -208,15 +236,44 @@ export class RealImageAnalysisAdapter implements ImageAnalysisAdapter {
     baseline: Awaited<ReturnType<RealImageAnalysisAdapter['originalFile']>>,
     followup: Awaited<ReturnType<RealImageAnalysisAdapter['originalFile']>>,
   ): Promise<ProgressComparisonResponse> {
-    const ai = this.config.get('ai', { infer: true });
     const form = new FormData();
-    form.append('baseline', new Blob([baseline.bytes], { type: baseline.mimeType }), baseline.fileName);
-    form.append('followup', new Blob([followup.bytes], { type: followup.mimeType }), followup.fileName);
+    form.append(
+      'baseline',
+      new Blob([baseline.bytes], { type: baseline.mimeType }),
+      baseline.fileName,
+    );
+    form.append(
+      'followup',
+      new Blob([followup.bytes], { type: followup.mimeType }),
+      followup.fileName,
+    );
     form.append('bodyRegion', context.lesionBodyRegion);
+    return this.postForm<ProgressComparisonResponse>('/v1/compare-lesion', form);
+  }
+
+  /** Real pixel counting for a clinician-supplied mask correction/confirmation
+   * image, via the AI service's /v1/mask-pixel-count (see be/ai/app/comparison.py
+   * count_mask_pixels). Never estimated/approximated on the Node side — the
+   * same process that segments AI-proposed masks counts corrected ones. */
+  async countMaskPixels(
+    bytes: Buffer,
+    mimeType: string,
+    fileName: string,
+  ): Promise<{ pixelArea: number; width: number; height: number }> {
+    const form = new FormData();
+    form.append('file', new Blob([bytes], { type: mimeType }), fileName);
+    return this.postForm<{ pixelArea: number; width: number; height: number }>(
+      '/v1/mask-pixel-count',
+      form,
+    );
+  }
+
+  private async postForm<T>(path: string, form: FormData): Promise<T> {
+    const ai = this.config.get('ai', { infer: true });
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), ai.timeoutMs);
     try {
-      const response = await fetch(`${ai.serviceUrl}/v1/compare-lesion`, {
+      const response = await fetch(`${ai.serviceUrl}${path}`, {
         method: 'POST',
         headers: ai.apiKey ? { 'X-AI-API-Key': ai.apiKey } : {},
         body: form,
@@ -224,13 +281,17 @@ export class RealImageAnalysisAdapter implements ImageAnalysisAdapter {
       });
       const text = await response.text();
       if (Buffer.byteLength(text) > ai.maxResponseBytes) {
-        throw new Error('AI comparison response exceeded configured size limit.');
+        throw new Error('AI service response exceeded configured size limit.');
       }
-      const parsed = JSON.parse(text) as ProgressComparisonResponse | { detail?: string };
+      const parsed = JSON.parse(text) as T | { detail?: string };
       if (!response.ok) {
-        throw new Error('detail' in parsed && parsed.detail ? parsed.detail : 'AI comparison failed.');
+        throw new Error(
+          parsed && typeof parsed === 'object' && 'detail' in parsed && parsed.detail
+            ? String(parsed.detail)
+            : `AI service request to ${path} failed.`,
+        );
       }
-      return parsed as ProgressComparisonResponse;
+      return parsed as T;
     } finally {
       clearTimeout(timeout);
     }

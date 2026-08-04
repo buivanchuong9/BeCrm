@@ -31,17 +31,37 @@ export interface ImageAnalysisContext {
   target: ObservationForAnalysis;
 }
 
+/** Raw registration-provenance payload from an adapter's registration step.
+ * Only RealImageAnalysisAdapter ever produces one; demo/unavailable paths
+ * must return null rather than fabricate it. */
+export interface RegistrationProvenance {
+  kind: string;
+  dx: number;
+  dy: number;
+  score: number;
+  phasePeakStrength: number;
+  likelySameBodyRegion: number;
+  likelySameLesion: number;
+  requiresClinicianMaskReview: boolean;
+}
+
 export interface ImageQualityAssessment {
   comparabilityScore: number | null;
   sharpness: number | null;
   lightingConsistency: number | null;
+  /** Not yet implemented — no adapter estimates camera angle; always null. */
   angleConsistency: number | null;
   scaleConsistency: number | null;
+  /** Not yet implemented — no real occlusion detector (foreign object / hair /
+   * bandage) exists. Must never be derived from exposure/brightness; that is
+   * a distinct, already-honest signal. Adapters must return null here until a
+   * real occlusion detector exists. */
   occlusion: number | null;
   registrationQuality: LesionRegistrationQuality;
   comparisonDisposition: LesionComparisonDisposition;
   qualityPolicyVersion: string | null;
   qualityReasons: string[];
+  registrationProvenance: RegistrationProvenance | null;
 }
 
 /**

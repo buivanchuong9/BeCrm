@@ -19,6 +19,7 @@ import { RequireIdempotencyKey } from '../../core/idempotency/idempotency-key.de
 import { AuthenticatedPrincipal } from '../../core/security/auth.types';
 import { CurrentUser } from '../../core/security/current-user.decorator';
 import {
+  CorrectLesionMaskRequest,
   CreateDermatologyAdverseEventRequest,
   CreateLesionComparisonRequest,
   CreateLesionObservationRequest,
@@ -186,5 +187,23 @@ export class LesionComparisonsController {
     @Req() request: Request,
   ) {
     return this.service.reviewComparison(principal, comparisonId, dto, context(request));
+  }
+
+  @Post(':comparisonId/masks/:assetId/corrections')
+  @Roles('doctor')
+  @HttpCode(HttpStatus.OK)
+  @RequireIdempotencyKey({ clinical: true })
+  @ApiOperation({
+    summary:
+      'Confirm or correct an AI-proposed mask; never mutates the original — always a new append-only row',
+  })
+  correctMask(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Param('comparisonId', ParseUUIDPipe) comparisonId: string,
+    @Param('assetId', ParseUUIDPipe) assetId: string,
+    @Body() dto: CorrectLesionMaskRequest,
+    @Req() request: Request,
+  ) {
+    return this.service.correctMask(principal, comparisonId, assetId, dto, context(request));
   }
 }
