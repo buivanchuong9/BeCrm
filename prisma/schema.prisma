@@ -1963,6 +1963,7 @@ model LesionObservation {
   imageQualityReasons     String[]                 @default([]) @map("image_quality_reasons")
   status                  LesionObservationStatus  @default(DRAFT)
   revision                Int                      @default(1)
+  aiSkinAnalysisCaseId    String?                  @unique @map("ai_skin_analysis_case_id") @db.Uuid
   createdAt               DateTime                 @default(now()) @map("created_at") @db.Timestamptz
   updatedAt               DateTime                 @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -1975,6 +1976,7 @@ model LesionObservation {
   metrics            LesionObservationMetric[]
   baselineFor        LesionComparisonSession[] @relation("ComparisonBaseline")
   targetFor          LesionComparisonSession[] @relation("ComparisonTarget")
+  aiSkinAnalysisCase AISkinAnalysisCase?       @relation(fields: [aiSkinAnalysisCaseId], references: [id], onDelete: SetNull)
 
   @@index([lesionId, capturedAt])
   @@index([encounterId])
@@ -2460,6 +2462,7 @@ model AISkinAnalysisCase {
   imageMetadata        Json      @map("image_metadata")
   aggregateOutput      Json      @map("aggregate_output")
   triageOutput         Json      @map("triage_output")
+  model                String    @default("unknown") @map("model")
   modelVersion         String    @map("model_version")
   labelsVersion        String    @map("labels_version")
   preprocessingVersion String    @map("preprocessing_version")
@@ -2472,10 +2475,11 @@ model AISkinAnalysisCase {
   generatedAt          DateTime  @map("generated_at") @db.Timestamptz
   createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
-  patient    Patient?                 @relation(fields: [patientId], references: [id], onDelete: Restrict)
-  encounter  MedicalEncounter?        @relation(fields: [encounterId], references: [id], onDelete: Restrict)
-  artifacts  AISkinAnalysisArtifact[]
-  usageEvent AiUsageEvent?
+  patient           Patient?                 @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  encounter         MedicalEncounter?        @relation(fields: [encounterId], references: [id], onDelete: Restrict)
+  artifacts         AISkinAnalysisArtifact[]
+  usageEvent        AiUsageEvent?
+  lesionObservation LesionObservation?
 
   @@index([patientId, generatedAt])
   @@index([encounterId, generatedAt])

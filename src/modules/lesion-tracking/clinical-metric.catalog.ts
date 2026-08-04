@@ -245,6 +245,18 @@ const definitions: ClinicalMetricDefinition[] = [
     allowedSources: [LesionMetricSource.IMAGE_ANALYSIS],
     interpretation: 'NEUTRAL',
   },
+  {
+    code: 'ai-classification-confidence',
+    label: 'Độ tin cậy phân loại AI cho nhóm ban đầu',
+    category: LesionMetricCategory.OTHER,
+    unit: '%',
+    minimum: 0,
+    maximum: 100,
+    allowedSources: [LesionMetricSource.IMAGE_ANALYSIS],
+    // Confidence is not inherently "lower/higher is better" clinically — never
+    // infer a direction from it the way MORPHOLOGY/INFLAMMATION indices do.
+    interpretation: 'NEUTRAL',
+  },
 ];
 
 export const CLINICAL_METRIC_CATALOG = new Map(

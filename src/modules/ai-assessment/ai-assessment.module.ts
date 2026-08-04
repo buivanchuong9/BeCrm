@@ -27,6 +27,6 @@ import { AiEntitlementsModule } from '../ai-entitlements/ai-entitlements.module'
     SkinAnalysisService,
     SkinAnalysisCaseService,
   ],
-  exports: [AiAssessmentRepository],
+  exports: [AiAssessmentRepository, SkinAnalysisCaseService],
 })
 export class AiAssessmentModule {}

@@ -22,6 +22,7 @@ import {
 } from '../../core/errors/app-error';
 import { AuthenticatedPrincipal } from '../../core/security/auth.types';
 import { ObjectStorageService } from '../../core/storage/object-storage.service';
+import { isSuperAdministrator } from '../patients/policies/patient-policies';
 import { CLINICAL_METRIC_CATALOG, requireMetricDefinition } from './clinical-metric.catalog';
 import { ComparisonAnalysisService } from './comparison-analysis.service';
 import {
@@ -1154,11 +1155,18 @@ export class LesionTrackingService {
       clinicalRelationships.map((relationship) => relationship.relationship),
     );
     const self = patient.userId === principal.userId;
+    // A platform super_administrator has full authority across every
+    // feature, same as elsewhere in the app (see isSuperAdministrator usage
+    // in patients/policies) — treated as an assigned doctor here so they can
+    // read, write, and clinically review any patient's lesion data without
+    // requiring a care-team assignment.
+    const superAdmin = isSuperAdministrator(principal);
     const doctorAssigned =
-      doctorRole &&
-      (patient.primaryDoctorId === principal.userId ||
-        relationships.has('primary_doctor') ||
-        relationships.has('assigned_doctor'));
+      superAdmin ||
+      (doctorRole &&
+        (patient.primaryDoctorId === principal.userId ||
+          relationships.has('primary_doctor') ||
+          relationships.has('assigned_doctor')));
     const nurseAssigned = nurseRole && relationships.has('assigned_nurse');
     const medicalAdminRead =
       mode === 'read' &&

@@ -20,6 +20,12 @@ export interface ImageAnalysisContext {
   comparisonId: string;
   lesionId: string;
   organizationId: string | null;
+  /** Needed by adapters that call an AI service requiring a body-region hint
+   * (e.g. RealImageAnalysisAdapter) — avoids a redundant lesion lookup. */
+  lesionBodyRegion: string;
+  /** The user who requested this comparison; used as the actor for any AI
+   * usage-quota reservation an adapter makes on their behalf. */
+  requestedById: string;
   baseline: ObservationForAnalysis;
   target: ObservationForAnalysis;
 }
@@ -47,7 +53,7 @@ export interface ImageQualityAssessment {
 export interface DerivedAssetRequest {
   forObservationId: string;
   originalAssetId: string;
-  type: 'ALIGNED' | 'MASK' | 'DIFFERENCE_MAP' | 'THUMBNAIL';
+  type: 'ALIGNED' | 'MASK' | 'DIFFERENCE_MAP' | 'THUMBNAIL' | 'HEATMAP';
   mimeType: string;
   width: number;
   height: number;

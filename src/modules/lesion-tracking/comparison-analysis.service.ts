@@ -26,6 +26,7 @@ import {
 } from './analysis-adapters/image-analysis-adapter.interface';
 import { UnavailableImageAnalysisAdapter } from './analysis-adapters/unavailable-image-analysis.adapter';
 import { DemoImageAnalysisAdapter } from './analysis-adapters/demo-image-analysis.adapter';
+import { RealImageAnalysisAdapter } from './analysis-adapters/real-image-analysis.adapter';
 
 const ANALYSIS_VERSION = 'clinical-data-delta/1.0.0';
 const MAX_ATTEMPTS = 3;
@@ -40,6 +41,7 @@ export class ComparisonAnalysisService {
     private readonly config: ConfigService<AppConfiguration, true>,
     private readonly unavailableAdapter: UnavailableImageAnalysisAdapter,
     private readonly demoAdapter: DemoImageAnalysisAdapter,
+    private readonly realAdapter: RealImageAnalysisAdapter,
   ) {}
 
   /**
@@ -48,8 +50,10 @@ export class ComparisonAnalysisService {
    * the derma_timeline_demo_analysis flag is enabled for the organization —
    * unless an operator has explicitly forced DERMA_TIMELINE_ANALYSIS_ADAPTER
    * =demo (env.validation.ts already refuses that combination in
-   * production). Every other lesion always gets UnavailableImageAnalysisAdapter,
-   * so a real patient's upload can never receive simulated numbers.
+   * production). Every other lesion gets RealImageAnalysisAdapter (the
+   * default) so real patients get real AI analysis, unless an operator has
+   * explicitly forced DERMA_TIMELINE_ANALYSIS_ADAPTER=unavailable to disable
+   * automated image analysis entirely.
    */
   private async selectAdapter(
     lesionId: string,
@@ -64,7 +68,8 @@ export class ComparisonAnalysisService {
       );
       if (demoEnabled) return this.demoAdapter;
     }
-    return this.unavailableAdapter;
+    if (forcedAdapter === 'unavailable') return this.unavailableAdapter;
+    return this.realAdapter;
   }
 
   /**
@@ -114,6 +119,8 @@ export class ComparisonAnalysisService {
         comparisonId: comparison.id,
         lesionId: comparison.lesionId,
         organizationId: comparison.lesion.organizationId,
+        lesionBodyRegion: comparison.lesion.bodyRegion,
+        requestedById: comparison.requestedById,
         baseline: comparison.baseline as ObservationForAnalysis,
         target: comparison.target as ObservationForAnalysis,
       });

@@ -61,9 +61,12 @@ export const envSchema = z.object({
   AI_MAX_RESPONSE_BYTES: z.coerce.number().int().positive().max(20_000_000).default(5_000_000),
 
   /** Selects which ImageAnalysisAdapter backs lesion-comparison image analysis.
-   * 'demo' additionally requires the seeded demo lesion AND the
-   * derma_timeline_demo_analysis feature flag — see DemoImageAnalysisAdapter. */
-  DERMA_TIMELINE_ANALYSIS_ADAPTER: z.enum(['unavailable', 'demo']).default('unavailable'),
+   * 'real' (default) calls the self-hosted AI service via
+   * RealImageAnalysisAdapter for every real patient. 'demo' additionally
+   * requires the seeded demo lesion AND the derma_timeline_demo_analysis
+   * feature flag — see DemoImageAnalysisAdapter. 'unavailable' disables
+   * automated image analysis entirely (clinical-data-only comparisons). */
+  DERMA_TIMELINE_ANALYSIS_ADAPTER: z.enum(['unavailable', 'demo', 'real']).default('real'),
 
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
   SENTRY_DSN: z.string().optional(),

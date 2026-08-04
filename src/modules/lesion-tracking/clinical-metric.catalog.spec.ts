@@ -31,6 +31,7 @@ const EXPECTED_CODES = [
   'erythema-index',
   'lesion-count-estimate',
   'new-lesion-region-detected',
+  'ai-classification-confidence',
 ] as const;
 
 const IMAGE_ANALYSIS_ONLY_CODES = [
@@ -38,6 +39,7 @@ const IMAGE_ANALYSIS_ONLY_CODES = [
   'erythema-index',
   'lesion-count-estimate',
   'new-lesion-region-detected',
+  'ai-classification-confidence',
 ] as const;
 
 describe('clinical metric catalog', () => {

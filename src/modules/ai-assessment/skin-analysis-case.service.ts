@@ -31,6 +31,19 @@ export interface SkinCaseFile {
 }
 export type SkinCaseFiles = Partial<Record<SkinImageRole, SkinCaseFile[]>>;
 
+export interface RunCaseAnalysisParams {
+  patientId: string;
+  organizationId: string;
+  actorId: string;
+  encounterId?: string | null;
+  files: SkinCaseFiles;
+  bodyRegion: string;
+  durationDays?: number;
+  symptoms: string[];
+  note?: string;
+  context: RequestContext;
+}
+
 @Injectable()
 export class SkinAnalysisCaseService {
   constructor(
@@ -76,6 +89,31 @@ export class SkinAnalysisCaseService {
       ]);
     }
 
+    return this.runCaseAnalysis({
+      patientId: patient.id,
+      organizationId: patient.organizationId,
+      actorId: principal.userId,
+      encounterId: encounter?.id ?? null,
+      files,
+      bodyRegion: dto.bodyRegion,
+      durationDays: dto.durationDays,
+      symptoms,
+      note: dto.note,
+      context,
+    });
+  }
+
+  /**
+   * The AI-call/persistence/entitlement core of analyze(), split out so
+   * trusted internal callers that have already authorized patient/encounter
+   * access themselves (e.g. the lesion-tracking comparison pipeline) can run
+   * a real case analysis without re-deriving an AuthenticatedPrincipal for a
+   * background job. Never call this directly from a controller — it skips
+   * patients.findVisibleById.
+   */
+  async runCaseAnalysis(params: RunCaseAnalysisParams): Promise<{ data: SkinAnalysisCaseResponseDto }> {
+    const { patientId, organizationId, actorId, encounterId, files, bodyRegion, durationDays, symptoms, note, context } =
+      params;
     const ai = this.config.get('ai', { infer: true });
     const form = new FormData();
     for (const role of ['overview', 'closeup', 'alternate'] as const) {
@@ -84,20 +122,16 @@ export class SkinAnalysisCaseService {
         form.append(role, new Blob([file.buffer], { type: file.mimetype }), file.originalname);
       }
     }
-    form.append('bodyRegion', dto.bodyRegion);
-    if (dto.durationDays !== undefined) {
-      form.append('durationDays', String(dto.durationDays));
+    form.append('bodyRegion', bodyRegion);
+    if (durationDays !== undefined) {
+      form.append('durationDays', String(durationDays));
     }
     form.append('symptoms', JSON.stringify(symptoms));
-    if (dto.note?.trim()) {
-      form.append('note', dto.note.trim());
+    if (note?.trim()) {
+      form.append('note', note.trim());
     }
 
-    const reservation = await this.entitlements.reserve(
-      patient.id,
-      principal.userId,
-      context.requestId,
-    );
+    const reservation = await this.entitlements.reserve(patientId, actorId, context.requestId);
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), ai.timeoutMs);
     try {
@@ -185,13 +219,13 @@ export class SkinAnalysisCaseService {
         await tx.aISkinAnalysisCase.create({
           data: {
             id: result.caseId,
-            patientId: patient.id,
-            encounterId: encounter?.id ?? null,
-            actorId: principal.userId,
-            organizationId: patient.organizationId,
+            patientId,
+            encounterId: encounterId ?? null,
+            actorId,
+            organizationId,
             status: result.status,
-            bodyRegion: dto.bodyRegion,
-            durationDays: dto.durationDays ?? null,
+            bodyRegion,
+            durationDays: durationDays ?? null,
             symptomSnapshot: symptoms,
             imageMetadata: result.images.map((image) => ({
               role: image.role,
@@ -210,6 +244,7 @@ export class SkinAnalysisCaseService {
             })) as unknown as Prisma.InputJsonValue,
             aggregateOutput: result.aggregate as unknown as Prisma.InputJsonValue,
             triageOutput: result.triage as unknown as Prisma.InputJsonValue,
+            model: result.model,
             modelVersion: result.modelVersion,
             labelsVersion: result.labelsVersion,
             preprocessingVersion: result.preprocessingVersion,
@@ -230,12 +265,12 @@ export class SkinAnalysisCaseService {
         );
         await this.audit.write(
           {
-            actorId: principal.userId,
+            actorId,
             action: 'ai.skin_analysis_case.generated',
             resourceType: 'ai_skin_analysis_case',
             resourceId: result.caseId,
-            patientId: patient.id,
-            organizationId: patient.organizationId,
+            patientId,
+            organizationId,
             requestId: context.requestId ?? null,
             ip: context.ip ?? null,
             userAgent: context.userAgent ?? null,

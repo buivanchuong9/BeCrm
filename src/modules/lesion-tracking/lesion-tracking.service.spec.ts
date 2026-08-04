@@ -156,17 +156,24 @@ describe('LesionTrackingService — authorization, trusted input, and idempotenc
   });
 
   describe('care-team authorization', () => {
-    it.each(['super_administrator', 'receptionist'])(
-      'does not grant %s implicit access to a patient clinical timeline',
-      async (role) => {
-        await expect(
-          service.listLesions(principal(role), PATIENT_ID, { limit: 30 } as any),
-        ).rejects.toMatchObject({ code: 'LESION_ACCESS_DENIED' });
+    it('does not grant receptionist implicit access to a patient clinical timeline', async () => {
+      await expect(
+        service.listLesions(principal('receptionist'), PATIENT_ID, { limit: 30 } as any),
+      ).rejects.toMatchObject({ code: 'LESION_ACCESS_DENIED' });
 
-        expect(repository.listLesions).not.toHaveBeenCalled();
-        expect(featureFlags.assertEnabled).not.toHaveBeenCalled();
-      },
-    );
+      expect(repository.listLesions).not.toHaveBeenCalled();
+      expect(featureFlags.assertEnabled).not.toHaveBeenCalled();
+    });
+
+    it('grants super_administrator full access to a patient clinical timeline, same as an assigned doctor', async () => {
+      repository.listLesions.mockResolvedValue({ rows: [], nextCursor: null });
+
+      await expect(
+        service.listLesions(principal('super_administrator'), PATIENT_ID, { limit: 30 } as any),
+      ).resolves.toEqual({ data: { items: [], nextCursor: null } });
+
+      expect(repository.listLesions).toHaveBeenCalled();
+    });
 
     it('rejects patient-authored diagnosis, clinician assignment, and treatment fields', async () => {
       prisma.patient.findUnique.mockResolvedValue(patientRow());
