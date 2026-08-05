@@ -374,6 +374,19 @@ def compare_lesion_images(baseline_bytes: bytes, followup_bytes: bytes) -> dict[
     derived_assets: list[dict[str, object]] = []
     metrics: list[dict[str, object]] = []
 
+    # Per-image mask overlays are independent of pair registration: a mask is
+    # just a proposed lesion region on ONE photo, computed before the two
+    # photos are ever compared to each other. Gating it behind `comparable`
+    # (as ALIGNED/DIFFERENCE_MAP correctly are, since those require a valid
+    # registration to mean anything) hid real, valid per-image evidence any
+    # time registration failed - even though nothing about that evidence
+    # depended on registration succeeding.
+    if masks_ready:
+        derived_assets.extend([
+            {"role": "baseline", "type": "MASK", "dataUrl": _data_url(_mask_overlay(baseline_mask, (46, 196, 182))), "width": WORK_SIZE, "height": WORK_SIZE},
+            {"role": "followup", "type": "MASK", "dataUrl": _data_url(_mask_overlay(target_mask, (46, 196, 182))), "width": WORK_SIZE, "height": WORK_SIZE},
+        ])
+
     if masks_ready and baseline_px_per_mm and followup_px_per_mm:
         metrics.append({
             "key": "lesion-area-physical-cm2",
@@ -384,7 +397,7 @@ def compare_lesion_images(baseline_bytes: bytes, followup_bytes: bytes) -> dict[
             "unit": "cm²",
             "source": "IMAGE_ANALYSIS",
             "confidence": mask_confidence,
-            "measurementMethod": "Hiệu chỉnh bằng thẻ chuẩn ArUco phát hiện trong ảnh (aruco-calibration/v1)",
+            "measurementMethod": "Hiệu chỉnh bằng thẻ đo DermaHealth phát hiện trong ảnh (dermahealth-calibration-card/v1)",
             "missingReason": None,
         })
     else:
@@ -397,11 +410,11 @@ def compare_lesion_images(baseline_bytes: bytes, followup_bytes: bytes) -> dict[
             "unit": "cm²",
             "source": "IMAGE_ANALYSIS",
             "confidence": None,
-            "measurementMethod": "Hiệu chỉnh bằng thẻ chuẩn ArUco phát hiện trong ảnh (aruco-calibration/v1)",
+            "measurementMethod": "Hiệu chỉnh bằng thẻ đo DermaHealth phát hiện trong ảnh (dermahealth-calibration-card/v1)",
             "missingReason": (
                 "Không tạo được vùng tổn thương đề xuất ổn định trên cả hai ảnh."
                 if not masks_ready
-                else "Không phát hiện được thẻ chuẩn CareFollow trong một hoặc cả hai ảnh."
+                else "Ảnh chưa có thẻ đo DermaHealth nên chưa thể quy đổi sang cm²."
             ),
         })
 
@@ -436,8 +449,6 @@ def compare_lesion_images(baseline_bytes: bytes, followup_bytes: bytes) -> dict[
         derived_assets.extend([
             {"role": "baseline", "type": "ALIGNED", "dataUrl": _data_url(aligned_baseline), "width": WORK_SIZE, "height": WORK_SIZE},
             {"role": "followup", "type": "ALIGNED", "dataUrl": _data_url(aligned_followup), "width": WORK_SIZE, "height": WORK_SIZE},
-            {"role": "baseline", "type": "MASK", "dataUrl": _data_url(_mask_overlay(baseline_mask, (46, 196, 182))), "width": WORK_SIZE, "height": WORK_SIZE},
-            {"role": "followup", "type": "MASK", "dataUrl": _data_url(_mask_overlay(target_mask, (46, 196, 182))), "width": WORK_SIZE, "height": WORK_SIZE},
             {"role": "followup", "type": "DIFFERENCE_MAP", "dataUrl": _data_url(_difference_map(baseline_mask, target_mask)), "width": WORK_SIZE, "height": WORK_SIZE},
         ])
     else:

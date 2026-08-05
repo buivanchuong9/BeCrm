@@ -38,13 +38,49 @@ class LesionComparisonTests(unittest.TestCase):
         asset_types = {asset["type"] for asset in result["derivedAssets"]}
         self.assertTrue({"ALIGNED", "MASK", "DIFFERENCE_MAP"}.issubset(asset_types))
 
+    def test_missing_marker_reason_has_no_technical_jargon(self):
+        # Patient-facing missingReason/measurementMethod text must read as
+        # "no DermaHealth calibration card", never leak the underlying
+        # fiducial-marker library name or old inconsistent branding.
+        result = compare_lesion_images(lesion_photo(96), lesion_photo(76, offset_x=4))
+        physical = next(
+            metric for metric in result["metrics"] if metric["key"] == "lesion-area-physical-cm2"
+        )
+        self.assertIsNone(physical["baseline"])
+        self.assertIsNotNone(physical["missingReason"])
+        for text in (physical["missingReason"], physical["measurementMethod"]):
+            self.assertNotIn("aruco", text.lower())
+            self.assertNotIn("CareFollow", text)
+        self.assertIn("DermaHealth", physical["missingReason"])
+
     def test_unusable_pair_does_not_fabricate_area(self):
         result = compare_lesion_images(lesion_photo(96), lesion_photo(30, offset_x=170, brightness=245))
         if result["quality"]["comparisonDisposition"] == "NOT_COMPARABLE":
             area = next(metric for metric in result["metrics"] if metric["key"] == "lesion-area-index")
             self.assertIsNone(area["baseline"])
             self.assertIsNone(area["current"])
-            self.assertFalse(result["derivedAssets"])
+            # ALIGNED/DIFFERENCE_MAP require a valid pair registration and must
+            # never appear for a NOT_COMPARABLE pair. Per-image MASK overlays
+            # are a different story: a mask is proposed on ONE photo before
+            # the two are ever compared, so it may legitimately still exist
+            # even when the pair itself isn't comparable - see
+            # test_masks_remain_available_when_pair_is_not_comparable below.
+            asset_types = {asset["type"] for asset in result["derivedAssets"]}
+            self.assertNotIn("ALIGNED", asset_types)
+            self.assertNotIn("DIFFERENCE_MAP", asset_types)
+
+    def test_masks_remain_available_when_pair_is_not_comparable(self):
+        # A per-image mask is proposed on ONE photo before the two photos are
+        # ever compared to each other - it must not disappear just because
+        # the PAIR later turns out not comparable (different framing/lighting
+        # here is enough to fail registration while each photo's own lesion
+        # is still cleanly segmentable on its own).
+        result = compare_lesion_images(lesion_photo(96), lesion_photo(30, offset_x=170, brightness=245))
+        if result["quality"]["comparisonDisposition"] == "NOT_COMPARABLE":
+            asset_types = {asset["type"] for asset in result["derivedAssets"]}
+            self.assertIn("MASK", asset_types)
+            mask_roles = {asset["role"] for asset in result["derivedAssets"] if asset["type"] == "MASK"}
+            self.assertEqual(mask_roles, {"baseline", "followup"})
 
     def test_grad_cam_is_not_emitted_as_difference_map(self):
         result = compare_lesion_images(lesion_photo(96), lesion_photo(82, offset_x=3))
