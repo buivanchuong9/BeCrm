@@ -29,6 +29,7 @@ const EXPECTED_CODES = [
   'reported-taken-dose-count',
   'lesion-area-index',
   'lesion-area-index-clinician-verified',
+  'lesion-area-physical-cm2',
   'erythema-index',
   'lesion-count-estimate',
   'new-lesion-region-detected',
@@ -37,6 +38,7 @@ const EXPECTED_CODES = [
 
 const IMAGE_ANALYSIS_ONLY_CODES = [
   'lesion-area-index',
+  'lesion-area-physical-cm2',
   'erythema-index',
   'lesion-count-estimate',
   'new-lesion-region-detected',

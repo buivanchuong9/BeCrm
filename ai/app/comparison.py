@@ -8,6 +8,8 @@ from dataclasses import dataclass
 import numpy as np
 from PIL import Image, ImageFilter, ImageOps, UnidentifiedImageError
 
+from .calibration import detect_marker
+
 
 WORK_SIZE = 384
 MIN_REGISTRATION_SCORE = 0.55
@@ -30,6 +32,13 @@ class PreparedComparisonImage:
     brightness: float
     sharpness: float
     exposure: float
+    # Dimensions of the EXIF-oriented photo BEFORE the ImageOps.fit crop to
+    # WORK_SIZE below - needed to convert a calibration marker's px-per-mm
+    # (measured in this original space) into the working canvas's own
+    # px-per-mm, since ImageOps.fit center-crops to a min(width, height)
+    # square and then rescales that square to WORK_SIZE.
+    original_width: int
+    original_height: int
 
 
 def _data_url(image: Image.Image) -> str:
@@ -46,6 +55,7 @@ def _load_image(payload: bytes) -> PreparedComparisonImage:
             oriented = ImageOps.exif_transpose(source).convert("RGB")
             if oriented.width < 224 or oriented.height < 224:
                 raise ComparisonImageError("Ảnh phải có kích thước tối thiểu 224 × 224 px.")
+            original_width, original_height = oriented.width, oriented.height
             normalized = ImageOps.fit(
                 oriented,
                 (WORK_SIZE, WORK_SIZE),
@@ -68,7 +78,9 @@ def _load_image(payload: bytes) -> PreparedComparisonImage:
     brightness = float(gray.mean())
     clipped = float(np.mean((gray < 0.035) | (gray > 0.965)))
     exposure = float(np.clip(1.0 - clipped * 3.0 - abs(brightness - 0.52) * 1.2, 0.0, 1.0))
-    return PreparedComparisonImage(normalized, rgb, gray, brightness, sharpness, exposure)
+    return PreparedComparisonImage(
+        normalized, rgb, gray, brightness, sharpness, exposure, original_width, original_height,
+    )
 
 
 def _phase_translation(reference: np.ndarray, moving: np.ndarray) -> tuple[int, int, float]:
@@ -185,6 +197,19 @@ def _propose_mask(rgb: np.ndarray, valid: np.ndarray | None = None) -> tuple[np.
     return component, round(0.65 * contrast + 0.35 * size_score, 4)
 
 
+def _working_px_per_mm(px_per_mm_original: float | None, original_width: int, original_height: int) -> float | None:
+    """Converts a px-per-mm scale measured on the original photo into the
+    equivalent scale inside the WORK_SIZE working canvas produced by
+    ImageOps.fit (a center crop to a min(width, height) square, then a
+    resize of that square to WORK_SIZE)."""
+    if px_per_mm_original is None:
+        return None
+    crop_side_px = min(original_width, original_height)
+    if crop_side_px <= 0:
+        return None
+    return px_per_mm_original * (WORK_SIZE / crop_side_px)
+
+
 def _mask_overlay(mask: np.ndarray, color: tuple[int, int, int]) -> Image.Image:
     expanded = Image.fromarray((mask.astype(np.uint8) * 255), mode="L").filter(ImageFilter.MaxFilter(7))
     contracted = Image.fromarray((mask.astype(np.uint8) * 255), mode="L").filter(ImageFilter.MinFilter(5))
@@ -248,6 +273,23 @@ def compare_lesion_images(baseline_bytes: bytes, followup_bytes: bytes) -> dict[
 
     baseline = _load_image(baseline_bytes)
     followup = _load_image(followup_bytes)
+
+    # Marker detection must run on the ORIGINAL bytes, never on `baseline`/
+    # `followup` above - those are already cropped/resized to WORK_SIZE,
+    # which destroys real-world scale. Each photo self-calibrates from its
+    # own in-frame marker, so this works even when the two photos were
+    # taken at different distances or angles.
+    baseline_calibration = detect_marker(baseline_bytes)
+    followup_calibration = detect_marker(followup_bytes)
+    baseline_px_per_mm = _working_px_per_mm(
+        baseline_calibration.px_per_mm if baseline_calibration else None,
+        baseline.original_width, baseline.original_height,
+    )
+    followup_px_per_mm = _working_px_per_mm(
+        followup_calibration.px_per_mm if followup_calibration else None,
+        followup.original_width, followup.original_height,
+    )
+
     dx, dy, phase_strength = _phase_translation(baseline.gray, followup.gray)
     excessive_shift = abs(dx) > WORK_SIZE * 0.28 or abs(dy) > WORK_SIZE * 0.28
     aligned_rgb, valid = _shift_rgb(followup.rgb, dx, dy)
@@ -289,9 +331,16 @@ def compare_lesion_images(baseline_bytes: bytes, followup_bytes: bytes) -> dict[
 
     limitations: list[str] = [
         "Mask là vùng đề xuất bán tự động và phải được bác sĩ xác nhận trước khi dùng làm bằng chứng lâm sàng.",
-        "Diện tích là tương đối theo ảnh đã chuẩn hóa; không phải cm² vì chưa có vật chuẩn kích thước.",
         "Đăng ký ảnh hiện hỗ trợ hiệu chỉnh tịnh tiến; ảnh khác góc hoặc tỷ lệ đáng kể cần chụp lại.",
     ]
+    if baseline_px_per_mm and followup_px_per_mm:
+        limitations.append(
+            "Diện tích cm² được hiệu chỉnh bằng thẻ chuẩn phát hiện trong từng ảnh; vẫn có sai số nếu thẻ không đặt sát mặt phẳng tổn thương."
+        )
+    else:
+        limitations.append(
+            "Diện tích là tương đối theo ảnh đã chuẩn hóa; không phải cm² vì chưa phát hiện được vật chuẩn kích thước trong ảnh."
+        )
     quality_reasons: list[str] = []
     if sharpness_score < 0.45:
         quality_reasons.append("Một trong hai ảnh thiếu nét.")
@@ -308,13 +357,57 @@ def compare_lesion_images(baseline_bytes: bytes, followup_bytes: bytes) -> dict[
             "Một trong hai ảnh bị cháy sáng hoặc thiếu sáng nghiêm trọng, có thể che khuất vùng tổn thương."
         )
 
+    # Physical-area calibration deliberately does NOT require `comparable`:
+    # it only needs each photo's own mask + own in-frame marker, neither of
+    # which depends on registration between the two photos (a translation
+    # shift doesn't change a mask's pixel count, and each marker calibrates
+    # its own photo independently). Requiring `comparable` here would let a
+    # marker's own strong edges - which can themselves confuse the
+    # translation-registration estimate - suppress the very feature meant
+    # to make cross-photo comparison more reliable.
+    baseline_pixels = int(baseline_mask.sum()) if masks_ready else None
+    target_pixels = int(target_mask.sum()) if masks_ready else None
+    mask_confidence = (
+        round(min(baseline_mask_confidence, target_mask_confidence), 4) if masks_ready else None
+    )
+
     derived_assets: list[dict[str, object]] = []
     metrics: list[dict[str, object]] = []
+
+    if masks_ready and baseline_px_per_mm and followup_px_per_mm:
+        metrics.append({
+            "key": "lesion-area-physical-cm2",
+            "label": "Diện tích tổn thương (đã hiệu chỉnh bằng vật chuẩn)",
+            "category": "MORPHOLOGY",
+            "baseline": round(baseline_pixels / (baseline_px_per_mm ** 2) / 100.0, 2),
+            "current": round(target_pixels / (followup_px_per_mm ** 2) / 100.0, 2),
+            "unit": "cm²",
+            "source": "IMAGE_ANALYSIS",
+            "confidence": mask_confidence,
+            "measurementMethod": "Hiệu chỉnh bằng thẻ chuẩn ArUco phát hiện trong ảnh (aruco-calibration/v1)",
+            "missingReason": None,
+        })
+    else:
+        metrics.append({
+            "key": "lesion-area-physical-cm2",
+            "label": "Diện tích tổn thương (đã hiệu chỉnh bằng vật chuẩn)",
+            "category": "MORPHOLOGY",
+            "baseline": None,
+            "current": None,
+            "unit": "cm²",
+            "source": "IMAGE_ANALYSIS",
+            "confidence": None,
+            "measurementMethod": "Hiệu chỉnh bằng thẻ chuẩn ArUco phát hiện trong ảnh (aruco-calibration/v1)",
+            "missingReason": (
+                "Không tạo được vùng tổn thương đề xuất ổn định trên cả hai ảnh."
+                if not masks_ready
+                else "Không phát hiện được thẻ chuẩn CareFollow trong một hoặc cả hai ảnh."
+            ),
+        })
+
     assessment = "INDETERMINATE"
     summary = "Chưa đủ bằng chứng hình ảnh để kết luận tiến triển."
     if comparable and baseline_mask is not None and target_mask is not None:
-        baseline_pixels = int(baseline_mask.sum())
-        target_pixels = int(target_mask.sum())
         current_index = round(target_pixels / max(baseline_pixels, 1) * 100.0, 1)
         delta = round(current_index - 100.0, 1)
         confidence = round(min(registration_score, baseline_mask_confidence, target_mask_confidence), 4)
@@ -364,7 +457,7 @@ def compare_lesion_images(baseline_bytes: bytes, followup_bytes: bytes) -> dict[
     return {
         "model": "semi-automatic-lesion-progress",
         "modelVersion": "1.0.0",
-        "algorithmVersion": "translation-registration-redness-mask/1.0.0",
+        "algorithmVersion": "translation-registration-redness-mask-calibration/1.1.0",
         "assessment": assessment,
         "visualChangeSummary": summary,
         "limitations": limitations,

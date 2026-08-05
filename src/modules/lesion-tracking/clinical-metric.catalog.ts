@@ -230,6 +230,22 @@ const definitions: ClinicalMetricDefinition[] = [
     allowedSources: [LesionMetricSource.CLINICIAN_REPORTED],
     interpretation: 'LOWER_IS_BETTER',
   },
+  // Distinct from lesion-area-cm2 above (clinician/device-measured): this is
+  // AI-computed from a printed ArUco reference marker detected in-frame
+  // (see be/ai/app/calibration.py). Kept as its own code rather than
+  // reusing lesion-area-cm2 so AI vs clinician-measured provenance is never
+  // conflated under one key, matching the lesion-area-index /
+  // lesion-area-index-clinician-verified split above.
+  {
+    code: 'lesion-area-physical-cm2',
+    label: 'Diện tích tổn thương (đã hiệu chỉnh bằng vật chuẩn)',
+    category: LesionMetricCategory.MORPHOLOGY,
+    unit: 'cm²',
+    minimum: 0,
+    maximum: 50000,
+    allowedSources: [LesionMetricSource.IMAGE_ANALYSIS],
+    interpretation: 'LOWER_IS_BETTER',
+  },
   {
     code: 'erythema-index',
     label: 'Mức ban đỏ (chỉ số so với mốc = 100%)',
