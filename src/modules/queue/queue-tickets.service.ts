@@ -331,4 +331,114 @@ export class QueueTicketsService {
 
     return { data: { upcomingAppointments, waitingCount, inServiceCount } };
   }
+
+  async createWalkIn(dto: {
+    clinicLocationId: string;
+    serviceCode: string;
+    fullName: string;
+    phone: string;
+    note?: string;
+  }) {
+    const clinicLocation = await this.prisma.clinicLocation.findUnique({
+      where: { id: dto.clinicLocationId },
+    });
+    if (!clinicLocation) {
+      throw new NotFoundAppError('Clinic location not found.');
+    }
+
+    const serviceMap: Record<string, { department: string; station: string; prefix: string }> = {
+      DERMATOLOGY: { department: 'Khoa Da liễu', station: 'Tiếp nhận Da liễu', prefix: 'D' },
+      GENERAL: { department: 'Khám tổng quát', station: 'Quầy tiếp nhận', prefix: 'A' },
+      VITALS: { department: 'Điều dưỡng', station: 'Khu đo sinh hiệu', prefix: 'S' },
+    };
+
+    const targetService = serviceMap[dto.serviceCode] ?? {
+      department: 'Khoa Da liễu',
+      station: 'Tiếp nhận Da liễu',
+      prefix: 'D',
+    };
+
+    const ticket = await this.prisma.$transaction(async (tx) => {
+      // Find or create patient
+      let patient = await tx.patient.findFirst({
+        where: { organizationId: clinicLocation.organizationId, profile: { is: { phone: dto.phone } } },
+      });
+
+      if (!patient) {
+        const code = `WALK-${Date.now().toString().slice(-6)}`;
+        patient = await tx.patient.create({
+          data: {
+            organizationId: clinicLocation.organizationId,
+            code,
+            name: dto.fullName,
+            profile: {
+              create: {
+                phone: dto.phone,
+                dob: new Date('1995-01-01'),
+                gender: 'unknown',
+              },
+            },
+          },
+        });
+      }
+
+      // Create appointment & encounter for walk-in
+      const now = new Date();
+      const appointment = await tx.appointment.create({
+        data: {
+          organizationId: clinicLocation.organizationId,
+          clinicLocationId: dto.clinicLocationId,
+          patientId: patient.id,
+          date: now,
+          startAt: now,
+          endAt: new Date(now.getTime() + 30 * 60 * 1000),
+          department: targetService.department,
+          status: 'in_consultation',
+          mode: 'in_person',
+        },
+      });
+
+      const encounter = await tx.medicalEncounter.create({
+        data: {
+          organizationId: clinicLocation.organizationId,
+          clinicLocationId: dto.clinicLocationId,
+          appointmentId: appointment.id,
+          patientId: patient.id,
+          department: targetService.department,
+          status: 'in_progress',
+        },
+      });
+
+      const dayStart = new Date();
+      dayStart.setUTCHours(0, 0, 0, 0);
+      const issuedToday = await tx.queueTicket.count({
+        where: {
+          organizationId: clinicLocation.organizationId,
+          clinicLocationId: dto.clinicLocationId,
+          department: targetService.department,
+          issuedAt: { gte: dayStart },
+        },
+      });
+
+      const number = `${targetService.prefix}${String(issuedToday + 1).padStart(3, '0')}`;
+
+      const created = await this.tickets.create(tx, {
+        organizationId: clinicLocation.organizationId,
+        clinicLocationId: dto.clinicLocationId,
+        appointmentId: appointment.id,
+        patientId: patient.id,
+        encounterId: encounter.id,
+        number,
+        department: targetService.department,
+        serviceStation: targetService.station,
+        waitingArea: 'Sảnh chờ tầng 1',
+        priority: 'normal',
+        status: 'waiting',
+      });
+
+      return created;
+    });
+
+    return { data: await this.withEstimate(ticket) };
+  }
 }

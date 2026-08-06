@@ -26,6 +26,8 @@ import {
 } from './dto/responses/queue-ticket-response.dto';
 import { CallNextRequest } from './dto/call-next.dto';
 import { CompleteTicketRequest, TicketActionRequest } from './dto/ticket-action.dto';
+import { Public } from '../../core/security/public.decorator';
+import { CreateWalkInTicketRequest } from './dto/create-walk-in.dto';
 import { QueueTicketsService } from './queue-tickets.service';
 import { from, interval, map, Observable, startWith, switchMap } from 'rxjs';
 
@@ -121,6 +123,14 @@ export class QueueTicketsController {
     @Req() req: Request,
   ) {
     return this.queueTicketsService.complete(principal, ticketId, dto, requestContext(req));
+  }
+
+  @Public()
+  @ApiOkEnvelope(QueueTicketResponseDto)
+  @Post('walk-ins')
+  @HttpCode(HttpStatus.CREATED)
+  async createWalkIn(@Body() dto: CreateWalkInTicketRequest) {
+    return this.queueTicketsService.createWalkIn(dto);
   }
 }
 
