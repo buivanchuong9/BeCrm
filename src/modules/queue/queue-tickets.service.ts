@@ -359,9 +359,9 @@ export class QueueTicketsService {
     };
 
     const ticket = await this.prisma.$transaction(async (tx) => {
-      // Find or create patient
+      // Find or create patient by phone
       let patient = await tx.patient.findFirst({
-        where: { organizationId: clinicLocation.organizationId, profile: { is: { phone: dto.phone } } },
+        where: { organizationId: clinicLocation.organizationId, phone: dto.phone },
       });
 
       if (!patient) {
@@ -371,16 +371,19 @@ export class QueueTicketsService {
             organizationId: clinicLocation.organizationId,
             code,
             name: dto.fullName,
-            profile: {
-              create: {
-                phone: dto.phone,
-                dob: new Date('1995-01-01'),
-                gender: 'unknown',
-              },
-            },
+            phone: dto.phone,
+            dob: new Date('1995-01-01'),
+            gender: 'unknown',
           },
         });
       }
+
+      // Find doctor user in organization or fallback to first active user
+      const defaultDoctor = await tx.userMembership.findFirst({
+        where: { organizationId: clinicLocation.organizationId, role: 'doctor' },
+        select: { userId: true },
+      });
+      const doctorId = defaultDoctor?.userId ?? (await tx.user.findFirstOrThrow()).id;
 
       // Create appointment & encounter for walk-in
       const now = new Date();
@@ -389,11 +392,12 @@ export class QueueTicketsService {
           organizationId: clinicLocation.organizationId,
           clinicLocationId: dto.clinicLocationId,
           patientId: patient.id,
+          doctorId,
           date: now,
           startAt: now,
           endAt: new Date(now.getTime() + 30 * 60 * 1000),
           department: targetService.department,
-          status: 'in_consultation',
+          status: 'upcoming',
           mode: 'in_person',
         },
       });
@@ -404,6 +408,8 @@ export class QueueTicketsService {
           clinicLocationId: dto.clinicLocationId,
           appointmentId: appointment.id,
           patientId: patient.id,
+          type: 'standard',
+          origin: 'walk_in',
           department: targetService.department,
           status: 'in_progress',
         },
