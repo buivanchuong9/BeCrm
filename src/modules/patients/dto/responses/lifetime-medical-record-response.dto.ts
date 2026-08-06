@@ -100,8 +100,37 @@ export class PatientProfileNarrativeDto {
   @ApiProperty({ nullable: true }) currentSymptoms!: string | null;
   @ApiProperty({ nullable: true }) lifestyle!: string | null;
   @ApiProperty({ nullable: true }) occupation!: string | null;
+  @ApiProperty({ nullable: true }) surgicalHistory!: string | null;
+  @ApiProperty({ nullable: true }) vaccinationNotes!: string | null;
   @ApiProperty() isPatientProvided!: boolean;
   @ApiProperty({ format: 'date-time' }) updatedAt!: string;
+}
+
+export class ProblemListEntryDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty() conditionName!: string;
+  @ApiProperty({ nullable: true }) conditionCode!: string | null;
+  @ApiProperty() status!: string;
+  @ApiProperty({ format: 'date', nullable: true }) onsetDate!: string | null;
+  @ApiProperty({ nullable: true }) severity!: string | null;
+  @ApiProperty({ nullable: true }) note!: string | null;
+  @ApiProperty({ format: 'uuid' }) addedByUserId!: string;
+  @ApiProperty({ nullable: true }) addedByName!: string | null;
+  @ApiProperty({ format: 'date-time' }) addedAt!: string;
+}
+
+export class CurrentMedicationDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty() medicationName!: string;
+  @ApiProperty({ nullable: true }) dosage!: string | null;
+  @ApiProperty({ nullable: true }) frequency!: string | null;
+  @ApiProperty({ nullable: true }) route!: string | null;
+  @ApiProperty({ format: 'date', nullable: true }) startedAt!: string | null;
+  @ApiProperty({ nullable: true }) note!: string | null;
+  @ApiProperty() active!: boolean;
+  @ApiProperty({ format: 'uuid' }) addedByUserId!: string;
+  @ApiProperty({ nullable: true }) addedByName!: string | null;
+  @ApiProperty({ format: 'date-time' }) addedAt!: string;
 }
 
 export class LifetimeRecordClinicalItemDto {
@@ -187,6 +216,9 @@ export class LifetimeMedicalRecordResponseDto {
   @ApiProperty({ type: VitalObservationDto, isArray: true }) vitals!: VitalObservationDto[];
   @ApiProperty({ type: PatientProfileNarrativeDto, nullable: true })
   narrative!: PatientProfileNarrativeDto | null;
+  @ApiProperty({ type: ProblemListEntryDto, isArray: true }) problemList!: ProblemListEntryDto[];
+  @ApiProperty({ type: CurrentMedicationDto, isArray: true })
+  currentMedications!: CurrentMedicationDto[];
   @ApiProperty({ type: LifetimeRecordEventDto, isArray: true }) events!: LifetimeRecordEventDto[];
   @ApiProperty() page!: number;
   @ApiProperty() limit!: number;

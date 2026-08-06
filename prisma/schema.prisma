@@ -79,6 +79,8 @@ model Organization {
   allergyKnowledgeAssessments   AllergyKnowledgeAssessment[]
   vitalObservations             VitalObservation[]
   patientProfileNarratives      PatientProfileNarrative[]
+  problemListEntries            PatientProblemListEntry[]
+  currentMedications            PatientCurrentMedication[]
 
   @@map("organizations")
 }
@@ -164,6 +166,8 @@ model User {
   assessedKnowledgeStates     AllergyKnowledgeAssessment[] @relation("AllergyKnowledgeAssessor")
   recordedVitals              VitalObservation[]           @relation("VitalRecorder")
   updatedNarratives           PatientProfileNarrative[]    @relation("NarrativeUpdater")
+  addedProblemListEntries     PatientProblemListEntry[]    @relation("ProblemListEntryAdder")
+  addedCurrentMedications     PatientCurrentMedication[]  @relation("CurrentMedicationAdder")
 
   @@map("users")
 }
@@ -437,6 +441,8 @@ model Patient {
   allergyKnowledgeAssessments AllergyKnowledgeAssessment[]
   vitalObservations           VitalObservation[]
   profileNarrative            PatientProfileNarrative?
+  problemListEntries          PatientProblemListEntry[]
+  currentMedications          PatientCurrentMedication[]
 
   @@unique([organizationId, code])
   @@index([organizationId])
@@ -726,24 +732,71 @@ model VitalObservation {
 }
 
 model PatientProfileNarrative {
-  patientId       String   @id @map("patient_id") @db.Uuid
-  organizationId  String   @map("organization_id") @db.Uuid
-  chiefComplaint  String?  @map("chief_complaint")
-  medicalHistory  String?  @map("medical_history")
-  familyHistory   String?  @map("family_history")
-  socialHistory   String?  @map("social_history")
-  currentSymptoms String?  @map("current_symptoms")
-  lifestyle       String?
-  occupation      String?
-  version         Int      @default(1)
-  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz
-  updatedByUserId String?  @map("updated_by_user_id") @db.Uuid
+  patientId        String   @id @map("patient_id") @db.Uuid
+  organizationId   String   @map("organization_id") @db.Uuid
+  chiefComplaint   String?  @map("chief_complaint")
+  medicalHistory   String?  @map("medical_history")
+  familyHistory    String?  @map("family_history")
+  socialHistory    String?  @map("social_history")
+  currentSymptoms  String?  @map("current_symptoms")
+  lifestyle        String?
+  occupation       String?
+  surgicalHistory  String?  @map("surgical_history")
+  vaccinationNotes String?  @map("vaccination_notes")
+  version          Int      @default(1)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  updatedByUserId  String?  @map("updated_by_user_id") @db.Uuid
 
   patient      Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   updatedBy    User?        @relation("NarrativeUpdater", fields: [updatedByUserId], references: [id], onDelete: SetNull)
 
   @@map("patient_profile_narratives")
+}
+
+model PatientProblemListEntry {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patientId      String    @map("patient_id") @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  conditionName  String    @map("condition_name")
+  conditionCode  String?   @map("condition_code")
+  status         String    @default("active")
+  onsetDate      DateTime? @map("onset_date") @db.Date
+  severity       String?
+  note           String?
+  addedByUserId  String    @map("added_by_user_id") @db.Uuid
+  addedAt        DateTime  @default(now()) @map("added_at") @db.Timestamptz
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  patient      Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  addedBy      User         @relation("ProblemListEntryAdder", fields: [addedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([patientId, status])
+  @@map("patient_problem_list_entries")
+}
+
+model PatientCurrentMedication {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patientId      String    @map("patient_id") @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  medicationName String    @map("medication_name")
+  dosage         String?
+  frequency      String?
+  route          String?
+  startedAt      DateTime? @map("started_at") @db.Date
+  note           String?
+  active         Boolean   @default(true)
+  addedByUserId  String    @map("added_by_user_id") @db.Uuid
+  addedAt        DateTime  @default(now()) @map("added_at") @db.Timestamptz
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  patient      Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  addedBy      User         @relation("CurrentMedicationAdder", fields: [addedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([patientId, active])
+  @@map("patient_current_medications")
 }
 
 // ---------------------------------------------------------------------------

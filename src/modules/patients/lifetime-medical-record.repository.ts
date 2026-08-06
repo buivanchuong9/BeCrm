@@ -99,6 +99,153 @@ export class LifetimeMedicalRecordRepository {
     });
   }
 
+  upsertNarrative(
+    patientId: string,
+    organizationId: string,
+    data: {
+      occupation?: string | null;
+      chiefComplaint?: string | null;
+      medicalHistory?: string | null;
+      familyHistory?: string | null;
+      currentSymptoms?: string | null;
+      lifestyle?: string | null;
+      surgicalHistory?: string | null;
+      vaccinationNotes?: string | null;
+    },
+    updatedByUserId: string,
+  ) {
+    return this.prisma.patientProfileNarrative.upsert({
+      where: { patientId },
+      create: { patientId, organizationId, ...data, updatedByUserId },
+      update: { ...data, updatedByUserId, version: { increment: 1 } },
+    });
+  }
+
+  findProblemList(patientId: string) {
+    return this.prisma.patientProblemListEntry.findMany({
+      where: { patientId },
+      include: { addedBy: { select: { id: true, displayName: true } } },
+      orderBy: [{ status: 'asc' }, { addedAt: 'desc' }],
+    });
+  }
+
+  createProblemEntry(
+    patientId: string,
+    organizationId: string,
+    addedByUserId: string,
+    data: {
+      conditionName: string;
+      conditionCode?: string | null;
+      status?: string;
+      onsetDate?: string | null;
+      severity?: string | null;
+      note?: string | null;
+    },
+  ) {
+    return this.prisma.patientProblemListEntry.create({
+      data: {
+        patientId,
+        organizationId,
+        addedByUserId,
+        conditionName: data.conditionName,
+        conditionCode: data.conditionCode ?? null,
+        status: data.status ?? 'active',
+        onsetDate: data.onsetDate ? new Date(data.onsetDate) : null,
+        severity: data.severity ?? null,
+        note: data.note ?? null,
+      },
+      include: { addedBy: { select: { id: true, displayName: true } } },
+    });
+  }
+
+  updateProblemEntry(
+    id: string,
+    data: {
+      conditionName?: string;
+      conditionCode?: string | null;
+      status?: string;
+      onsetDate?: string | null;
+      severity?: string | null;
+      note?: string | null;
+    },
+  ) {
+    return this.prisma.patientProblemListEntry.update({
+      where: { id },
+      data: {
+        ...data,
+        onsetDate: data.onsetDate !== undefined ? (data.onsetDate ? new Date(data.onsetDate) : null) : undefined,
+      },
+      include: { addedBy: { select: { id: true, displayName: true } } },
+    });
+  }
+
+  findProblemEntry(id: string) {
+    return this.prisma.patientProblemListEntry.findUnique({ where: { id }, select: { id: true, patientId: true } });
+  }
+
+  findCurrentMedications(patientId: string) {
+    return this.prisma.patientCurrentMedication.findMany({
+      where: { patientId },
+      include: { addedBy: { select: { id: true, displayName: true } } },
+      orderBy: [{ active: 'desc' }, { addedAt: 'desc' }],
+    });
+  }
+
+  createCurrentMedication(
+    patientId: string,
+    organizationId: string,
+    addedByUserId: string,
+    data: {
+      medicationName: string;
+      dosage?: string | null;
+      frequency?: string | null;
+      route?: string | null;
+      startedAt?: string | null;
+      note?: string | null;
+    },
+  ) {
+    return this.prisma.patientCurrentMedication.create({
+      data: {
+        patientId,
+        organizationId,
+        addedByUserId,
+        medicationName: data.medicationName,
+        dosage: data.dosage ?? null,
+        frequency: data.frequency ?? null,
+        route: data.route ?? null,
+        startedAt: data.startedAt ? new Date(data.startedAt) : null,
+        note: data.note ?? null,
+      },
+      include: { addedBy: { select: { id: true, displayName: true } } },
+    });
+  }
+
+  updateCurrentMedication(
+    id: string,
+    data: {
+      medicationName?: string;
+      dosage?: string | null;
+      frequency?: string | null;
+      route?: string | null;
+      startedAt?: string | null;
+      note?: string | null;
+      active?: boolean;
+    },
+  ) {
+    return this.prisma.patientCurrentMedication.update({
+      where: { id },
+      data: {
+        ...data,
+        startedAt: data.startedAt !== undefined ? (data.startedAt ? new Date(data.startedAt) : null) : undefined,
+      },
+      include: { addedBy: { select: { id: true, displayName: true } } },
+    });
+  }
+
+  findCurrentMedication(id: string) {
+    return this.prisma.patientCurrentMedication.findUnique({ where: { id }, select: { id: true, patientId: true } });
+  }
+
   findLatestAllergyKnowledgeAssessment(patientId: string) {
     return this.prisma.allergyKnowledgeAssessment.findFirst({
       where: { patientId },

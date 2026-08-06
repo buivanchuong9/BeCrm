@@ -117,21 +117,27 @@ export class LesionTrackingService {
     await this.assertTimelineEnabled(access.organizationId);
 
     await this.prisma.$transaction(async (tx) => {
-      // Find all observations for this lesion
+      // 1. Unlink clinicianSelectedBaseline on Lesion
+      await tx.lesion.update({
+        where: { id: lesionId },
+        data: { clinicianSelectedBaselineId: null },
+      });
+
+      // 2. Find all observations for this lesion
       const obs = await tx.lesionObservation.findMany({
         where: { lesionId },
         select: { id: true },
       });
       const obsIds = obs.map((o) => o.id);
 
-      // Find all comparison sessions for this lesion
+      // 3. Find all comparison sessions for this lesion
       const comps = await tx.lesionComparisonSession.findMany({
         where: { lesionId },
         select: { id: true },
       });
       const compIds = comps.map((c) => c.id);
 
-      // Clean up comparisons, reviews, metrics, and analyses
+      // 4. Clean up comparisons, reviews, metrics, and analyses
       if (compIds.length > 0) {
         await tx.lesionClinicianReview.deleteMany({
           where: { comparisonSessionId: { in: compIds } },
@@ -147,20 +153,34 @@ export class LesionTrackingService {
         });
       }
 
-      // Clean up metrics and assets
+      // 5. Clean up metrics, assets, and observations with foreign key safety
       if (obsIds.length > 0) {
+        await tx.lesionObservationMetric.updateMany({
+          where: { observationId: { in: obsIds } },
+          data: { supersedesMetricId: null },
+        });
         await tx.lesionObservationMetric.deleteMany({
           where: { observationId: { in: obsIds } },
         });
+
+        await tx.lesionImageAsset.updateMany({
+          where: { observationId: { in: obsIds } },
+          data: { originalAssetId: null, correctsAssetId: null },
+        });
         await tx.lesionImageAsset.deleteMany({
           where: { observationId: { in: obsIds } },
+        });
+
+        await tx.lesionObservation.updateMany({
+          where: { lesionId },
+          data: { revisionOfId: null },
         });
         await tx.lesionObservation.deleteMany({
           where: { id: { in: obsIds } },
         });
       }
 
-      // Delete timeline events and adverse events
+      // 6. Delete timeline events and adverse events
       await tx.lesionTimelineEvent.deleteMany({
         where: { lesionId },
       });
@@ -168,7 +188,7 @@ export class LesionTrackingService {
         where: { lesionId },
       });
 
-      // Delete the lesion record
+      // 7. Delete the lesion record
       await tx.lesion.delete({
         where: { id: lesionId },
       });

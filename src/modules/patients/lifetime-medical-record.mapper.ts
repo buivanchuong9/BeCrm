@@ -1,6 +1,7 @@
 import {
   AllergyIntoleranceDto,
   AllergyKnowledgeStateDto,
+  CurrentMedicationDto,
   LifetimeRecordClinicalItemDto,
   LifetimeRecordDocumentDto,
   LifetimeRecordEventDto,
@@ -9,6 +10,7 @@ import {
   LifetimeRecordSourceDto,
   LifetimeRecordSummaryDto,
   PatientProfileNarrativeDto,
+  ProblemListEntryDto,
   VitalObservationDto,
 } from './dto/responses/lifetime-medical-record-response.dto';
 import { LifetimeMedicalRecordRepository } from './lifetime-medical-record.repository';
@@ -31,6 +33,12 @@ type VitalRow = Awaited<
 type NarrativeRow = NonNullable<
   Awaited<ReturnType<LifetimeMedicalRecordRepository['findProfileNarrative']>>
 >;
+type ProblemListRow = Awaited<
+  ReturnType<LifetimeMedicalRecordRepository['findProblemList']>
+>[number];
+type CurrentMedRow = Awaited<
+  ReturnType<LifetimeMedicalRecordRepository['findCurrentMedications']>
+>[number];
 
 type PrescriptionMedication = { name: string; dose: string; durationDays: number };
 
@@ -451,9 +459,41 @@ export function toNarrativeDto(n: NarrativeRow | null): PatientProfileNarrativeD
     currentSymptoms: n.currentSymptoms,
     lifestyle: n.lifestyle,
     occupation: n.occupation,
-    // PatientProfileNarrative is always patient-provided by design.
+    surgicalHistory: n.surgicalHistory,
+    vaccinationNotes: n.vaccinationNotes,
     isPatientProvided: true,
     updatedAt: n.updatedAt.toISOString(),
+  };
+}
+
+export function toProblemListEntryDto(r: ProblemListRow): ProblemListEntryDto {
+  return {
+    id: r.id,
+    conditionName: r.conditionName,
+    conditionCode: r.conditionCode,
+    status: r.status,
+    onsetDate: r.onsetDate ? r.onsetDate.toISOString().slice(0, 10) : null,
+    severity: r.severity,
+    note: r.note,
+    addedByUserId: r.addedByUserId,
+    addedByName: r.addedBy.displayName,
+    addedAt: r.addedAt.toISOString(),
+  };
+}
+
+export function toCurrentMedicationDto(r: CurrentMedRow): CurrentMedicationDto {
+  return {
+    id: r.id,
+    medicationName: r.medicationName,
+    dosage: r.dosage,
+    frequency: r.frequency,
+    route: r.route,
+    startedAt: r.startedAt ? r.startedAt.toISOString().slice(0, 10) : null,
+    note: r.note,
+    active: r.active,
+    addedByUserId: r.addedByUserId,
+    addedByName: r.addedBy.displayName,
+    addedAt: r.addedAt.toISOString(),
   };
 }
 
