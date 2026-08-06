@@ -24,6 +24,7 @@ import {
   DerivedAssetRequest,
   ImageAnalysisAdapter,
   ImageAnalysisMetric,
+  ImageAnalysisResult,
   ObservationForAnalysis,
 } from './analysis-adapters/image-analysis-adapter.interface';
 import { UnavailableImageAnalysisAdapter } from './analysis-adapters/unavailable-image-analysis.adapter';
