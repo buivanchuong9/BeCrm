@@ -173,14 +173,22 @@ export class LifetimeMedicalRecordRepository {
       where: { id },
       data: {
         ...data,
-        onsetDate: data.onsetDate !== undefined ? (data.onsetDate ? new Date(data.onsetDate) : null) : undefined,
+        onsetDate:
+          data.onsetDate !== undefined
+            ? data.onsetDate
+              ? new Date(data.onsetDate)
+              : null
+            : undefined,
       },
       include: { addedBy: { select: { id: true, displayName: true } } },
     });
   }
 
   findProblemEntry(id: string) {
-    return this.prisma.patientProblemListEntry.findUnique({ where: { id }, select: { id: true, patientId: true } });
+    return this.prisma.patientProblemListEntry.findUnique({
+      where: { id },
+      select: { id: true, patientId: true },
+    });
   }
 
   findCurrentMedications(patientId: string) {
@@ -236,14 +244,22 @@ export class LifetimeMedicalRecordRepository {
       where: { id },
       data: {
         ...data,
-        startedAt: data.startedAt !== undefined ? (data.startedAt ? new Date(data.startedAt) : null) : undefined,
+        startedAt:
+          data.startedAt !== undefined
+            ? data.startedAt
+              ? new Date(data.startedAt)
+              : null
+            : undefined,
       },
       include: { addedBy: { select: { id: true, displayName: true } } },
     });
   }
 
   findCurrentMedication(id: string) {
-    return this.prisma.patientCurrentMedication.findUnique({ where: { id }, select: { id: true, patientId: true } });
+    return this.prisma.patientCurrentMedication.findUnique({
+      where: { id },
+      select: { id: true, patientId: true },
+    });
   }
 
   findLatestAllergyKnowledgeAssessment(patientId: string) {

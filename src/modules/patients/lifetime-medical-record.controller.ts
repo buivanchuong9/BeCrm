@@ -1,4 +1,17 @@
-import { Body, Controller, Get, Header, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Put, Query, Req } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Header,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Put,
+  Query,
+  Req,
+} from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { CurrentUser } from '../../core/security/current-user.decorator';
@@ -9,7 +22,10 @@ import { LifetimeMedicalRecordResponseDto } from './dto/responses/lifetime-medic
 import { LifetimeMedicalRecordService } from './lifetime-medical-record.service';
 import { UpdateNarrativeDto } from './dto/update-narrative.dto';
 import { CreateProblemEntryDto, UpdateProblemEntryDto } from './dto/create-problem-entry.dto';
-import { CreateCurrentMedicationDto, UpdateCurrentMedicationDto } from './dto/create-current-medication.dto';
+import {
+  CreateCurrentMedicationDto,
+  UpdateCurrentMedicationDto,
+} from './dto/create-current-medication.dto';
 
 @ApiTags('patients')
 @Controller({ path: 'patients/:patientId', version: '1' })

@@ -5,7 +5,10 @@ import { AppError } from '../../core/errors/app-error';
 import { LifetimeMedicalRecordQuery } from './dto/lifetime-medical-record-query.dto';
 import { UpdateNarrativeDto } from './dto/update-narrative.dto';
 import { CreateProblemEntryDto, UpdateProblemEntryDto } from './dto/create-problem-entry.dto';
-import { CreateCurrentMedicationDto, UpdateCurrentMedicationDto } from './dto/create-current-medication.dto';
+import {
+  CreateCurrentMedicationDto,
+  UpdateCurrentMedicationDto,
+} from './dto/create-current-medication.dto';
 import { LifetimeRecordEventDto } from './dto/responses/lifetime-medical-record-response.dto';
 import { LifetimeMedicalRecordRepository } from './lifetime-medical-record.repository';
 import { assertCanViewLifetimeRecord } from './policies/lifetime-medical-record-policies';
@@ -82,17 +85,25 @@ export class LifetimeMedicalRecordService {
 
     const encounters = await this.repo.findEncountersForPatient(patientId);
     const encounterIds = encounters.map((e) => e.id);
-    const [prescriptions, documents, allergies, vitals, narrative, latestKnowledgeAssessment, problemList, currentMedications] =
-      await Promise.all([
-        this.repo.findPrescriptions(encounterIds),
-        this.repo.findDocuments(encounterIds),
-        this.repo.findAllergies(patientId),
-        this.repo.findVitalObservations(patientId),
-        this.repo.findProfileNarrative(patientId),
-        this.repo.findLatestAllergyKnowledgeAssessment(patientId),
-        this.repo.findProblemList(patientId),
-        this.repo.findCurrentMedications(patientId),
-      ]);
+    const [
+      prescriptions,
+      documents,
+      allergies,
+      vitals,
+      narrative,
+      latestKnowledgeAssessment,
+      problemList,
+      currentMedications,
+    ] = await Promise.all([
+      this.repo.findPrescriptions(encounterIds),
+      this.repo.findDocuments(encounterIds),
+      this.repo.findAllergies(patientId),
+      this.repo.findVitalObservations(patientId),
+      this.repo.findProfileNarrative(patientId),
+      this.repo.findLatestAllergyKnowledgeAssessment(patientId),
+      this.repo.findProblemList(patientId),
+      this.repo.findCurrentMedications(patientId),
+    ]);
     const userNames = await this.repo.findUserNames(
       collectDoctorIds(encounters, prescriptions, documents),
     );
@@ -153,15 +164,22 @@ export class LifetimeMedicalRecordService {
     dto: UpdateNarrativeDto,
   ) {
     const patient = await this.repo.findPatientCore(patientId);
-    if (!patient) throw new AppError('PATIENT_NOT_FOUND', 'Patient not found.', HttpStatus.NOT_FOUND);
+    if (!patient)
+      throw new AppError('PATIENT_NOT_FOUND', 'Patient not found.', HttpStatus.NOT_FOUND);
 
     const hasActiveDoctorRelationship =
       patient.primaryDoctorId === principal.userId ||
       (await this.repo.hasActiveCareTeamRow(patientId, principal.userId));
-    const { assertCanViewLifetimeRecord } = await import('./policies/lifetime-medical-record-policies');
+    const { assertCanViewLifetimeRecord } =
+      await import('./policies/lifetime-medical-record-policies');
     assertCanViewLifetimeRecord(principal, patient, hasActiveDoctorRelationship);
 
-    const row = await this.repo.upsertNarrative(patientId, patient.organizationId, dto, principal.userId);
+    const row = await this.repo.upsertNarrative(
+      patientId,
+      patient.organizationId,
+      dto,
+      principal.userId,
+    );
 
     await this.audit.write({
       actorId: principal.userId,
@@ -182,13 +200,19 @@ export class LifetimeMedicalRecordService {
     dto: CreateProblemEntryDto,
   ) {
     const patient = await this.repo.findPatientCore(patientId);
-    if (!patient) throw new AppError('PATIENT_NOT_FOUND', 'Patient not found.', HttpStatus.NOT_FOUND);
+    if (!patient)
+      throw new AppError('PATIENT_NOT_FOUND', 'Patient not found.', HttpStatus.NOT_FOUND);
     const hasRelationship =
       patient.primaryDoctorId === principal.userId ||
       (await this.repo.hasActiveCareTeamRow(patientId, principal.userId));
     assertCanViewLifetimeRecord(principal, patient, hasRelationship);
 
-    const row = await this.repo.createProblemEntry(patientId, patient.organizationId, principal.userId, dto);
+    const row = await this.repo.createProblemEntry(
+      patientId,
+      patient.organizationId,
+      principal.userId,
+      dto,
+    );
     return { data: toProblemListEntryDto(row) };
   }
 
@@ -199,7 +223,8 @@ export class LifetimeMedicalRecordService {
     dto: UpdateProblemEntryDto,
   ) {
     const patient = await this.repo.findPatientCore(patientId);
-    if (!patient) throw new AppError('PATIENT_NOT_FOUND', 'Patient not found.', HttpStatus.NOT_FOUND);
+    if (!patient)
+      throw new AppError('PATIENT_NOT_FOUND', 'Patient not found.', HttpStatus.NOT_FOUND);
     const entry = await this.repo.findProblemEntry(entryId);
     if (!entry || entry.patientId !== patientId)
       throw new AppError('NOT_FOUND', 'Problem list entry not found.', HttpStatus.NOT_FOUND);
@@ -218,13 +243,19 @@ export class LifetimeMedicalRecordService {
     dto: CreateCurrentMedicationDto,
   ) {
     const patient = await this.repo.findPatientCore(patientId);
-    if (!patient) throw new AppError('PATIENT_NOT_FOUND', 'Patient not found.', HttpStatus.NOT_FOUND);
+    if (!patient)
+      throw new AppError('PATIENT_NOT_FOUND', 'Patient not found.', HttpStatus.NOT_FOUND);
     const hasRelationship =
       patient.primaryDoctorId === principal.userId ||
       (await this.repo.hasActiveCareTeamRow(patientId, principal.userId));
     assertCanViewLifetimeRecord(principal, patient, hasRelationship);
 
-    const row = await this.repo.createCurrentMedication(patientId, patient.organizationId, principal.userId, dto);
+    const row = await this.repo.createCurrentMedication(
+      patientId,
+      patient.organizationId,
+      principal.userId,
+      dto,
+    );
     return { data: toCurrentMedicationDto(row) };
   }
 
@@ -235,7 +266,8 @@ export class LifetimeMedicalRecordService {
     dto: UpdateCurrentMedicationDto & { active?: boolean },
   ) {
     const patient = await this.repo.findPatientCore(patientId);
-    if (!patient) throw new AppError('PATIENT_NOT_FOUND', 'Patient not found.', HttpStatus.NOT_FOUND);
+    if (!patient)
+      throw new AppError('PATIENT_NOT_FOUND', 'Patient not found.', HttpStatus.NOT_FOUND);
     const med = await this.repo.findCurrentMedication(medicationId);
     if (!med || med.patientId !== patientId)
       throw new AppError('NOT_FOUND', 'Medication not found.', HttpStatus.NOT_FOUND);
