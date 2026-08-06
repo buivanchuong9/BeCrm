@@ -55,6 +55,7 @@ function pathToDiagnosed(from: EncounterStatus): EncounterStatus[] | undefined {
     intake_complete: ['under_doctor_review', 'diagnosed'],
     ai_assessed: ['under_doctor_review', 'diagnosed'],
     checked_in: ['under_doctor_review', 'diagnosed'],
+    escalated: ['under_doctor_review', 'diagnosed'],
     under_doctor_review: ['diagnosed'],
     awaiting_results: ['diagnosed'],
     diagnosed: [],
