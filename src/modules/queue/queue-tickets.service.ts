@@ -393,7 +393,6 @@ export class QueueTicketsService {
           clinicLocationId: dto.clinicLocationId,
           patientId: patient.id,
           doctorId,
-          date: now,
           startAt: now,
           endAt: new Date(now.getTime() + 30 * 60 * 1000),
           department: targetService.department,
