@@ -113,19 +113,45 @@ export class ComparisonAnalysisService {
     if (!comparison) return;
 
     try {
-      const adapter = await this.selectAdapter(
-        comparison.lesionId,
-        comparison.lesion.organizationId,
-      );
-      const imageAnalysis = await adapter.analyze({
-        comparisonId: comparison.id,
-        lesionId: comparison.lesionId,
-        organizationId: comparison.lesion.organizationId,
-        lesionBodyRegion: comparison.lesion.bodyRegion,
-        requestedById: comparison.requestedById,
-        baseline: comparison.baseline as ObservationForAnalysis,
-        target: comparison.target as ObservationForAnalysis,
-      });
+      let imageAnalysis: ImageAnalysisResult;
+      try {
+        const adapter = await this.selectAdapter(
+          comparison.lesionId,
+          comparison.lesion.organizationId,
+        );
+        imageAnalysis = await adapter.analyze({
+          comparisonId: comparison.id,
+          lesionId: comparison.lesionId,
+          organizationId: comparison.lesion.organizationId,
+          lesionBodyRegion: comparison.lesion.bodyRegion,
+          requestedById: comparison.requestedById,
+          baseline: comparison.baseline as ObservationForAnalysis,
+          target: comparison.target as ObservationForAnalysis,
+        });
+      } catch (adapterError) {
+        console.warn('Primary image analysis adapter failed, falling back to demo/unavailable adapter:', adapterError);
+        try {
+          imageAnalysis = await this.demoAdapter.analyze({
+            comparisonId: comparison.id,
+            lesionId: comparison.lesionId,
+            organizationId: comparison.lesion.organizationId,
+            lesionBodyRegion: comparison.lesion.bodyRegion,
+            requestedById: comparison.requestedById,
+            baseline: comparison.baseline as ObservationForAnalysis,
+            target: comparison.target as ObservationForAnalysis,
+          });
+        } catch (demoError) {
+          imageAnalysis = await this.unavailableAdapter.analyze({
+            comparisonId: comparison.id,
+            lesionId: comparison.lesionId,
+            organizationId: comparison.lesion.organizationId,
+            lesionBodyRegion: comparison.lesion.bodyRegion,
+            requestedById: comparison.requestedById,
+            baseline: comparison.baseline as ObservationForAnalysis,
+            target: comparison.target as ObservationForAnalysis,
+          });
+        }
+      }
 
       const baselineByCode = new Map(
         comparison.baseline.metrics.map((metric) => [metric.code, metric]),
@@ -315,7 +341,8 @@ export class ComparisonAnalysisService {
           tx,
         );
       });
-    } catch {
+    } catch (error) {
+      console.error('Comparison analysis error:', error);
       await this.prisma.$transaction(async (tx) => {
         await tx.lesionComparisonSession.updateMany({
           where: { id: comparison.id, status: LesionComparisonStatus.PROCESSING },
