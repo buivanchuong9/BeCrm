@@ -1,4 +1,6 @@
 import {
+  AllergyIntoleranceDto,
+  AllergyKnowledgeStateDto,
   LifetimeRecordClinicalItemDto,
   LifetimeRecordDocumentDto,
   LifetimeRecordEventDto,
@@ -6,6 +8,8 @@ import {
   LifetimeRecordProvenanceDto,
   LifetimeRecordSourceDto,
   LifetimeRecordSummaryDto,
+  PatientProfileNarrativeDto,
+  VitalObservationDto,
 } from './dto/responses/lifetime-medical-record-response.dto';
 import { LifetimeMedicalRecordRepository } from './lifetime-medical-record.repository';
 
@@ -19,6 +23,13 @@ type PrescriptionRow = Awaited<
 type DocumentRow = Awaited<ReturnType<LifetimeMedicalRecordRepository['findDocuments']>>[number];
 type PatientCore = NonNullable<
   Awaited<ReturnType<LifetimeMedicalRecordRepository['findPatientCore']>>
+>;
+type AllergyRow = Awaited<ReturnType<LifetimeMedicalRecordRepository['findAllergies']>>[number];
+type VitalRow = Awaited<
+  ReturnType<LifetimeMedicalRecordRepository['findVitalObservations']>
+>[number];
+type NarrativeRow = NonNullable<
+  Awaited<ReturnType<LifetimeMedicalRecordRepository['findProfileNarrative']>>
 >;
 
 type PrescriptionMedication = { name: string; dose: string; durationDays: number };
@@ -313,9 +324,27 @@ export function buildEvents(
   return events;
 }
 
+export function buildAllergyKnowledgeStateDto(
+  latestAssessment: Awaited<
+    ReturnType<LifetimeMedicalRecordRepository['findLatestAllergyKnowledgeAssessment']>
+  >,
+): AllergyKnowledgeStateDto {
+  if (!latestAssessment) {
+    return { state: 'unknown', assessedAt: null, assessedByUserId: null, organizationId: null };
+  }
+  return {
+    state: latestAssessment.knowledgeState as AllergyKnowledgeStateDto['state'],
+    assessedAt: latestAssessment.assessedAt.toISOString(),
+    assessedByUserId: latestAssessment.assessedByUserId,
+    organizationId: latestAssessment.organizationId,
+  };
+}
+
 export function buildSummary(
   encounters: EncounterAggregate[],
   prescriptions: PrescriptionRow[],
+  allergies: AllergyRow[],
+  allergyKnowledgeState: AllergyKnowledgeStateDto,
 ): LifetimeRecordSummaryDto {
   const organizationIds = new Set(encounters.map((e) => e.organizationId));
   const facilityIds = new Set(
@@ -347,10 +376,84 @@ export function buildSummary(
     firstRecordedAt: first?.toISOString() ?? null,
     lastRecordedAt: last?.toISOString() ?? null,
     activeConditions: [...activeByKey.values()].map(diagnosisItem),
-    // No AllergyIntolerance-equivalent model exists yet — always empty
-    // rather than fabricated.
-    allergies: [],
+    // Only include allergies that are active and not superseded/entered-in-error.
+    allergies: allergies
+      .filter(
+        (a) =>
+          a.active &&
+          a.verificationStatus !== 'superseded' &&
+          a.verificationStatus !== 'entered_in_error',
+      )
+      .map((a) => ({
+        id: a.id,
+        code: a.substanceCode,
+        display: a.substance,
+        status: a.verificationStatus,
+        value: a.severity,
+        note: a.reaction,
+      })),
     currentMedications: latestPrescription ? medicationItems(latestPrescription) : [],
+    allergyKnowledgeState,
+  };
+}
+
+export function toAllergyDto(a: AllergyRow): AllergyIntoleranceDto {
+  return {
+    id: a.id,
+    substance: a.substance,
+    substanceCode: a.substanceCode,
+    category: a.category,
+    reaction: a.reaction,
+    severity: a.severity,
+    onsetDate: a.onsetDate ? a.onsetDate.toISOString().slice(0, 10) : null,
+    effectiveAt: a.effectiveAt ? a.effectiveAt.toISOString() : null,
+    verificationStatus: a.verificationStatus,
+    verifiedAt: a.verifiedAt ? a.verifiedAt.toISOString() : null,
+    verifiedByUserId: a.verifiedByUserId,
+    note: a.note,
+    active: a.active,
+    recordedAt: a.recordedAt.toISOString(),
+    sourceType: a.sourceType,
+    organizationId: a.organizationId,
+    clinicLocationId: a.clinicLocationId,
+    encounterId: a.encounterId,
+    supersedesId: a.supersedesId,
+    enteredInErrorAt: a.enteredInErrorAt ? a.enteredInErrorAt.toISOString() : null,
+  };
+}
+
+export function toVitalDto(v: VitalRow): VitalObservationDto {
+  return {
+    id: v.id,
+    type: v.type,
+    value: Number(v.value),
+    unit: v.unit,
+    observedAt: v.observedAt.toISOString(),
+    recordedAt: v.recordedAt.toISOString(),
+    sourceType: v.sourceType,
+    organizationId: v.organizationId,
+    clinicLocationId: v.clinicLocationId,
+    encounterId: v.encounterId,
+    method: v.method,
+    note: v.note,
+    bmiSourceHeightId: v.bmiSourceHeightId,
+    bmiSourceWeightId: v.bmiSourceWeightId,
+  };
+}
+
+export function toNarrativeDto(n: NarrativeRow | null): PatientProfileNarrativeDto | null {
+  if (!n) return null;
+  return {
+    chiefComplaint: n.chiefComplaint,
+    medicalHistory: n.medicalHistory,
+    familyHistory: n.familyHistory,
+    socialHistory: n.socialHistory,
+    currentSymptoms: n.currentSymptoms,
+    lifestyle: n.lifestyle,
+    occupation: n.occupation,
+    // PatientProfileNarrative is always patient-provided by design.
+    isPatientProvided: true,
+    updatedAt: n.updatedAt.toISOString(),
   };
 }
 

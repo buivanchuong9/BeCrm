@@ -7,10 +7,14 @@ import { LifetimeRecordEventDto } from './dto/responses/lifetime-medical-record-
 import { LifetimeMedicalRecordRepository } from './lifetime-medical-record.repository';
 import { assertCanViewLifetimeRecord } from './policies/lifetime-medical-record-policies';
 import {
+  buildAllergyKnowledgeStateDto,
   buildEvents,
   buildSummary,
   collectDoctorIds,
+  toAllergyDto,
+  toNarrativeDto,
   toPatientDto,
+  toVitalDto,
 } from './lifetime-medical-record.mapper';
 
 export interface RequestContext {
@@ -73,19 +77,26 @@ export class LifetimeMedicalRecordService {
 
     const encounters = await this.repo.findEncountersForPatient(patientId);
     const encounterIds = encounters.map((e) => e.id);
-    const [prescriptions, documents] = await Promise.all([
-      this.repo.findPrescriptions(encounterIds),
-      this.repo.findDocuments(encounterIds),
-    ]);
+    const [prescriptions, documents, allergies, vitals, narrative, latestKnowledgeAssessment] =
+      await Promise.all([
+        this.repo.findPrescriptions(encounterIds),
+        this.repo.findDocuments(encounterIds),
+        this.repo.findAllergies(patientId),
+        this.repo.findVitalObservations(patientId),
+        this.repo.findProfileNarrative(patientId),
+        this.repo.findLatestAllergyKnowledgeAssessment(patientId),
+      ]);
     const userNames = await this.repo.findUserNames(
       collectDoctorIds(encounters, prescriptions, documents),
     );
+
+    const allergyKnowledgeState = buildAllergyKnowledgeStateDto(latestKnowledgeAssessment);
 
     // Summary/patient/counts are always computed from the full,
     // unfiltered record (matches the frontend's always-visible stat tiles
     // in LifetimeMedicalRecord.tsx); only the returned `events` page
     // respects the query filters below.
-    const summary = buildSummary(encounters, prescriptions);
+    const summary = buildSummary(encounters, prescriptions, allergies, allergyKnowledgeState);
     const allEvents = buildEvents(encounters, prescriptions, documents, userNames);
 
     const filtered = this.applyFilters(allEvents, query).sort((a, b) =>
@@ -115,6 +126,9 @@ export class LifetimeMedicalRecordService {
       data: {
         patient: toPatientDto(patient),
         summary,
+        allergies: allergies.map(toAllergyDto),
+        vitals: vitals.map(toVitalDto),
+        narrative: toNarrativeDto(narrative),
         events: pageEvents,
         page,
         limit,

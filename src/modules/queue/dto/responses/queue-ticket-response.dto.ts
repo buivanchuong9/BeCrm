@@ -9,13 +9,19 @@ const STATUS_VALUES = [
   'skipped',
   'completed',
   'routed',
+  'cancelled',
+  'no_show',
 ] as const;
+const SOURCE_VALUES = ['appointment', 'walk_in', 'legacy'] as const;
 
 export class QueueTicketResponseDto {
   @ApiProperty({ format: 'uuid' }) id!: string;
-  @ApiProperty({ format: 'uuid' }) appointmentId!: string;
+  @ApiProperty({ format: 'uuid', nullable: true }) appointmentId!: string | null;
   @ApiProperty({ format: 'uuid' }) patientId!: string;
-  @ApiProperty({ format: 'uuid' }) encounterId!: string;
+  @ApiProperty({ format: 'uuid', nullable: true }) encounterId!: string | null;
+  @ApiProperty({ format: 'uuid', nullable: true }) checkInId!: string | null;
+  @ApiProperty({ enum: SOURCE_VALUES }) sourceType!: (typeof SOURCE_VALUES)[number];
+  @ApiProperty({ format: 'date' }) clinicDate!: string;
   @ApiProperty() number!: string;
   @ApiProperty() department!: string;
   @ApiProperty() serviceStation!: string;
@@ -28,6 +34,9 @@ export class QueueTicketResponseDto {
   @ApiProperty({ format: 'date-time', nullable: true }) acknowledgedAt!: string | null;
   @ApiProperty({ format: 'date-time', nullable: true }) serviceStartedAt!: string | null;
   @ApiProperty({ format: 'date-time', nullable: true }) completedAt!: string | null;
+  @ApiProperty({ format: 'date-time', nullable: true }) skippedAt!: string | null;
+  @ApiProperty({ format: 'date-time', nullable: true }) cancelledAt!: string | null;
+  @ApiProperty({ format: 'date-time', nullable: true }) noShowAt!: string | null;
   @ApiProperty() peopleAhead!: number;
   @ApiProperty() estimatedWaitMinutes!: number;
   @ApiProperty({ type: [String] }) preparationInstructions!: string[];

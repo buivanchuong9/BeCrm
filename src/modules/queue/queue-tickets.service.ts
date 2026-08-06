@@ -13,6 +13,8 @@ import {
 } from './policies/queue-policies';
 import { toQueueTicketResponse } from './queue-ticket-response.mapper';
 import { estimateQueuePosition } from './queue-estimate.util';
+import { allocateQueueNumber } from './queue-number-allocator';
+import { toClinicDate } from './clinic-date.util';
 import { CallNextRequest } from './dto/call-next.dto';
 import { CompleteTicketRequest, TicketActionRequest } from './dto/ticket-action.dto';
 
@@ -21,6 +23,16 @@ export interface RequestContext {
   ip?: string;
   userAgent?: string;
 }
+
+/** Maps service codes to department/station/prefix configuration. */
+const SERVICE_MAP: Record<string, { department: string; station: string; prefix: string }> = {
+  DERMATOLOGY: { department: 'Khoa Da liễu', station: 'Tiếp nhận Da liễu', prefix: 'D' },
+  GENERAL: { department: 'Khám tổng quát', station: 'Quầy tiếp nhận', prefix: 'A' },
+  VITALS: { department: 'Điều dưỡng', station: 'Khu đo sinh hiệu', prefix: 'S' },
+};
+
+const DEFAULT_SERVICE = SERVICE_MAP.DERMATOLOGY;
+const FALLBACK_TZ = 'Asia/Ho_Chi_Minh';
 
 @Injectable()
 export class QueueTicketsService {
@@ -36,10 +48,13 @@ export class QueueTicketsService {
     if (ticket.status !== 'waiting') {
       return toQueueTicketResponse(ticket, { peopleAhead: 0, estimatedWaitMinutes: 0 });
     }
+    // Use the stored clinicDate (already timezone-correct when it was created)
+    // rather than recomputing now() so cross-midnight reads stay accurate.
     const ahead = await this.prisma.queueTicket.count({
       where: {
         organizationId: ticket.organizationId,
         clinicLocationId: ticket.clinicLocationId,
+        clinicDate: ticket.clinicDate,
         department: ticket.department,
         status: { in: ['waiting', 'called', 'acknowledged', 'in_service'] },
         OR: [
@@ -55,6 +70,7 @@ export class QueueTicketsService {
     principal: AuthenticatedPrincipal,
     query: {
       clinicLocationId?: string;
+      clinicDate?: string;
       department?: string;
       status?: QueueTicketStatus;
       serviceStation?: string;
@@ -71,9 +87,18 @@ export class QueueTicketsService {
     }
     assertClinicInScope(principal, STAFF_QUEUE_ROLES, clinicLocation.organizationId);
 
+    const tz = clinicLocation.timezone || FALLBACK_TZ;
+    // When query.clinicDate is provided (ISO date string like "2026-08-06"),
+    // treat it as a calendar date in the clinic timezone (clients always send
+    // the local date they intend).  new Date("2026-08-06") = midnight UTC for
+    // that date, which Prisma serialises to the DATE "2026-08-06" — correct.
+    // When not provided, compute today's calendar date in the clinic timezone.
+    const clinicDate = query.clinicDate ? new Date(query.clinicDate) : toClinicDate(tz);
+
     const rows = await this.tickets.list({
       organizationId: clinicLocation.organizationId,
       clinicLocationId: query.clinicLocationId,
+      clinicDate,
       department: query.department,
       status: query.status,
       serviceStation: query.serviceStation,
@@ -90,7 +115,15 @@ export class QueueTicketsService {
       throw new NotFoundAppError('Clinic location not found.');
     }
     assertClinicInScope(principal, STAFF_QUEUE_ROLES, clinicLocation.organizationId);
-    const rows = await this.tickets.stationSummary(clinicLocation.organizationId, clinicLocationId);
+
+    const tz = clinicLocation.timezone || FALLBACK_TZ;
+    const clinicDate = toClinicDate(tz);
+
+    const rows = await this.tickets.stationSummary(
+      clinicLocation.organizationId,
+      clinicLocationId,
+      clinicDate,
+    );
     return { data: rows };
   }
 
@@ -103,12 +136,17 @@ export class QueueTicketsService {
     }
     assertClinicInScope(principal, QUEUE_CONTROL_ROLES, clinicLocation.organizationId);
 
+    const tz = clinicLocation.timezone || FALLBACK_TZ;
+    const clinicDate = toClinicDate(tz);
+
     const called = await this.prisma.$transaction(async (tx) => {
       const ticket = await this.tickets.callNext(
         tx,
         clinicLocation.organizationId,
         dto.clinicLocationId,
-        dto.department,
+        clinicDate,
+        dto.department ?? null,
+        principal.userId,
       );
       if (!ticket) return null;
       await this.audit.write(
@@ -190,8 +228,59 @@ export class QueueTicketsService {
       ticketId,
       dto.version,
       ['waiting', 'called', 'acknowledged'],
-      { status: 'skipped' },
+      { status: 'skipped', skippedAt: new Date() },
       'queue_ticket.skipped',
+      context,
+    );
+  }
+
+  async returnToQueue(
+    principal: AuthenticatedPrincipal,
+    ticketId: string,
+    dto: TicketActionRequest,
+    context: RequestContext,
+  ) {
+    return this.applyTransition(
+      principal,
+      ticketId,
+      dto.version,
+      ['skipped'],
+      { status: 'waiting', skippedAt: null },
+      'queue_ticket.returned_to_queue',
+      context,
+    );
+  }
+
+  async cancel(
+    principal: AuthenticatedPrincipal,
+    ticketId: string,
+    dto: TicketActionRequest,
+    context: RequestContext,
+  ) {
+    return this.applyTransition(
+      principal,
+      ticketId,
+      dto.version,
+      ['waiting', 'called', 'acknowledged', 'skipped'],
+      { status: 'cancelled', cancelledAt: new Date() },
+      'queue_ticket.cancelled',
+      context,
+    );
+  }
+
+  async noShow(
+    principal: AuthenticatedPrincipal,
+    ticketId: string,
+    dto: TicketActionRequest,
+    context: RequestContext,
+  ) {
+    return this.applyTransition(
+      principal,
+      ticketId,
+      dto.version,
+      ['called', 'acknowledged'],
+      { status: 'no_show', noShowAt: new Date() },
+      'queue_ticket.no_show',
       context,
     );
   }
@@ -227,6 +316,9 @@ export class QueueTicketsService {
           appointmentId: ticket.appointmentId,
           patientId: ticket.patientId,
           encounterId: ticket.encounterId,
+          sourceType: ticket.sourceType,
+          clinicDate: ticket.clinicDate,
+          seqNumber: ticket.seqNumber,
           number: ticket.number,
           department: ticket.department,
           serviceStation: dto.nextStation,
@@ -319,19 +411,32 @@ export class QueueTicketsService {
     }
     assertClinicInScope(principal, RECEPTION_ROLES, clinicLocation.organizationId);
 
+    const tz = clinicLocation.timezone || FALLBACK_TZ;
+    const clinicDate = toClinicDate(tz);
+
     const [upcomingAppointments, waitingCount, inServiceCount] = await this.prisma.$transaction([
       this.prisma.appointment.count({
         where: { clinicLocationId, status: 'upcoming', startAt: { gte: new Date() } },
       }),
-      this.prisma.queueTicket.count({ where: { clinicLocationId, status: 'waiting' } }),
       this.prisma.queueTicket.count({
-        where: { clinicLocationId, status: { in: ['called', 'acknowledged', 'in_service'] } },
+        where: { clinicLocationId, clinicDate, status: 'waiting' },
+      }),
+      this.prisma.queueTicket.count({
+        where: {
+          clinicLocationId,
+          clinicDate,
+          status: { in: ['called', 'acknowledged', 'in_service'] },
+        },
       }),
     ]);
 
     return { data: { upcomingAppointments, waitingCount, inServiceCount } };
   }
 
+  /**
+   * Walk-in registration: creates a queue entry WITHOUT a fake appointment.
+   * sourceType = 'walk_in'.  clinicDate is derived from the clinic timezone.
+   */
   async createWalkIn(dto: {
     clinicLocationId: string;
     serviceCode: string;
@@ -346,20 +451,11 @@ export class QueueTicketsService {
       throw new NotFoundAppError('Clinic location not found.');
     }
 
-    const serviceMap: Record<string, { department: string; station: string; prefix: string }> = {
-      DERMATOLOGY: { department: 'Khoa Da liễu', station: 'Tiếp nhận Da liễu', prefix: 'D' },
-      GENERAL: { department: 'Khám tổng quát', station: 'Quầy tiếp nhận', prefix: 'A' },
-      VITALS: { department: 'Điều dưỡng', station: 'Khu đo sinh hiệu', prefix: 'S' },
-    };
-
-    const targetService = serviceMap[dto.serviceCode] ?? {
-      department: 'Khoa Da liễu',
-      station: 'Tiếp nhận Da liễu',
-      prefix: 'D',
-    };
+    const targetService = SERVICE_MAP[dto.serviceCode] ?? DEFAULT_SERVICE;
+    const tz = clinicLocation.timezone || FALLBACK_TZ;
+    const clinicDate = toClinicDate(tz);
 
     const ticket = await this.prisma.$transaction(async (tx) => {
-      // Find or create patient by phone
       let patient = await tx.patient.findFirst({
         where: { organizationId: clinicLocation.organizationId, phone: dto.phone },
       });
@@ -378,34 +474,10 @@ export class QueueTicketsService {
         });
       }
 
-      // Find doctor user in organization or fallback to first active user
-      const defaultDoctor = await tx.userMembership.findFirst({
-        where: { organizationId: clinicLocation.organizationId, role: 'doctor' },
-        select: { userId: true },
-      });
-      const doctorId = defaultDoctor?.userId ?? (await tx.user.findFirstOrThrow()).id;
-
-      // Create appointment & encounter for walk-in
-      const now = new Date();
-      const appointment = await tx.appointment.create({
-        data: {
-          organizationId: clinicLocation.organizationId,
-          clinicLocationId: dto.clinicLocationId,
-          patientId: patient.id,
-          doctorId,
-          startAt: now,
-          endAt: new Date(now.getTime() + 30 * 60 * 1000),
-          department: targetService.department,
-          status: 'upcoming',
-          mode: 'in_person',
-        },
-      });
-
       const encounter = await tx.medicalEncounter.create({
         data: {
           organizationId: clinicLocation.organizationId,
           clinicLocationId: dto.clinicLocationId,
-          appointmentId: appointment.id,
           patientId: patient.id,
           type: 'standard',
           origin: 'walk_in',
@@ -414,26 +486,23 @@ export class QueueTicketsService {
         },
       });
 
-      const dayStart = new Date();
-      dayStart.setUTCHours(0, 0, 0, 0);
-      const issuedToday = await tx.queueTicket.count({
-        where: {
-          organizationId: clinicLocation.organizationId,
-          clinicLocationId: dto.clinicLocationId,
-          department: targetService.department,
-          issuedAt: { gte: dayStart },
-        },
+      const { seqNumber, displayCode } = await allocateQueueNumber(tx, {
+        organizationId: clinicLocation.organizationId,
+        clinicLocationId: dto.clinicLocationId,
+        clinicDate,
+        department: targetService.department,
+        prefix: targetService.prefix,
       });
-
-      const number = `${targetService.prefix}${String(issuedToday + 1).padStart(3, '0')}`;
 
       const created = await this.tickets.create(tx, {
         organizationId: clinicLocation.organizationId,
         clinicLocationId: dto.clinicLocationId,
-        appointmentId: appointment.id,
         patientId: patient.id,
         encounterId: encounter.id,
-        number,
+        sourceType: 'walk_in',
+        clinicDate,
+        seqNumber,
+        number: displayCode,
         department: targetService.department,
         serviceStation: targetService.station,
         waitingArea: 'Sảnh chờ tầng 1',

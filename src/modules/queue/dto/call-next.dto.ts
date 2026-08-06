@@ -1,10 +1,14 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsUUID } from 'class-validator';
+import { IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class CallNextRequest {
-  @ApiProperty()
+  @ApiProperty({
+    required: false,
+    description: 'Filter to a specific department. Omit to select globally.',
+  })
+  @IsOptional()
   @IsString()
-  department!: string;
+  department?: string;
 
   @ApiProperty({ format: 'uuid' })
   @IsUUID()

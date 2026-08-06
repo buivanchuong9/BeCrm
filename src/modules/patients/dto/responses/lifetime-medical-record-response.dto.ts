@@ -1,6 +1,34 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { LIFETIME_RECORD_EVENT_TYPES } from '../lifetime-medical-record-query.dto';
 
+const ALLERGY_KNOWLEDGE_STATE_VALUES = [
+  'unknown',
+  'no_known_allergies',
+  'known_allergies',
+] as const;
+const ALLERGY_VERIFICATION_VALUES = [
+  'patient_reported',
+  'clinician_verified',
+  'unverified',
+  'imported_unverified',
+  'organization_verified',
+  'superseded',
+  'entered_in_error',
+] as const;
+const ALLERGY_SOURCE_VALUES = [
+  'patient_reported',
+  'clinical_assessment',
+  'imported_unverified',
+  'legacy_backfill',
+] as const;
+const VITAL_SOURCE_VALUES = [
+  'clinical_measurement',
+  'patient_reported',
+  'device_imported',
+  'ehr_imported',
+  'legacy_backfill',
+] as const;
+
 export class LifetimeRecordPatientDto {
   @ApiProperty({ format: 'uuid' }) id!: string;
   @ApiProperty({ nullable: true }) nationalHealthId!: string | null;
@@ -14,6 +42,66 @@ export class LifetimeRecordPatientDto {
   @ApiProperty({ nullable: true }) address!: string | null;
   @ApiProperty({ nullable: true }) heightCm!: number | null;
   @ApiProperty({ nullable: true }) weightKg!: number | null;
+}
+
+export class AllergyKnowledgeStateDto {
+  @ApiProperty({ enum: ALLERGY_KNOWLEDGE_STATE_VALUES })
+  state!: (typeof ALLERGY_KNOWLEDGE_STATE_VALUES)[number];
+  @ApiProperty({ format: 'date-time', nullable: true }) assessedAt!: string | null;
+  @ApiProperty({ format: 'uuid', nullable: true }) assessedByUserId!: string | null;
+  @ApiProperty({ format: 'uuid', nullable: true }) organizationId!: string | null;
+}
+
+export class AllergyIntoleranceDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty() substance!: string;
+  @ApiProperty({ nullable: true }) substanceCode!: string | null;
+  @ApiProperty() category!: string;
+  @ApiProperty({ nullable: true }) reaction!: string | null;
+  @ApiProperty({ nullable: true }) severity!: string | null;
+  @ApiProperty({ format: 'date', nullable: true }) onsetDate!: string | null;
+  @ApiProperty({ format: 'date-time', nullable: true }) effectiveAt!: string | null;
+  @ApiProperty({ enum: ALLERGY_VERIFICATION_VALUES }) verificationStatus!: string;
+  @ApiProperty({ nullable: true }) verifiedAt!: string | null;
+  @ApiProperty({ format: 'uuid', nullable: true }) verifiedByUserId!: string | null;
+  @ApiProperty({ nullable: true }) note!: string | null;
+  @ApiProperty() active!: boolean;
+  @ApiProperty({ format: 'date-time' }) recordedAt!: string;
+  @ApiProperty({ enum: ALLERGY_SOURCE_VALUES }) sourceType!: string;
+  @ApiProperty({ format: 'uuid' }) organizationId!: string;
+  @ApiProperty({ format: 'uuid', nullable: true }) clinicLocationId!: string | null;
+  @ApiProperty({ format: 'uuid', nullable: true }) encounterId!: string | null;
+  @ApiProperty({ format: 'uuid', nullable: true }) supersedesId!: string | null;
+  @ApiProperty({ format: 'date-time', nullable: true }) enteredInErrorAt!: string | null;
+}
+
+export class VitalObservationDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty() type!: string;
+  @ApiProperty() value!: number;
+  @ApiProperty() unit!: string;
+  @ApiProperty({ format: 'date-time' }) observedAt!: string;
+  @ApiProperty({ format: 'date-time' }) recordedAt!: string;
+  @ApiProperty({ enum: VITAL_SOURCE_VALUES }) sourceType!: string;
+  @ApiProperty({ format: 'uuid' }) organizationId!: string;
+  @ApiProperty({ format: 'uuid', nullable: true }) clinicLocationId!: string | null;
+  @ApiProperty({ format: 'uuid', nullable: true }) encounterId!: string | null;
+  @ApiProperty({ nullable: true }) method!: string | null;
+  @ApiProperty({ nullable: true }) note!: string | null;
+  @ApiProperty({ format: 'uuid', nullable: true }) bmiSourceHeightId!: string | null;
+  @ApiProperty({ format: 'uuid', nullable: true }) bmiSourceWeightId!: string | null;
+}
+
+export class PatientProfileNarrativeDto {
+  @ApiProperty({ nullable: true }) chiefComplaint!: string | null;
+  @ApiProperty({ nullable: true }) medicalHistory!: string | null;
+  @ApiProperty({ nullable: true }) familyHistory!: string | null;
+  @ApiProperty({ nullable: true }) socialHistory!: string | null;
+  @ApiProperty({ nullable: true }) currentSymptoms!: string | null;
+  @ApiProperty({ nullable: true }) lifestyle!: string | null;
+  @ApiProperty({ nullable: true }) occupation!: string | null;
+  @ApiProperty() isPatientProvided!: boolean;
+  @ApiProperty({ format: 'date-time' }) updatedAt!: string;
 }
 
 export class LifetimeRecordClinicalItemDto {
@@ -37,6 +125,8 @@ export class LifetimeRecordSummaryDto {
   allergies!: LifetimeRecordClinicalItemDto[];
   @ApiProperty({ type: LifetimeRecordClinicalItemDto, isArray: true })
   currentMedications!: LifetimeRecordClinicalItemDto[];
+  @ApiProperty({ type: AllergyKnowledgeStateDto })
+  allergyKnowledgeState!: AllergyKnowledgeStateDto;
 }
 
 export class LifetimeRecordSourceDto {
@@ -93,6 +183,10 @@ export class LifetimeRecordEventDto {
 export class LifetimeMedicalRecordResponseDto {
   @ApiProperty({ type: LifetimeRecordPatientDto }) patient!: LifetimeRecordPatientDto;
   @ApiProperty({ type: LifetimeRecordSummaryDto }) summary!: LifetimeRecordSummaryDto;
+  @ApiProperty({ type: AllergyIntoleranceDto, isArray: true }) allergies!: AllergyIntoleranceDto[];
+  @ApiProperty({ type: VitalObservationDto, isArray: true }) vitals!: VitalObservationDto[];
+  @ApiProperty({ type: PatientProfileNarrativeDto, nullable: true })
+  narrative!: PatientProfileNarrativeDto | null;
   @ApiProperty({ type: LifetimeRecordEventDto, isArray: true }) events!: LifetimeRecordEventDto[];
   @ApiProperty() page!: number;
   @ApiProperty() limit!: number;

@@ -14,4 +14,4 @@ import { DoctorDecisionRepository } from './doctor-decision.repository';
   providers: [DoctorDecisionService, DoctorDecisionRepository],
   exports: [DoctorDecisionRepository],
 })
-export class DoctorDecisionModule { }
+export class DoctorDecisionModule {}

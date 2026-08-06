@@ -30,14 +30,15 @@ export class CarePlansRepository {
 
   async create(patientId: string, encounterId: string) {
     const plan = await this.prisma.crmCarePlan.create({ data: { patientId, encounterId } });
-    
+
     // Comprehensive production follow-up activities for dermatology patients
     const initialActivities = [
       {
         carePlanId: plan.id,
         type: 'medication_reminder',
         title: 'Nhắc uống thuốc kháng Histamine & bôi kem dưỡng ẩm dịu da',
-        description: 'Tự động gửi thông báo ứng dụng & SMS nhắc nhở dùng thuốc 2 lần/ngày (08:00 & 20:00).',
+        description:
+          'Tự động gửi thông báo ứng dụng & SMS nhắc nhở dùng thuốc 2 lần/ngày (08:00 & 20:00).',
         dueDate: new Date(Date.now() + 12 * 3600000), // 12h later
         priority: 'high',
         status: 'due',
@@ -59,7 +60,8 @@ export class CarePlansRepository {
         carePlanId: plan.id,
         type: 'patient_education',
         title: 'Hướng dẫn chăm sóc da thương tổn & chống nắng đúng cách',
-        description: 'Cung cấp bài viết chuẩn Y khoa về quy trình làm sạch dịu nhẹ và sử dụng kem chống nắng.',
+        description:
+          'Cung cấp bài viết chuẩn Y khoa về quy trình làm sạch dịu nhẹ và sử dụng kem chống nắng.',
         dueDate: new Date(Date.now() + 72 * 3600000),
         priority: 'low',
         status: 'scheduled',
@@ -70,7 +72,8 @@ export class CarePlansRepository {
         carePlanId: plan.id,
         type: 'adherence_check',
         title: 'Cập nhật ảnh tổn thương da theo dõi tiến triển 7 ngày',
-        description: 'Bệnh nhân chụp và tải lên 1 ảnh vùng tổn thương để hệ thống AI phân tích đối chiếu.',
+        description:
+          'Bệnh nhân chụp và tải lên 1 ảnh vùng tổn thương để hệ thống AI phân tích đối chiếu.',
         dueDate: new Date(Date.now() + 168 * 3600000),
         priority: 'high',
         status: 'due',

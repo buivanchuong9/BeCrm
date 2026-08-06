@@ -14,7 +14,7 @@ import {
 } from '@nestjs/common';
 import { ApiOkResponse, ApiProduces, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
-import { IsIn, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsDateString, IsIn, IsOptional, IsString, IsUUID } from 'class-validator';
 import { QueueTicketStatus } from '@prisma/client';
 import { CurrentUser } from '../../core/security/current-user.decorator';
 import { AuthenticatedPrincipal } from '../../core/security/auth.types';
@@ -39,10 +39,13 @@ const STATUS_VALUES = [
   'skipped',
   'completed',
   'routed',
+  'cancelled',
+  'no_show',
 ] as const;
 
 class ListQueueTicketsQuery {
   @IsOptional() @IsUUID() clinicLocationId?: string;
+  @IsOptional() @IsDateString() clinicDate?: string;
   @IsOptional() @IsString() department?: string;
   @IsOptional() @IsIn(STATUS_VALUES) status?: QueueTicketStatus;
   @IsOptional() @IsString() serviceStation?: string;
@@ -114,6 +117,42 @@ export class QueueTicketsController {
   }
 
   @ApiOkEnvelope(QueueTicketResponseDto)
+  @Post(':ticketId/return-to-queue')
+  @HttpCode(HttpStatus.OK)
+  async returnToQueue(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Param('ticketId', ParseUUIDPipe) ticketId: string,
+    @Body() dto: TicketActionRequest,
+    @Req() req: Request,
+  ) {
+    return this.queueTicketsService.returnToQueue(principal, ticketId, dto, requestContext(req));
+  }
+
+  @ApiOkEnvelope(QueueTicketResponseDto)
+  @Post(':ticketId/cancellations')
+  @HttpCode(HttpStatus.OK)
+  async cancel(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Param('ticketId', ParseUUIDPipe) ticketId: string,
+    @Body() dto: TicketActionRequest,
+    @Req() req: Request,
+  ) {
+    return this.queueTicketsService.cancel(principal, ticketId, dto, requestContext(req));
+  }
+
+  @ApiOkEnvelope(QueueTicketResponseDto)
+  @Post(':ticketId/no-shows')
+  @HttpCode(HttpStatus.OK)
+  async noShow(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Param('ticketId', ParseUUIDPipe) ticketId: string,
+    @Body() dto: TicketActionRequest,
+    @Req() req: Request,
+  ) {
+    return this.queueTicketsService.noShow(principal, ticketId, dto, requestContext(req));
+  }
+
+  @ApiOkEnvelope(QueueTicketResponseDto)
   @Post(':ticketId/completions')
   @HttpCode(HttpStatus.OK)
   async complete(
@@ -168,9 +207,12 @@ export class ReceptionController {
 @Controller({ path: 'queue', version: '1' })
 export class QueueContractController {
   constructor(private readonly service: QueueTicketsService) {}
-  @Get() list(@CurrentUser() p: AuthenticatedPrincipal, @Query() q: ListQueueTicketsQuery) {
+
+  @Get()
+  list(@CurrentUser() p: AuthenticatedPrincipal, @Query() q: ListQueueTicketsQuery) {
     return this.service.list(p, q);
   }
+
   @Sse('stream')
   @ApiProduces('text/event-stream')
   @ApiOkResponse({
@@ -191,20 +233,22 @@ export class QueueContractController {
       map((payload) => ({ type: 'queue.snapshot', data: payload })),
     );
   }
-  @Get('stations') stations(
+
+  @Get('stations')
+  stations(
     @CurrentUser() p: AuthenticatedPrincipal,
     @Query('clinicLocationId', ParseUUIDPipe) clinic: string,
   ) {
     return this.service.stations(p, clinic);
   }
-  @Post('call-next') call(
-    @CurrentUser() p: AuthenticatedPrincipal,
-    @Body() d: CallNextRequest,
-    @Req() r: Request,
-  ) {
+
+  @Post('call-next')
+  call(@CurrentUser() p: AuthenticatedPrincipal, @Body() d: CallNextRequest, @Req() r: Request) {
     return this.service.callNext(p, d, requestContext(r));
   }
-  @Post(':id/acknowledge') acknowledge(
+
+  @Post(':id/acknowledge')
+  acknowledge(
     @CurrentUser() p: AuthenticatedPrincipal,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() d: TicketActionRequest,
@@ -212,7 +256,9 @@ export class QueueContractController {
   ) {
     return this.service.acknowledge(p, id, d, requestContext(r));
   }
-  @Post(':id/start-service') start(
+
+  @Post(':id/start-service')
+  start(
     @CurrentUser() p: AuthenticatedPrincipal,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() d: TicketActionRequest,
@@ -220,7 +266,9 @@ export class QueueContractController {
   ) {
     return this.service.startService(p, id, d, requestContext(r));
   }
-  @Post(':id/skip') skip(
+
+  @Post(':id/skip')
+  skip(
     @CurrentUser() p: AuthenticatedPrincipal,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() d: TicketActionRequest,
@@ -228,7 +276,39 @@ export class QueueContractController {
   ) {
     return this.service.skip(p, id, d, requestContext(r));
   }
-  @Post(':id/complete') complete(
+
+  @Post(':id/return-to-queue')
+  returnToQueue(
+    @CurrentUser() p: AuthenticatedPrincipal,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() d: TicketActionRequest,
+    @Req() r: Request,
+  ) {
+    return this.service.returnToQueue(p, id, d, requestContext(r));
+  }
+
+  @Post(':id/cancel')
+  cancel(
+    @CurrentUser() p: AuthenticatedPrincipal,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() d: TicketActionRequest,
+    @Req() r: Request,
+  ) {
+    return this.service.cancel(p, id, d, requestContext(r));
+  }
+
+  @Post(':id/no-show')
+  noShow(
+    @CurrentUser() p: AuthenticatedPrincipal,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() d: TicketActionRequest,
+    @Req() r: Request,
+  ) {
+    return this.service.noShow(p, id, d, requestContext(r));
+  }
+
+  @Post(':id/complete')
+  complete(
     @CurrentUser() p: AuthenticatedPrincipal,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() d: CompleteTicketRequest,

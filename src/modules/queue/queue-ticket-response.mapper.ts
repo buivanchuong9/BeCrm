@@ -10,6 +10,9 @@ export function toQueueTicketResponse(
     appointmentId: ticket.appointmentId,
     patientId: ticket.patientId,
     encounterId: ticket.encounterId,
+    checkInId: ticket.checkInId,
+    sourceType: ticket.sourceType,
+    clinicDate: ticket.clinicDate.toISOString().split('T')[0],
     number: ticket.number,
     department: ticket.department,
     serviceStation: ticket.serviceStation,
@@ -22,11 +25,13 @@ export function toQueueTicketResponse(
     acknowledgedAt: ticket.acknowledgedAt?.toISOString() ?? null,
     serviceStartedAt: ticket.serviceStartedAt?.toISOString() ?? null,
     completedAt: ticket.completedAt?.toISOString() ?? null,
+    skippedAt: ticket.skippedAt?.toISOString() ?? null,
+    cancelledAt: ticket.cancelledAt?.toISOString() ?? null,
+    noShowAt: ticket.noShowAt?.toISOString() ?? null,
     peopleAhead: derived.peopleAhead,
     estimatedWaitMinutes: derived.estimatedWaitMinutes,
-    // No confirmed per-department prep-instruction source exists yet
-    // (docs/api.md section 45) — never fabricated, always empty until a real
-    // content source is scoped.
+    // No confirmed per-department prep-instruction source exists yet —
+    // never fabricated, always empty until a real content source is scoped.
     preparationInstructions: [],
     nextStation: ticket.nextStation,
     version: ticket.version,

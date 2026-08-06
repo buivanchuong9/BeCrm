@@ -76,4 +76,40 @@ export class LifetimeMedicalRecordRepository {
     });
     return new Map(rows.map((r) => [r.id, r.displayName]));
   }
+
+  findAllergies(patientId: string) {
+    return this.prisma.allergyIntolerance.findMany({
+      where: { patientId },
+      orderBy: [{ active: 'desc' }, { recordedAt: 'desc' }],
+    });
+  }
+
+  findVitalObservations(patientId: string) {
+    return this.prisma.vitalObservation.findMany({
+      where: { patientId },
+      // Sort by observedAt (the clinically authoritative measurement time),
+      // not recordedAt (system entry time — may be later for imports/backfills).
+      orderBy: { observedAt: 'desc' },
+    });
+  }
+
+  findProfileNarrative(patientId: string) {
+    return this.prisma.patientProfileNarrative.findUnique({
+      where: { patientId },
+    });
+  }
+
+  findLatestAllergyKnowledgeAssessment(patientId: string) {
+    return this.prisma.allergyKnowledgeAssessment.findFirst({
+      where: { patientId },
+      orderBy: { assessedAt: 'desc' },
+      select: {
+        id: true,
+        knowledgeState: true,
+        assessedAt: true,
+        assessedByUserId: true,
+        organizationId: true,
+      },
+    });
+  }
 }

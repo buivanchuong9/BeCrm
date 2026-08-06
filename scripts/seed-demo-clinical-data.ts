@@ -408,6 +408,8 @@ async function main() {
 
         const status = patient.today.queueStatus;
         const issuedAt = atHour(new Date(), 7, 30);
+        const clinicDate = new Date(issuedAt);
+        clinicDate.setHours(0, 0, 0, 0);
         await tx.queueTicket.create({
           data: {
             organizationId: organization.id,
@@ -415,7 +417,10 @@ async function main() {
             appointmentId: todayAppointment.id,
             patientId: p.id,
             encounterId: todayEncounter.id,
+            sourceType: 'appointment',
+            clinicDate,
             number: `${ticketPrefix(DEPARTMENT_NAME)}${String(ticketSeq).padStart(3, '0')}`,
+            seqNumber: ticketSeq,
             department: DEPARTMENT_NAME,
             serviceStation: DEPARTMENT_NAME,
             waitingArea: DEPARTMENT_NAME,

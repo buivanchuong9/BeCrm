@@ -70,9 +70,7 @@ export class MeController {
     // GET /me (and therefore the entire authenticated application). Uploads
     // fail explicitly at their own endpoints; profile reads degrade to no
     // server avatar so the client can use its local cache.
-    const avatarUrl = upload
-      ? this.storage.signApiDownload(upload.id, upload.storageKey)
-      : null;
+    const avatarUrl = upload ? this.storage.signApiDownload(upload.id, upload.storageKey) : null;
     return toCurrentUserResponse(user, this.users.toMembershipScopes(user), avatarUrl);
   }
 

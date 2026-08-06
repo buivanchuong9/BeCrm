@@ -69,11 +69,16 @@ model Organization {
   appointments                  Appointment[]
   encounters                    MedicalEncounter[]
   queueTickets                  QueueTicket[]
+  dailyQueueCounters            DailyQueueCounter[]
   kioskDevices                  KioskDevice[]
   specialties                   Specialty[]
   practitionerClinicAssignments PractitionerClinicAssignment[]
   staffInvitations              StaffInvitation[]
   featureFlagOverrides          FeatureFlagOverride[]
+  allergyIntolerances           AllergyIntolerance[]
+  allergyKnowledgeAssessments   AllergyKnowledgeAssessment[]
+  vitalObservations             VitalObservation[]
+  patientProfileNarratives      PatientProfileNarrative[]
 
   @@map("organizations")
 }
@@ -95,8 +100,12 @@ model ClinicLocation {
   appointments                  Appointment[]
   encounters                    MedicalEncounter[]
   queueTickets                  QueueTicket[]
+  dailyQueueCounters            DailyQueueCounter[]
   kioskDevices                  KioskDevice[]
   practitionerClinicAssignments PractitionerClinicAssignment[]
+  allergyIntolerances           AllergyIntolerance[]
+  allergyKnowledgeAssessments   AllergyKnowledgeAssessment[]
+  vitalObservations             VitalObservation[]
 
   @@unique([organizationId, code])
   @@index([organizationId])
@@ -149,6 +158,12 @@ model User {
   doctorAppointments      Appointment[]           @relation("AppointmentDoctor")
   currentDoctorEncounters MedicalEncounter[]      @relation("EncounterCurrentDoctor")
   practitionerProfile     PractitionerProfile?
+  verifiedAllergies           AllergyIntolerance[]         @relation("AllergyVerifier")
+  recordedAllergies           AllergyIntolerance[]         @relation("AllergyRecorder")
+  enteredInErrorAllergies     AllergyIntolerance[]         @relation("AllergyEnteredInErrorBy")
+  assessedKnowledgeStates     AllergyKnowledgeAssessment[] @relation("AllergyKnowledgeAssessor")
+  recordedVitals              VitalObservation[]           @relation("VitalRecorder")
+  updatedNarratives           PatientProfileNarrative[]    @relation("NarrativeUpdater")
 
   @@map("users")
 }
@@ -314,6 +329,66 @@ model AuditEvent {
 // Patients, care team, and consent (T04)
 // ---------------------------------------------------------------------------
 
+enum AllergyVerificationStatus {
+  patient_reported
+  clinician_verified
+  unverified
+  imported_unverified
+  organization_verified
+  superseded
+  entered_in_error
+}
+
+enum AllergyKnowledgeState {
+  unknown
+  no_known_allergies
+  known_allergies
+}
+
+enum AllergySourceType {
+  patient_reported
+  clinical_assessment
+  imported_unverified
+  legacy_backfill
+}
+
+enum VitalSourceType {
+  clinical_measurement
+  patient_reported
+  device_imported
+  ehr_imported
+  legacy_backfill
+}
+
+enum AllergyCategory {
+  medication
+  food
+  environment
+  contact
+  biologic
+  other
+}
+
+enum AllergySeverity {
+  mild
+  moderate
+  severe
+  life_threatening
+}
+
+enum VitalType {
+  height_cm
+  weight_kg
+  bmi
+  systolic_bp
+  diastolic_bp
+  heart_rate
+  respiratory_rate
+  temperature_c
+  spo2
+  blood_glucose
+}
+
 enum PatientGender {
   male
   female
@@ -358,6 +433,10 @@ model Patient {
   aiPlanChanges            AiPlanChangeRequest[]
   lesions                  Lesion[]
   dermatologyAdverseEvents DermatologyAdverseEvent[]
+  allergyIntolerances         AllergyIntolerance[]
+  allergyKnowledgeAssessments AllergyKnowledgeAssessment[]
+  vitalObservations           VitalObservation[]
+  profileNarrative            PatientProfileNarrative?
 
   @@unique([organizationId, code])
   @@index([organizationId])
@@ -537,6 +616,134 @@ model ConsentEvent {
 
   @@index([patientId, occurredAt])
   @@map("consent_events")
+}
+
+model AllergyIntolerance {
+  id                    String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patientId             String                    @map("patient_id") @db.Uuid
+  organizationId        String                    @map("organization_id") @db.Uuid
+  clinicLocationId      String?                   @map("clinic_location_id") @db.Uuid
+  encounterId           String?                   @map("encounter_id") @db.Uuid
+  sourceType            AllergySourceType         @default(patient_reported) @map("source_type")
+  category              AllergyCategory           @default(other)
+  substance             String
+  substanceCode         String?                   @map("substance_code")
+  reaction              String?
+  severity              AllergySeverity?
+  onsetDate             DateTime?                 @map("onset_date") @db.Date
+  effectiveAt           DateTime?                 @map("effective_at") @db.Timestamptz
+  verificationStatus    AllergyVerificationStatus @default(patient_reported) @map("verification_status")
+  verifiedByUserId      String?                   @map("verified_by_user_id") @db.Uuid
+  verifiedAt            DateTime?                 @map("verified_at") @db.Timestamptz
+  note                  String?
+  active                Boolean                   @default(true)
+  recordedByUserId      String?                   @map("recorded_by_user_id") @db.Uuid
+  recordedAt            DateTime                  @default(now()) @map("recorded_at") @db.Timestamptz
+  // Correction versioning: supersedesId points to the record this one replaces.
+  // The superseded record's verificationStatus is set to 'superseded'.
+  supersedesId          String?                   @unique @map("supersedes_id") @db.Uuid
+  enteredInErrorAt      DateTime?                 @map("entered_in_error_at") @db.Timestamptz
+  enteredInErrorByUserId String?                  @map("entered_in_error_by_user_id") @db.Uuid
+  sourceDocumentId      String?                   @map("source_document_id")
+  createdAt             DateTime                  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt             DateTime                  @updatedAt @map("updated_at") @db.Timestamptz
+
+  patient              Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  organization         Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  clinicLocation       ClinicLocation?   @relation(fields: [clinicLocationId], references: [id], onDelete: SetNull)
+  encounter            MedicalEncounter? @relation("AllergyEncounter", fields: [encounterId], references: [id], onDelete: SetNull)
+  verifiedBy           User?             @relation("AllergyVerifier", fields: [verifiedByUserId], references: [id], onDelete: SetNull)
+  recordedBy           User?             @relation("AllergyRecorder", fields: [recordedByUserId], references: [id], onDelete: SetNull)
+  enteredInErrorBy     User?             @relation("AllergyEnteredInErrorBy", fields: [enteredInErrorByUserId], references: [id], onDelete: SetNull)
+  supersedes           AllergyIntolerance?  @relation("AllergyCorrections", fields: [supersedesId], references: [id], onDelete: SetNull)
+  supersededBy         AllergyIntolerance?  @relation("AllergyCorrections")
+
+  @@index([patientId, active])
+  @@index([organizationId, patientId])
+  @@map("allergy_intolerances")
+}
+
+model AllergyKnowledgeAssessment {
+  id               String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patientId        String                @map("patient_id") @db.Uuid
+  organizationId   String                @map("organization_id") @db.Uuid
+  clinicLocationId String?               @map("clinic_location_id") @db.Uuid
+  encounterId      String?               @map("encounter_id") @db.Uuid
+  knowledgeState   AllergyKnowledgeState @map("knowledge_state")
+  assessedByUserId String?               @map("assessed_by_user_id") @db.Uuid
+  assessedAt       DateTime              @default(now()) @map("assessed_at") @db.Timestamptz
+  note             String?
+  createdAt        DateTime              @default(now()) @map("created_at") @db.Timestamptz
+
+  patient        Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  clinicLocation ClinicLocation?   @relation(fields: [clinicLocationId], references: [id], onDelete: SetNull)
+  encounter      MedicalEncounter? @relation("KnowledgeAssessmentEncounter", fields: [encounterId], references: [id], onDelete: SetNull)
+  assessedBy     User?             @relation("AllergyKnowledgeAssessor", fields: [assessedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([patientId, assessedAt(sort: Desc)])
+  @@map("allergy_knowledge_assessments")
+}
+
+model VitalObservation {
+  id                String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patientId         String         @map("patient_id") @db.Uuid
+  organizationId    String         @map("organization_id") @db.Uuid
+  clinicLocationId  String?        @map("clinic_location_id") @db.Uuid
+  encounterId       String?        @map("encounter_id") @db.Uuid
+  sourceType        VitalSourceType @default(clinical_measurement) @map("source_type")
+  type              VitalType
+  value             Decimal        @db.Decimal(8, 2)
+  unit              String
+  // observedAt: the moment the measurement was taken (clinically authoritative).
+  // recordedAt: when it was entered into the system (may be later for imports).
+  observedAt        DateTime       @map("observed_at") @db.Timestamptz
+  recordedAt        DateTime       @default(now()) @map("recorded_at") @db.Timestamptz
+  recordedByUserId  String?        @map("recorded_by_user_id") @db.Uuid
+  method            String?
+  note              String?
+  // For derived BMI: references the source height and weight observations.
+  bmiSourceHeightId String?        @map("bmi_source_height_id") @db.Uuid
+  bmiSourceWeightId String?        @map("bmi_source_weight_id") @db.Uuid
+  // Correction chain: supersedesId points to the observation this one replaces.
+  supersedesId      String?        @unique @map("supersedes_id") @db.Uuid
+  createdAt         DateTime       @default(now()) @map("created_at") @db.Timestamptz
+
+  patient         Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  organization    Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  clinicLocation  ClinicLocation?   @relation(fields: [clinicLocationId], references: [id], onDelete: SetNull)
+  encounter       MedicalEncounter? @relation(fields: [encounterId], references: [id], onDelete: SetNull)
+  recordedBy      User?             @relation("VitalRecorder", fields: [recordedByUserId], references: [id], onDelete: SetNull)
+  supersedes      VitalObservation?  @relation("VitalCorrections", fields: [supersedesId], references: [id], onDelete: SetNull)
+  supersededBy    VitalObservation?  @relation("VitalCorrections")
+  bmiSourceHeight VitalObservation?  @relation("BmiSourceHeight", fields: [bmiSourceHeightId], references: [id], onDelete: SetNull)
+  bmiHeightOf     VitalObservation[] @relation("BmiSourceHeight")
+  bmiSourceWeight VitalObservation?  @relation("BmiSourceWeight", fields: [bmiSourceWeightId], references: [id], onDelete: SetNull)
+  bmiWeightOf     VitalObservation[] @relation("BmiSourceWeight")
+
+  @@index([patientId, type, observedAt])
+  @@map("vital_observations")
+}
+
+model PatientProfileNarrative {
+  patientId       String   @id @map("patient_id") @db.Uuid
+  organizationId  String   @map("organization_id") @db.Uuid
+  chiefComplaint  String?  @map("chief_complaint")
+  medicalHistory  String?  @map("medical_history")
+  familyHistory   String?  @map("family_history")
+  socialHistory   String?  @map("social_history")
+  currentSymptoms String?  @map("current_symptoms")
+  lifestyle       String?
+  occupation      String?
+  version         Int      @default(1)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  updatedByUserId String?  @map("updated_by_user_id") @db.Uuid
+
+  patient      Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  updatedBy    User?        @relation("NarrativeUpdater", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+
+  @@map("patient_profile_narratives")
 }
 
 // ---------------------------------------------------------------------------
@@ -881,7 +1088,10 @@ model MedicalEncounter {
   clinicalOrders     ClinicalOrder[]
   workflowInstance   WorkflowInstance?
   skinAnalysisCases  AISkinAnalysisCase[]
-  lesionObservations LesionObservation[]
+  lesionObservations          LesionObservation[]
+  vitalObservations           VitalObservation[]
+  allergyIntolerances         AllergyIntolerance[]         @relation("AllergyEncounter")
+  allergyKnowledgeAssessments AllergyKnowledgeAssessment[] @relation("KnowledgeAssessmentEncounter")
 
   @@index([organizationId, status])
   @@index([patientId, updatedAt])
@@ -925,15 +1135,33 @@ enum QueueTicketStatus {
   skipped
   completed
   routed
+  cancelled
+  no_show
+}
+
+enum QueueTicketSource {
+  appointment
+  walk_in
+  legacy
 }
 
 model QueueTicket {
   id               String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId   String              @map("organization_id") @db.Uuid
   clinicLocationId String              @map("clinic_location_id") @db.Uuid
-  appointmentId    String              @map("appointment_id") @db.Uuid
+  // Nullable: walk-in tickets have no scheduled appointment.
+  appointmentId    String?             @map("appointment_id") @db.Uuid
   patientId        String              @map("patient_id") @db.Uuid
-  encounterId      String              @map("encounter_id") @db.Uuid
+  // Nullable: encounter may be created lazily for walk-ins.
+  encounterId      String?             @map("encounter_id") @db.Uuid
+  // Plain scalar — no Prisma relation to avoid back-ref bloat on token model.
+  checkInId        String?             @map("check_in_id") @db.Uuid
+  sourceType       QueueTicketSource   @default(appointment) @map("source_type")
+  clinicDate       DateTime            @map("clinic_date") @db.Date
+  // seqNumber is the raw integer from DailyQueueCounter; used for unambiguous
+  // ordering and uniqueness.  number is the patient-facing display code (e.g.
+  // "D001") derived from prefix + zero-padded seqNumber.
+  seqNumber        Int                 @map("seq_number")
   number           String
   department       String
   serviceStation   String              @map("service_station")
@@ -943,22 +1171,49 @@ model QueueTicket {
   status           QueueTicketStatus   @default(waiting)
   issuedAt         DateTime            @default(now()) @map("issued_at") @db.Timestamptz
   calledAt         DateTime?           @map("called_at") @db.Timestamptz
+  calledByUserId   String?             @map("called_by_user_id") @db.Uuid
   acknowledgedAt   DateTime?           @map("acknowledged_at") @db.Timestamptz
   serviceStartedAt DateTime?           @map("service_started_at") @db.Timestamptz
   completedAt      DateTime?           @map("completed_at") @db.Timestamptz
+  skippedAt        DateTime?           @map("skipped_at") @db.Timestamptz
+  cancelledAt      DateTime?           @map("cancelled_at") @db.Timestamptz
+  noShowAt         DateTime?           @map("no_show_at") @db.Timestamptz
   nextStation      String?             @map("next_station")
   version          Int                 @default(1)
   createdAt        DateTime            @default(now()) @map("created_at") @db.Timestamptz
   updatedAt        DateTime            @updatedAt @map("updated_at") @db.Timestamptz
 
-  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  clinicLocation ClinicLocation   @relation(fields: [clinicLocationId], references: [id], onDelete: Restrict)
-  appointment    Appointment      @relation(fields: [appointmentId], references: [id], onDelete: Restrict)
-  encounter      MedicalEncounter @relation(fields: [encounterId], references: [id], onDelete: Restrict)
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  clinicLocation ClinicLocation    @relation(fields: [clinicLocationId], references: [id], onDelete: Restrict)
+  appointment    Appointment?      @relation(fields: [appointmentId], references: [id], onDelete: Restrict)
+  encounter      MedicalEncounter? @relation(fields: [encounterId], references: [id], onDelete: Restrict)
 
-  @@index([organizationId, clinicLocationId, department, status])
+  @@unique([clinicLocationId, clinicDate, department, seqNumber])
+  @@index([clinicLocationId, clinicDate, department, number])
+  @@index([organizationId, clinicLocationId, clinicDate, status])
+  @@index([clinicLocationId, clinicDate, department, status])
   @@index([appointmentId])
+  @@index([encounterId])
+  @@index([checkInId])
+  @@index([patientId])
   @@map("queue_tickets")
+}
+
+model DailyQueueCounter {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId   String   @map("organization_id") @db.Uuid
+  clinicLocationId String   @map("clinic_location_id") @db.Uuid
+  clinicDate       DateTime @map("clinic_date") @db.Date
+  department       String
+  lastNumber       Int      @default(0) @map("last_number")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  clinicLocation ClinicLocation @relation(fields: [clinicLocationId], references: [id], onDelete: Restrict)
+
+  @@unique([clinicLocationId, clinicDate, department])
+  @@map("daily_queue_counters")
 }
 
 // ---------------------------------------------------------------------------

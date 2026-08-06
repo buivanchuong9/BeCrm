@@ -15,6 +15,8 @@ import { KioskDevicesRepository, secretMatches } from './kiosk-devices.repositor
 import { QueueTicketsRepository } from './queue-tickets.repository';
 import { toQueueTicketResponse } from './queue-ticket-response.mapper';
 import { estimateQueuePosition } from './queue-estimate.util';
+import { allocateQueueNumber } from './queue-number-allocator';
+import { toClinicDate } from './clinic-date.util';
 import { CreateCheckInRequest } from './dto/create-check-in.dto';
 import { CheckInResponseDto } from './dto/responses/check-in-response.dto';
 import { OutboxService } from '../../core/outbox/outbox.service';
@@ -43,13 +45,6 @@ export class CheckInService {
     private readonly outbox: OutboxService,
   ) {}
 
-  /**
-   * docs/api.md section 21 APT-9 — mirrors the confirmed frontend
-   * `checkInService.checkIn` business logic exactly, corrected for the
-   * security gaps that evidence flags: server-random token (never a
-   * client-side hash), a registered-device credential instead of a
-   * client-generated deviceId, and no client-trusted `actorId`.
-   */
   async checkIn(
     dto: CreateCheckInRequest,
     context: RequestContext,
@@ -88,10 +83,9 @@ export class CheckInService {
       );
     }
 
-    // Idempotent rescan: a token already used with a still-live ticket for its
-    // appointment replays that ticket instead of failing (docs/api.md section
-    // 12/41 — a patient rescanning a physical QR code has no way to resend a
-    // client-generated Idempotency-Key).
+    // Idempotent rescan: a token already used with a still-live ticket replays
+    // that ticket instead of failing (patient rescanning a physical QR has no
+    // way to resend a client-generated Idempotency-Key).
     if (tokenRecord.status === 'used') {
       const liveTicket = await this.queueTickets.findLiveByAppointmentId(tokenRecord.appointmentId);
       if (liveTicket) {
@@ -167,26 +161,30 @@ export class CheckInService {
       throw new NotFoundAppError('No encounter is linked to this appointment.');
     }
 
+    const FALLBACK_TZ = 'Asia/Ho_Chi_Minh';
+    const clinicLoc = await this.prisma.clinicLocation.findUnique({
+      where: { id: appointment.clinicLocationId },
+      select: { timezone: true },
+    });
+    const clinicDate = toClinicDate(clinicLoc?.timezone || FALLBACK_TZ, appointment.startAt);
+
     const aheadCount = await this.queueTickets.countWaitingAhead(
       appointment.organizationId,
       appointment.clinicLocationId,
+      clinicDate,
       appointment.department,
     );
     const estimate = estimateQueuePosition(aheadCount);
 
     try {
       const ticket = await this.prisma.$transaction(async (tx) => {
-        const dayStart = new Date();
-        dayStart.setUTCHours(0, 0, 0, 0);
-        const issuedToday = await tx.queueTicket.count({
-          where: {
-            organizationId: appointment.organizationId,
-            clinicLocationId: appointment.clinicLocationId,
-            department: appointment.department,
-            issuedAt: { gte: dayStart },
-          },
+        const { seqNumber, displayCode } = await allocateQueueNumber(tx, {
+          organizationId: appointment.organizationId,
+          clinicLocationId: appointment.clinicLocationId,
+          clinicDate,
+          department: appointment.department,
+          prefix: ticketPrefix(appointment.department),
         });
-        const number = `${ticketPrefix(appointment.department)}${String(issuedToday + 1).padStart(3, '0')}`;
 
         const created = await this.queueTickets.create(tx, {
           organizationId: appointment.organizationId,
@@ -194,11 +192,12 @@ export class CheckInService {
           appointmentId: appointment.id,
           patientId: appointment.patientId,
           encounterId: encounter.id,
-          number,
+          checkInId: tokenRecord.id,
+          sourceType: 'appointment',
+          clinicDate,
+          number: displayCode,
+          seqNumber,
           department: appointment.department,
-          // Phase 1 default: no separate station-routing configuration exists
-          // yet (docs/api.md section 45) — service station and waiting area
-          // default to the department name.
           serviceStation: appointment.department,
           waitingArea: appointment.department,
           priority: 'normal',
@@ -259,12 +258,10 @@ export class CheckInService {
 
       return { data: { ticket: toQueueTicketResponse(ticket, estimate), repeated: false } };
     } catch (err) {
-      // docs/api.md section 41 "QR check-in": two truly concurrent redemptions
-      // of the same never-yet-used token both pass every check above and race
-      // to create the ticket — the partial unique index
-      // uniq_queue_ticket_live_per_appointment lets exactly one win; the loser
-      // replays the winner's ticket instead of erroring, same as a sequential
-      // rescan.
+      // Two truly concurrent redemptions of the same never-yet-used token both
+      // pass every check above and race to create the ticket — the partial
+      // unique index uniq_queue_ticket_live_per_appointment lets exactly one
+      // win; the loser replays the winner's ticket instead of erroring.
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
         const liveTicket = await this.queueTickets.findLiveByAppointmentId(
           tokenRecord.appointmentId,
@@ -283,6 +280,7 @@ export class CheckInService {
     const aheadCount = await this.queueTickets.countWaitingAhead(
       ticket.organizationId,
       ticket.clinicLocationId,
+      ticket.clinicDate,
       ticket.department,
     );
     return toQueueTicketResponse(ticket, estimateQueuePosition(aheadCount));
