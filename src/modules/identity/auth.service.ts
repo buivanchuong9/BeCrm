@@ -8,7 +8,7 @@ import { UsersRepository, UserWithMemberships } from './users.repository';
 import { RefreshSessionsRepository, DeviceContext } from './refresh-sessions.repository';
 
 const FAILED_LOGIN_LOCK_THRESHOLD = 5;
-const FAILED_LOGIN_LOCK_MINUTES = 15;
+const FAILED_LOGIN_LOCK_MINUTES = 2;
 
 export interface LoginResult {
   accessToken: string;

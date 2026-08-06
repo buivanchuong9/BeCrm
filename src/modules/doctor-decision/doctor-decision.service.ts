@@ -78,7 +78,7 @@ export class DoctorDecisionService {
     private readonly encounters: EncountersRepository,
     private readonly aiAssessments: AiAssessmentRepository,
     private readonly audit: AuditService,
-  ) {}
+  ) { }
 
   private async loadEncounter(principal: AuthenticatedPrincipal, encounterId: string) {
     const encounter = await this.encounters.findVisibleById(principal, encounterId);
@@ -363,10 +363,10 @@ export class DoctorDecisionService {
         responsibleProviderId: principal.userId,
         deviationFromProtocol: dto.deviationFromProtocol
           ? {
-              reason: dto.deviationFromProtocol.reason,
-              approvedBy: principal.userId,
-              approvedAt: signedAt.toISOString(),
-            }
+            reason: dto.deviationFromProtocol.reason,
+            approvedBy: principal.userId,
+            approvedAt: signedAt.toISOString(),
+          }
           : undefined,
         outcome: dto.outcome,
         currentStage: dto.currentStage ?? 'induction',
@@ -388,9 +388,9 @@ export class DoctorDecisionService {
             protocolRef:
               created.protocolTemplateId && created.protocolTemplateVersionId
                 ? {
-                    templateId: created.protocolTemplateId,
-                    templateVersionId: created.protocolTemplateVersionId,
-                  }
+                  templateId: created.protocolTemplateId,
+                  templateVersionId: created.protocolTemplateVersionId,
+                }
                 : null,
             milestones: created.milestones,
             monitoringMetrics: created.monitoringMetrics,
@@ -511,14 +511,14 @@ export class DoctorDecisionService {
           ...(dto.measurableGoals !== undefined ? { measurableGoals: dto.measurableGoals } : {}),
           ...(dto.protocolRef
             ? {
-                protocolTemplateId: dto.protocolRef.templateId,
-                protocolTemplateVersionId: dto.protocolRef.templateVersionId,
-              }
+              protocolTemplateId: dto.protocolRef.templateId,
+              protocolTemplateVersionId: dto.protocolRef.templateVersionId,
+            }
             : {}),
           ...(dto.milestones !== undefined
             ? {
-                milestones: dto.milestones as unknown as Prisma.InputJsonValue,
-              }
+              milestones: dto.milestones as unknown as Prisma.InputJsonValue,
+            }
             : {}),
           ...(dto.monitoringMetrics !== undefined
             ? { monitoringMetrics: dto.monitoringMetrics }
@@ -532,12 +532,12 @@ export class DoctorDecisionService {
           ...(dto.prerequisites !== undefined ? { prerequisites: dto.prerequisites } : {}),
           ...(dto.deviationFromProtocol !== undefined
             ? {
-                deviationFromProtocol: {
-                  reason: dto.deviationFromProtocol.reason,
-                  approvedBy: principal.userId,
-                  approvedAt: signedAt.toISOString(),
-                },
-              }
+              deviationFromProtocol: {
+                reason: dto.deviationFromProtocol.reason,
+                approvedBy: principal.userId,
+                approvedAt: signedAt.toISOString(),
+              },
+            }
             : {}),
           ...(dto.outcome !== undefined ? { outcome: dto.outcome } : {}),
           ...(dto.currentStage !== undefined ? { currentStage: dto.currentStage } : {}),
@@ -571,9 +571,9 @@ export class DoctorDecisionService {
             protocolRef:
               plan.protocolTemplateId && plan.protocolTemplateVersionId
                 ? {
-                    templateId: plan.protocolTemplateId,
-                    templateVersionId: plan.protocolTemplateVersionId,
-                  }
+                  templateId: plan.protocolTemplateId,
+                  templateVersionId: plan.protocolTemplateVersionId,
+                }
                 : null,
             milestones: plan.milestones,
             monitoringMetrics: plan.monitoringMetrics,
