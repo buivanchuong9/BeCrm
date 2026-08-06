@@ -70,24 +70,11 @@ SET "number" = (
 )
 WHERE "number" ~ '^[A-Za-z]+[0-9]+_[0-9]+$';
 
--- ---------------------------------------------------------------------------
--- Step 5: Reclassify historical source_type.
---
--- Old walk-ins had a synthetic appointment record — they were classified as
--- 'appointment' in migration 20260806000000.  We reclassify those tickets
--- that have NO matching appointment_check_in_tokens row as 'legacy' to
--- signal uncertain provenance.  Tickets WITH a matching token remain
--- 'appointment' (they were genuine QR check-ins).
--- ---------------------------------------------------------------------------
-UPDATE "queue_tickets" qt
-SET "source_type" = 'legacy'
-WHERE qt.source_type = 'appointment'
-  AND qt.check_in_id IS NULL
-  AND NOT EXISTS (
-      SELECT 1
-      FROM "appointment_check_in_tokens" ack
-      WHERE ack.appointment_id = qt.appointment_id
-  );
+-- Step 5 (reclassify 'legacy' source_type) has been moved to migration
+-- 20260806021000_queue_hardening_backfill because PostgreSQL requires
+-- ALTER TYPE ... ADD VALUE to be committed before the new value can be used
+-- in a subsequent statement.  Prisma wraps each migration in a single
+-- transaction, so both statements cannot coexist in this file.
 
 -- ---------------------------------------------------------------------------
 -- Step 6: Swap the unique constraint.
