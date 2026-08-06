@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Header,
   Headers,
@@ -137,6 +138,16 @@ export class LesionsController {
     @Query() query: LesionTimelineQuery,
   ) {
     return this.service.getTimeline(principal, lesionId, query);
+  }
+
+  @Delete(':lesionId')
+  @ApiOperation({ summary: 'Delete a lesion record and cascade its tracking data' })
+  delete(
+    @CurrentUser() principal: AuthenticatedPrincipal,
+    @Param('lesionId', ParseUUIDPipe) lesionId: string,
+    @Req() request: Request,
+  ) {
+    return this.service.deleteLesion(principal, lesionId, context(request));
   }
 }
 

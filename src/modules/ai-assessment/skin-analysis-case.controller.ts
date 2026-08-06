@@ -82,7 +82,7 @@ export class SkinAnalysisCaseController {
         { name: 'closeup', maxCount: 1 },
         { name: 'alternate', maxCount: 1 },
       ],
-      { limits: { files: 3, fileSize: MAX_IMAGE_BYTES, fields: 5, parts: 8 } },
+      { limits: { files: 3, fileSize: MAX_IMAGE_BYTES, fields: 6, parts: 9 } },
     ),
   )
   analyze(

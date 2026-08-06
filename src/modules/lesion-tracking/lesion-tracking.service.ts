@@ -107,6 +107,87 @@ export class LesionTrackingService {
     return { data: await this.buildBundle(lesionId) };
   }
 
+  async deleteLesion(
+    principal: AuthenticatedPrincipal,
+    lesionId: string,
+    context: RequestContext,
+  ) {
+    const access = await this.loadLesionAccess(lesionId);
+    await this.assertPatientAccess(principal, access.patientId, 'write');
+    await this.assertTimelineEnabled(access.organizationId);
+
+    await this.prisma.$transaction(async (tx) => {
+      // Find all observations for this lesion
+      const obs = await tx.lesionObservation.findMany({
+        where: { lesionId },
+        select: { id: true },
+      });
+      const obsIds = obs.map((o) => o.id);
+
+      // Find all comparison sessions for this lesion
+      const comps = await tx.lesionComparisonSession.findMany({
+        where: { lesionId },
+        select: { id: true },
+      });
+      const compIds = comps.map((c) => c.id);
+
+      // Clean up reviews and mask corrections
+      if (compIds.length > 0) {
+        await tx.lesionClinicianReview.deleteMany({
+          where: { comparisonSessionId: { in: compIds } },
+        });
+        await tx.lesionMaskCorrection.deleteMany({
+          where: { comparisonSessionId: { in: compIds } },
+        });
+        await tx.lesionComparisonSession.deleteMany({
+          where: { id: { in: compIds } },
+        });
+      }
+
+      // Clean up metrics and assets
+      if (obsIds.length > 0) {
+        await tx.lesionClinicalMetric.deleteMany({
+          where: { observationId: { in: obsIds } },
+        });
+        await tx.lesionImageAsset.deleteMany({
+          where: { observationId: { in: obsIds } },
+        });
+        await tx.lesionObservation.deleteMany({
+          where: { id: { in: obsIds } },
+        });
+      }
+
+      // Delete timeline events and adverse events
+      await tx.lesionTimelineEvent.deleteMany({
+        where: { lesionId },
+      });
+      await tx.dermatologyAdverseEvent.deleteMany({
+        where: { lesionId },
+      });
+
+      // Delete the lesion record
+      await tx.lesion.delete({
+        where: { id: lesionId },
+      });
+
+      await this.audit.write(
+        {
+          ...this.auditActor(principal, context),
+          action: 'lesion.deleted',
+          resourceType: 'lesion',
+          resourceId: lesionId,
+          patientId: access.patientId,
+          organizationId: access.organizationId,
+          result: 'success',
+          sourceModule: 'lesion-tracking',
+        },
+        tx,
+      );
+    });
+
+    return { data: { success: true, lesionId } };
+  }
+
   async createLesion(
     principal: AuthenticatedPrincipal,
     patientId: string,
