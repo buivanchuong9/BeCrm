@@ -131,12 +131,15 @@ export class LesionTrackingService {
       });
       const compIds = comps.map((c) => c.id);
 
-      // Clean up reviews and mask corrections
+      // Clean up comparisons, reviews, metrics, and analyses
       if (compIds.length > 0) {
         await tx.lesionClinicianReview.deleteMany({
           where: { comparisonSessionId: { in: compIds } },
         });
-        await tx.lesionMaskCorrection.deleteMany({
+        await tx.lesionComparisonMetric.deleteMany({
+          where: { analysis: { comparisonSessionId: { in: compIds } } },
+        });
+        await tx.lesionComparisonAnalysis.deleteMany({
           where: { comparisonSessionId: { in: compIds } },
         });
         await tx.lesionComparisonSession.deleteMany({
@@ -146,7 +149,7 @@ export class LesionTrackingService {
 
       // Clean up metrics and assets
       if (obsIds.length > 0) {
-        await tx.lesionClinicalMetric.deleteMany({
+        await tx.lesionObservationMetric.deleteMany({
           where: { observationId: { in: obsIds } },
         });
         await tx.lesionImageAsset.deleteMany({
